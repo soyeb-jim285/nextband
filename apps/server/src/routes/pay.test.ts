@@ -22,7 +22,7 @@ const until = async (userId: string) => (await db.select().from(userLimits).wher
 it('a verified payment turns the plan on once, and a renewal adds to the time left', async () => {
   const { user } = await testUser(undefined, { unlimited: false });
   const inv = await invoice(user.id, 'month', 499);
-  paystation({ trx_status: 'Success', trx_id: 'X1', payment_amount: '499.00', payment_method: 'bKash' });
+  paystation({ trx_status: 'successful', trx_id: 'X1', payment_amount: '499.00', payment_method: 'bKash' }); // what the real API sends
   expect(await settle(inv)).toBe('paid');
   expect(await settle(inv)).toBe('paid'); // IPN retry: no second extension
   const first = (await until(user.id))!.getTime();

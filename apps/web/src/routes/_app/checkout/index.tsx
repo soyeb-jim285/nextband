@@ -100,7 +100,14 @@ function Checkout() {
         <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!agree || !phoneOk} icon={<Lock />}>
           Pay {bdt(p.bdt)}
         </Button>
-        <p className="type-caption text-center">bKash, Nagad, Rocket, Upay, Visa and Mastercard, through PayStation.</p>
+        <img
+          src="/paystation-banner.png"
+          alt="Verified by PayStation. Pay with Visa, Mastercard, American Express, UnionPay, bKash, Nagad, Rocket, Upay and other cards, banks and wallets."
+          width={1920}
+          height={378}
+          loading="lazy"
+          className="w-full h-auto rounded-md"
+        />
       </form>
     </PageContainer>
   );

@@ -48,7 +48,8 @@ export async function settle(invoice: string): Promise<'paid' | 'failed' | 'pend
     await db.update(payments).set({ status: 'failed' }).where(and(eq(payments.invoice, invoice), eq(payments.status, 'pending')));
     return 'failed';
   }
-  if (s !== 'success' || Number(t!.payment_amount) < p.amount) return 'pending'; // processing, or short: leave for a person to look at
+  // Docs say "success"; the live sandbox answers "successful" (seen 2026-11-01). Accept both.
+  if ((s !== 'success' && s !== 'successful') || Number(t!.payment_amount) < p.amount) return 'pending'; // processing, or short: leave for a person to look at
 
   const days = PAID_PLANS[p.plan].days;
   const until = await db.transaction(async (tx) => {
