@@ -34,7 +34,7 @@ function Signup() {
     setBusy(true);
     setError(null);
     setExists(false);
-    const { data, error, statusToken } = await authClient.signUp.email({ name: String(f.get('name')).trim(), email, password: String(f.get('password')), callbackURL: `${location.origin}/` });
+    const { data, error, statusToken } = await authClient.signUp.email({ name: String(f.get('name')).trim(), email, password: String(f.get('password')), callbackURL: `${location.origin}/overview` });
     setBusy(false);
     if (error) {
       if (error.code === 'USER_ALREADY_EXISTS' || error.status === 422) return setExists(true);

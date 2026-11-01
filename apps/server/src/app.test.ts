@@ -1,3 +1,4 @@
+import { SITEMAP_PATHS } from '@ielts/core';
 import { it, expect } from 'vitest';
 import { app, req, seedPrompt, testUser } from './test/helpers';
 
@@ -50,5 +51,5 @@ it('serves robots.txt and a sitemap of the public pages', async () => {
   expect(robots).toMatch(/Sitemap: .+\/sitemap\.xml/);
   const map = await app.request('/sitemap.xml');
   expect(map.headers.get('content-type')).toContain('application/xml');
-  expect((await map.text()).match(/<loc>/g)).toHaveLength(6);
+  expect((await map.text()).match(/<loc>/g)).toHaveLength(SITEMAP_PATHS.length);
 });

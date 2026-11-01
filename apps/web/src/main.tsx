@@ -10,6 +10,17 @@ import { queryClient } from '@/lib/query';
 import { routeTree } from './routeTree.gen';
 import './styles.css';
 
+// A reload of the landing page opens on the hero, not wherever the visitor had scrolled: its pinned acts make a restored
+// mid-page position land between frames. Blocks the browser's own restore here and the router's on the first render.
+const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+// A reload also drops an in-page hash (#pricing, from the rail or a jump link); a fresh visit to a /#link still jumps.
+let reloadHome = location.pathname === '/' && nav?.type === 'reload';
+if (reloadHome) {
+  history.scrollRestoration = 'manual';
+  if (location.hash) history.replaceState(history.state, '', location.pathname + location.search);
+  scrollTo(0, 0);
+}
+
 const router = createRouter({
   routeTree,
   context: { queryClient },
@@ -17,7 +28,11 @@ const router = createRouter({
   defaultPreloadStaleTime: 0, // TanStack Query owns caching
   defaultPendingComponent: PageSkeleton,
   defaultErrorComponent: RouteError, // loader errors render inside the parent layout (AppShell)
-  scrollRestoration: true,
+  scrollRestoration: () => {
+    if (!reloadHome) return true;
+    reloadHome = false;
+    return false;
+  },
 });
 
 // Hard load: /api/me is already in flight from index.html; start the matched routes' split chunks now too, so the
@@ -38,7 +53,13 @@ const unboot = router.subscribe('onResolved', () => {
 
 // The tab title follows the page (the server writes the same one into the HTML for crawlers and link previews).
 router.subscribe('onResolved', ({ toLocation }) => {
-  document.title = pageMeta(toLocation.pathname).title;
+  const m = pageMeta(toLocation.pathname);
+  document.title = m.title;
+  // Keep the rest of the server's head block (apps/server/src/seo.ts) in step, so the live DOM matches the page.
+  document.querySelector('meta[name="description"]')?.setAttribute('content', m.description);
+  const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (canonical) canonical.href = new URL(toLocation.pathname, canonical.href).href;
+  document.querySelector('meta[name="robots"]')?.setAttribute('content', m.index ? 'index, follow, max-image-preview:large' : 'noindex, follow');
 });
 
 // After a deploy, reload into the new build at the next navigation between ordinary pages (never into or out of an exam screen).

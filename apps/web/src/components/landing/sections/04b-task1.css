@@ -1,0 +1,98 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+
+/* 04b-task1: the task panel and the line graph that draws itself. The desk is writing-desk.css. */
+
+.lp-t1-ask {
+  font-weight: 600;
+}
+.lp-t1-axis {
+  margin: 12px 0 2px !important;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.lp-t1-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.lp-t1-grid {
+  stroke: var(--lp-g-250);
+  stroke-width: 1;
+}
+.lp-t1-tick,
+.lp-t1-name {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  fill: var(--muted);
+}
+.lp-t1-name {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+.lp-t1-line path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.lp-t1-pt {
+  fill: var(--surface-2);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+/* Mobile: the heavy line, filled dots. Broadband: squares. Dial-up: grey, open dots. Shape and weight, not colour alone. */
+.lp-t1-line--0 path {
+  stroke-width: 2.75;
+}
+.lp-t1-line--0 .lp-t1-pt {
+  fill: var(--ink);
+}
+.lp-t1-line--2 path,
+.lp-t1-line--2 .lp-t1-pt {
+  stroke: var(--lp-g-550);
+}
+.lp-t1-line--2 .lp-t1-name {
+  fill: var(--lp-g-550);
+}
+
+/* Drawn as the act scrolls in: each line runs left to right like a pen, its points land as the line reaches them. */
+@supports (animation-timeline: view()) {
+  @media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+    .lp-t1-line path {
+      animation: lp-t1-draw linear both;
+      animation-timeline: --lp-track;
+      animation-range: entry calc(30% + var(--k) * 12%) entry calc(62% + var(--k) * 12%);
+    }
+    .lp-t1-pt {
+      animation: lp-t1-pop linear both;
+      animation-timeline: --lp-track;
+      animation-range: entry calc(30% + var(--k) * 12% + var(--j) * 7.5%) entry calc(33% + var(--k) * 12% + var(--j) * 7.5%);
+    }
+    .lp-t1-name {
+      animation: lp-t1-pop linear both;
+      animation-timeline: --lp-track;
+      animation-range: entry calc(62% + var(--k) * 12%) entry calc(66% + var(--k) * 12%);
+    }
+  }
+}
+@keyframes lp-t1-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes lp-t1-pop {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (min-width: 48rem) and (max-height: 50rem) {
+  .lp-t1-more {
+    display: none;
+  }
+}

@@ -9,19 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LiveDemoRouteImport } from './routes/live-demo'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
-import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppLegalRouteImport } from './routes/_app/_legal'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppBankRouteImport } from './routes/_app/bank'
 import { Route as AppCoachRouteImport } from './routes/_app/coach'
 import { Route as AppHistoryRouteImport } from './routes/_app/history'
 import { Route as AppMistakesRouteImport } from './routes/_app/mistakes'
+import { Route as AppOverviewRouteImport } from './routes/_app/overview'
 import { Route as AppReviewRouteImport } from './routes/_app/review'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppStyleguideRouteImport } from './routes/_app/styleguide'
@@ -65,6 +66,11 @@ import { Route as AppSpeakingResultAttemptIdRouteImport } from './routes/_app/sp
 import { Route as AppWritingResultAttemptIdRouteImport } from './routes/_app/writing/result.$attemptId'
 import { Route as AppWritingTaskPromptIdRouteImport } from './routes/_app/writing/task.$promptId'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -94,11 +100,6 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppLegalRoute = AppLegalRouteImport.update({
   id: '/_legal',
   getParentRoute: () => AppRoute,
@@ -126,6 +127,11 @@ const AppHistoryRoute = AppHistoryRouteImport.update({
 const AppMistakesRoute = AppMistakesRouteImport.update({
   id: '/mistakes',
   path: '/mistakes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOverviewRoute = AppOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
   getParentRoute: () => AppRoute,
 } as any)
 const AppReviewRoute = AppReviewRouteImport.update({
@@ -343,7 +349,7 @@ const AppWritingTaskPromptIdRoute = AppWritingTaskPromptIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/live-demo': typeof LiveDemoRoute
   '/login': typeof LoginRoute
@@ -354,6 +360,7 @@ export interface FileRoutesByFullPath {
   '/coach': typeof AppCoachRoute
   '/history': typeof AppHistoryRoute
   '/mistakes': typeof AppMistakesRoute
+  '/overview': typeof AppOverviewRoute
   '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRoute
   '/styleguide': typeof AppStyleguideRoute
@@ -398,16 +405,17 @@ export interface FileRoutesByFullPath {
   '/admin/users/': typeof AppAdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/live-demo': typeof LiveDemoRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/': typeof AppIndexRoute
   '/bank': typeof AppBankRoute
   '/coach': typeof AppCoachRoute
   '/history': typeof AppHistoryRoute
   '/mistakes': typeof AppMistakesRoute
+  '/overview': typeof AppOverviewRoute
   '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRoute
   '/styleguide': typeof AppStyleguideRoute
@@ -453,6 +461,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/live-demo': typeof LiveDemoRoute
@@ -465,10 +474,10 @@ export interface FileRoutesById {
   '/_app/coach': typeof AppCoachRoute
   '/_app/history': typeof AppHistoryRoute
   '/_app/mistakes': typeof AppMistakesRoute
+  '/_app/overview': typeof AppOverviewRoute
   '/_app/review': typeof AppReviewRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/styleguide': typeof AppStyleguideRoute
-  '/_app/': typeof AppIndexRoute
   '/_app/_legal/about': typeof AppLegalAboutRoute
   '/_app/_legal/contact': typeof AppLegalContactRoute
   '/_app/_legal/delivery': typeof AppLegalDeliveryRoute
@@ -523,6 +532,7 @@ export interface FileRouteTypes {
     | '/coach'
     | '/history'
     | '/mistakes'
+    | '/overview'
     | '/review'
     | '/settings'
     | '/styleguide'
@@ -567,16 +577,17 @@ export interface FileRouteTypes {
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/forgot-password'
     | '/live-demo'
     | '/login'
     | '/reset-password'
     | '/signup'
-    | '/'
     | '/bank'
     | '/coach'
     | '/history'
     | '/mistakes'
+    | '/overview'
     | '/review'
     | '/settings'
     | '/styleguide'
@@ -621,6 +632,7 @@ export interface FileRouteTypes {
     | '/admin/users'
   id:
     | '__root__'
+    | '/'
     | '/_app'
     | '/forgot-password'
     | '/live-demo'
@@ -633,10 +645,10 @@ export interface FileRouteTypes {
     | '/_app/coach'
     | '/_app/history'
     | '/_app/mistakes'
+    | '/_app/overview'
     | '/_app/review'
     | '/_app/settings'
     | '/_app/styleguide'
-    | '/_app/'
     | '/_app/_legal/about'
     | '/_app/_legal/contact'
     | '/_app/_legal/delivery'
@@ -679,6 +691,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LiveDemoRoute: typeof LiveDemoRoute
@@ -689,6 +702,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -731,13 +751,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/': {
-      id: '/_app/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/_legal': {
       id: '/_app/_legal'
       path: ''
@@ -778,6 +791,13 @@ declare module '@tanstack/react-router' {
       path: '/mistakes'
       fullPath: '/mistakes'
       preLoaderRoute: typeof AppMistakesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/overview': {
+      id: '/_app/overview'
+      path: '/overview'
+      fullPath: '/overview'
+      preLoaderRoute: typeof AppOverviewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/review': {
@@ -1150,10 +1170,10 @@ interface AppRouteChildren {
   AppCoachRoute: typeof AppCoachRoute
   AppHistoryRoute: typeof AppHistoryRoute
   AppMistakesRoute: typeof AppMistakesRoute
+  AppOverviewRoute: typeof AppOverviewRoute
   AppReviewRoute: typeof AppReviewRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppStyleguideRoute: typeof AppStyleguideRoute
-  AppIndexRoute: typeof AppIndexRoute
   AppCheckoutDoneRoute: typeof AppCheckoutDoneRoute
   AppMockIdRoute: typeof AppMockIdRoute
   AppSpeakingLiveRoute: typeof AppSpeakingLiveRoute
@@ -1179,10 +1199,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoachRoute: AppCoachRoute,
   AppHistoryRoute: AppHistoryRoute,
   AppMistakesRoute: AppMistakesRoute,
+  AppOverviewRoute: AppOverviewRoute,
   AppReviewRoute: AppReviewRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppStyleguideRoute: AppStyleguideRoute,
-  AppIndexRoute: AppIndexRoute,
   AppCheckoutDoneRoute: AppCheckoutDoneRoute,
   AppMockIdRoute: AppMockIdRoute,
   AppSpeakingLiveRoute: AppSpeakingLiveRoute,
@@ -1204,6 +1224,7 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LiveDemoRoute: LiveDemoRoute,

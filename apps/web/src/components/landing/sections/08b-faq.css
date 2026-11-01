@@ -1,0 +1,88 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+/* Hallmark · dismissed 54 · SectionHead renders the h2 that carries faq-title; the static pass cannot see inside the component */
+
+/*
+ * 08b-faq: no Stage, no wireframe, no blur. Nine native disclosures (the first two open), plain text at rest; no motion
+ * of its own, so nothing here owns a layer.
+ */
+.lp-faq {
+  padding-block: clamp(56px, 8vh, 96px);
+}
+.lp-faq-inner {
+  display: grid;
+  gap: 40px;
+}
+/* Wide screens: the head over the answers, which run in two columns so the section stays short. */
+@media (min-width: 64rem) {
+  .lp-faq-inner {
+    gap: 40px;
+  }
+  .lp-faq-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 64px;
+    align-items: start;
+  }
+}
+
+.lp-faq-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-faq-item {
+  border-top: 1px solid var(--line-strong);
+}
+.lp-faq-d {
+  padding-block: 4px;
+}
+.lp-faq-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  cursor: pointer;
+  list-style: none;
+}
+.lp-faq-sum::-webkit-details-marker {
+  display: none;
+}
+.lp-faq-sum::after {
+  content: '+';
+  flex: none;
+  width: 2rem;
+  text-align: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--ink);
+}
+.lp-faq-d[open] > .lp-faq-sum::after {
+  content: '\2212';
+}
+.lp-faq-q {
+  margin: 0;
+  padding-block: 8px;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.lp-faq-a {
+  margin: 0 0 20px;
+  max-width: 62ch;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.lp-faq-more {
+  margin: 0;
+  padding-top: 20px;
+  overflow-wrap: anywhere;
+}
+.lp-faq-more .lp-link {
+  display: inline-block;
+  padding-block: 0.25rem; /* 24px tall: a full target size, not only the inline-in-text exception */
+}
+.lp-faq-more .lp-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: var(--lp-radius-chip);
+}

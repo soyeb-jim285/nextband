@@ -20,7 +20,7 @@ function Done() {
     if (status === 'paid') void qc.invalidateQueries(); // plan, quota and unlocked tests all change
   }, [status, qc]);
 
-  const home = <Link to="/" className={buttonStyles({ size: 'lg' })}>Start practising</Link>;
+  const home = <Link to="/overview" className={buttonStyles({ size: 'lg' })}>Start practising</Link>;
   return (
     <PageContainer>
       {status === 'paid' ? (

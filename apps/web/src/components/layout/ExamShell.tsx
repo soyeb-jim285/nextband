@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { MessageSquareWarning, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { buttonStyles, WIDTH } from '@/components/ui';
+import { useHome } from '@/lib/query';
 import { cn } from '@/lib/utils';
 import { openFeedback } from './FeedbackButton';
 
@@ -25,12 +26,13 @@ export function ExamShell({
   /** Use full width (split prompt/editor). Default is a centered reading column. */
   wide?: boolean;
 }) {
+  const home = useHome();
   return (
     <div className="flex h-dvh flex-col bg-bg">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface px-3 pt-[env(safe-area-inset-top)] sm:px-5">
         <div className="flex min-w-0 flex-1 items-center">
           {exit ?? (
-            <Link to="/" aria-label="Exit" className={buttonStyles({ variant: 'ghost', size: 'sm', className: '-ml-1 text-muted hover:text-ink' })}>
+            <Link to={home.to} aria-label="Exit" className={buttonStyles({ variant: 'ghost', size: 'sm', className: '-ml-1 text-muted hover:text-ink' })}>
               <X aria-hidden />
               <span className="hidden sm:inline">Exit</span>
             </Link>

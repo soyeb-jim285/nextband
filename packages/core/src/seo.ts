@@ -15,7 +15,12 @@ const DEFAULT: PageMeta = {
 
 /** Public pages worth indexing; everything else (results, history, settings, exam screens) gets a title but noindex. */
 const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
-  '/': DEFAULT,
+  '/': {
+    title: `${SITE_NAME}: Know your IELTS band and what to fix`,
+    description:
+      'Practise IELTS Listening, Reading, Writing and Speaking free, no account or card. See every mistake marked, then a plan for what to fix this week.',
+    image: '/og/landing.png',
+  },
   '/speaking': {
     title: `IELTS Speaking practice test with band score | ${SITE_NAME}`,
     description:
@@ -45,6 +50,11 @@ const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
     description: 'Browse hundreds of IELTS Speaking cue cards, Part 1 and Part 3 topics, and Writing Task 1 and Task 2 questions, and practise any of them.',
     image: '/og/home.png',
   },
+  '/mock': {
+    title: `Full IELTS mock test online | ${SITE_NAME}`,
+    description: 'Sit Listening, Reading, Writing and Speaking in one go, with a band for each skill and one overall.',
+    image: DEFAULT.image,
+  },
   '/signup': { title: `Create your free account | ${SITE_NAME}`, description: DEFAULT.description, image: DEFAULT.image },
   '/privacy': {
     title: `Privacy policy | ${SITE_NAME}`,
@@ -61,10 +71,31 @@ const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
     description: 'Practise free, or get unlimited Speaking and Writing tests, the live examiner and every Listening and Reading test from ৳499 a month.',
     image: DEFAULT.image,
   },
+  '/terms': {
+    title: `Terms of service | ${SITE_NAME}`,
+    description: 'The terms for using NextBand: accounts, guest practice, paid plans and how scores should be read.',
+    image: DEFAULT.image,
+  },
+  '/refunds': {
+    title: `Refund policy | ${SITE_NAME}`,
+    description: 'How refunds work for NextBand plans, including a full refund for an unused plan within 7 days.',
+    image: DEFAULT.image,
+  },
+  '/delivery': {
+    title: `Delivery policy | ${SITE_NAME}`,
+    description: 'How a NextBand plan is delivered: access opens on your account as soon as your payment is confirmed.',
+    image: DEFAULT.image,
+  },
+  '/contact': {
+    title: `Contact | ${SITE_NAME}`,
+    description: 'How to reach NextBand and Dolphin Commerce for support, billing or anything else.',
+    image: DEFAULT.image,
+  },
   '/login': { title: `Sign in | ${SITE_NAME}`, description: DEFAULT.description, image: DEFAULT.image },
 };
 
 const NOINDEX_TITLES: [RegExp, string][] = [
+  [/^\/overview/, 'Dashboard'],
   [/^\/speaking\/(session|live)/, 'Speaking test'],
   [/^\/speaking\/result/, 'Speaking result'],
   [/^\/writing\/(task|full)/, 'Writing test'],
@@ -77,11 +108,12 @@ const NOINDEX_TITLES: [RegExp, string][] = [
   [/^\/settings/, 'Settings'],
   [/^\/admin/, 'Admin'],
   [/^\/checkout/, 'Checkout'],
+  [/^\/mock/, 'Mock test'], // needs an account (AccountGate), so it stays out of the index with a proper title
   [/^\/(forgot|reset)-password/, 'Reset password'],
 ];
 
 /** Paths listed in sitemap.xml. */
-export const SITEMAP_PATHS = ['/', '/speaking', '/writing', '/listening', '/reading', '/bank'];
+export const SITEMAP_PATHS = ['/', '/speaking', '/writing', '/listening', '/reading', '/bank', '/mock', '/pricing', '/about', '/privacy', '/terms', '/refunds', '/delivery', '/contact'];
 
 export function pageMeta(path: string): PageMeta {
   const p = path.length > 1 ? path.replace(/\/+$/, '') : path;

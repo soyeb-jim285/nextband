@@ -136,7 +136,7 @@ test.describe('your API keys', () => {
     await page.getByLabel('Password', { exact: true }).fill('correct-horse-battery');
     await page.getByLabel('Confirm password').fill('correct-horse-battery');
     await page.getByRole('button', { name: 'Create account' }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/overview$/);
 
     let saved: { provider: string; last4: string; addedAt: string; valid: boolean } | null = null;
     await page.route('**/api/keys', (r) => r.fulfill({ json: { keys: saved ? [saved] : [] } }));

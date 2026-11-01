@@ -103,7 +103,7 @@ function ReviewPage() {
                 {noCards ? 'Go to Mistakes and add cards' : 'Browse your mistakes'}
               </Link>
               {reviewed > 0 && (
-                <Link to="/" className={buttonStyles({ variant: 'primary' })}>
+                <Link to="/overview" className={buttonStyles({ variant: 'primary' })}>
                   Back to dashboard
                 </Link>
               )}

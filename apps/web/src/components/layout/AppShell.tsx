@@ -28,9 +28,12 @@ import { openFeedback } from './FeedbackButton';
 import { Logo, LogoMark } from './Logo';
 import { SiteFooter } from './SiteFooter';
 
-type NavItem = { to: '/' | '/speaking' | '/writing' | '/listening' | '/reading' | '/bank' | '/coach' | '/mistakes' | '/review' | '/history' | '/settings' | '/admin'; label: string; short?: string; icon: LucideIcon };
+type NavItem = { to: '/' | '/overview' | '/speaking' | '/writing' | '/listening' | '/reading' | '/bank' | '/coach' | '/mistakes' | '/review' | '/history' | '/settings' | '/admin'; label: string; short?: string; icon: LucideIcon };
 
-const DASHBOARD: NavItem = { to: '/', label: 'Dashboard', short: 'Home', icon: House };
+const DASHBOARD: NavItem = { to: '/overview', label: 'Dashboard', short: 'Home', icon: House };
+// A visitor or a guest has no dashboard: their home row is the landing page.
+const HOME: NavItem = { to: '/', label: 'Home', icon: House };
+const forSession = (item: NavItem, account: unknown) => (item === DASHBOARD && !account ? HOME : item);
 const SPEAKING: NavItem = { to: '/speaking', label: 'Speaking', short: 'Speak', icon: Mic };
 const WRITING: NavItem = { to: '/writing', label: 'Writing', short: 'Write', icon: PenLine };
 const LISTENING: NavItem = { to: '/listening', label: 'Listening', short: 'Listen', icon: Headphones };
@@ -57,22 +60,23 @@ function useSignOut() {
   const navigate = useNavigate();
   return async () => {
     await signOut();
-    await navigate({ to: '/' }); // back to the guest dashboard
+    await navigate({ to: '/' }); // back to the landing page
   };
 }
 
-const isCurrent = (pathname: string, to: NavItem['to']) => (to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`));
+const isCurrent = (pathname: string, to: NavItem['to']) => (to === '/overview' ? pathname === '/overview' : pathname === to || pathname.startsWith(`${to}/`));
 
 /** Sidebar row: 32 px, 16 px icon, muted until hovered; current = filled row + teal icon. */
 const rowClass = 'h-8 gap-2.5 px-2 text-sm text-muted hover:text-ink data-[active=true]:font-medium data-[active=true]:text-ink data-[active=true]:[&>svg]:text-accent-text';
 
-function SideLink({ item }: { item: NavItem }) {
+function SideLink({ item: given }: { item: NavItem }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const item = forSession(given, useAccount());
   const Icon = item.icon;
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isCurrent(pathname, item.to)} tooltip={item.label} className={rowClass}>
-        <Link to={item.to} activeOptions={{ exact: item.to === '/' }}>
+        <Link to={item.to} activeOptions={{ exact: item.to === '/overview' || item.to === '/' }}>
           <Icon />
           <span>{item.label}</span>
         </Link>
@@ -84,7 +88,7 @@ function SideLink({ item }: { item: NavItem }) {
 /** Where sign-in / sign-up send the visitor back to: the page they are on (nothing to carry from the dashboard). */
 function useBackTo() {
   const href = useRouterState({ select: (s) => s.location.href });
-  return href === '/' ? undefined : href;
+  return href === '/' || href === '/overview' ? undefined : href;
 }
 
 /** Sidebar footer for a guest: one primary (Create account) over a secondary (Sign in); the icon rail keeps a single sign-in button. */
@@ -158,6 +162,7 @@ function UserMenu() {
 /** Logo + collapse button; collapsed to the icon rail it becomes a single expand button. Ctrl/Cmd+B toggles from anywhere. */
 function SidebarTop() {
   const { state, toggleSidebar } = useSidebar();
+  const account = useAccount();
   return state === 'collapsed' ? (
     <button type="button" onClick={toggleSidebar} aria-label="Expand sidebar" className="group/logo relative mx-auto grid size-9 place-items-center rounded-md  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
       <LogoMark className="transition-opacity duration-150 group-hover/logo:opacity-0" />
@@ -165,7 +170,7 @@ function SidebarTop() {
     </button>
   ) : (
     <div className="flex h-9 items-center justify-between gap-2 pl-1.5">
-      <Link to="/" aria-label="NextBand, dashboard" className="rounded-md  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+      <Link to={account ? '/overview' : '/'} aria-label={account ? 'NextBand, dashboard' : 'NextBand, home'} className="rounded-md  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
         <Logo />
       </Link>
       <SidebarTrigger role="img" className="size-8 text-muted hover:text-ink" aria-label="Collapse sidebar" />
@@ -303,9 +308,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile tab bar */}
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
         <ul className="mx-auto grid max-w-md grid-cols-5">
-          {TABS.map(({ to, short, label, icon: Icon }) => (
+          {TABS.map((t) => forSession(t, me)).map(({ to, short, label, icon: Icon }) => (
             <li key={to}>
-              <Link to={to} activeOptions={{ exact: to === '/' }} className={tabClass}>
+              <Link to={to} activeOptions={{ exact: to === '/overview' || to === '/' }} className={tabClass}>
                 <span aria-hidden className={pill}>
                   <Icon className="size-5" />
                 </span>

@@ -1,0 +1,698 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+
+/*
+ * 03-address, the Listening act: exam sheet, result, transcript review, overlapping on one desk. Base rules are step 3
+ * (everything placed, the playhead on Q12): what phones, reduced motion and no JS show. Earlier steps live in the
+ * desktop no-preference block at the end; every change is transform, opacity or a colour, 420ms or less.
+ */
+
+/* ---------- Frame ---------- */
+.lp-lx-frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  row-gap: clamp(24px, 4svh, 40px);
+  height: 100%;
+  padding-block: calc(var(--lp-header-h, 4rem) + 32px) 40px;
+}
+.lp-lx-desk {
+  position: relative;
+  min-height: 34rem;
+}
+.lp-lx-cap {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+/* ---------- Exam sheet (Runner) ---------- */
+.lp-lx-exam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 56%;
+  border: 1px solid var(--lp-hair);
+  z-index: 1;
+}
+.lp-lx-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--lp-hair);
+  font-size: 0.875rem;
+}
+.lp-lx-label {
+  font-weight: 600;
+}
+.lp-lx-where {
+  color: var(--muted);
+}
+.lp-lx-clock {
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--lp-hair);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.lp-lx-rec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--lp-hair);
+  background: var(--surface-2);
+  font-size: 0.875rem;
+}
+/* ---------- Waveforms: grey bars for the recording, an ink copy clipped to what has played (--p) ---------- */
+.lp-lx-wave {
+  position: relative;
+  display: block;
+  flex: 1;
+  height: 24px;
+}
+.lp-lx-wbars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lp-lx-wbars > i {
+  width: 2px;
+  height: calc(var(--h) * 100%);
+  border-radius: 1px;
+  background: var(--lp-g-300);
+}
+.lp-lx-wplayed {
+  clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0);
+}
+.lp-lx-wplayed > i {
+  background: var(--ink);
+}
+.lp-lx-recwave {
+  --p: 0.62;
+}
+.lp-lx-notes {
+  padding: 18px 20px 8px;
+}
+.lp-lx-ntitle {
+  margin: 0;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.125rem;
+}
+.lp-lx-ninstr {
+  margin: 4px 0 10px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.lp-lx-nlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-lx-nrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 42px;
+  border-bottom: 1px dashed var(--lp-hair);
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1rem;
+}
+.lp-lx-gap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 7.5rem;
+  height: 30px;
+  padding: 0 8px 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+}
+.lp-lx-gnum {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lp-lx-typed {
+  white-space: nowrap;
+}
+/* Once marked (step 1 on), a wrong gap carries the pen's wavy underline. */
+.lp-lx-gap[data-wrong] .lp-lx-typed {
+  text-decoration: underline wavy var(--lp-pen);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+.lp-lx-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--lp-hair);
+  font-size: 0.8125rem;
+  color: var(--muted);
+  overflow: hidden;
+}
+.lp-lx-part {
+  flex: none;
+  padding: 4px 8px;
+  border: 1px solid var(--lp-hair);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.lp-lx-part b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.lp-lx-nums {
+  display: flex;
+  gap: 4px;
+}
+.lp-lx-nums > i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--lp-hair);
+  border-radius: 5px;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.lp-lx-nums > i[data-on] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.lp-lx-nums > i[data-cur] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* ---------- Result (Results hero) ---------- */
+.lp-lx-result {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 2;
+  display: grid;
+  gap: 12px;
+  width: 36%;
+  padding: 22px 24px;
+  border: 1px solid var(--lp-hair);
+}
+.lp-lx-band {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  column-gap: 16px;
+}
+.lp-lx-band > .lp-lx-cap {
+  grid-column: 1 / -1;
+}
+.lp-lx-bandnum {
+  font-family: var(--font-sans);
+  font-size: 3.25rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.lp-lx-sample {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+.lp-lx-raw {
+  padding-bottom: 8px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.lp-lx-btn {
+  justify-self: start;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.lp-lx-h {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.lp-lx-causes {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+.lp-lx-causes > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--lp-hair);
+}
+.lp-lx-qchip {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 24px;
+  border: 1px solid var(--lp-pen);
+  border-radius: 4px;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lp-pen);
+}
+
+/* ---------- Transcript review (Results, Transcript tab) ---------- */
+.lp-lx-review {
+  position: absolute;
+  top: 13.5rem;
+  left: 16%;
+  z-index: 3;
+  width: 74%;
+  border: 1px solid var(--lp-hair);
+  box-shadow: var(--lp-shadow-pop, var(--lp-shadow-float));
+}
+.lp-lx-tabs {
+  display: flex;
+  gap: 22px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--lp-hair);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.lp-lx-tabs > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0 10px;
+  border-bottom: 2px solid transparent;
+}
+.lp-lx-tabs > .lp-lx-tab-on {
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+.lp-lx-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-style: normal;
+  font-size: 0.75rem;
+}
+.lp-lx-player {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px 10px;
+}
+.lp-lx-play {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--surface);
+}
+.lp-lx-scrub {
+  position: relative;
+  flex: 1;
+  height: 28px;
+}
+.lp-lx-rail {
+  --p: 0.44; /* played up to the playhead (Q12; Q11 at step 2) */
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+.lp-lx-rail .lp-lx-wbars > i {
+  opacity: 0.85;
+}
+/* Right answers are round, wrong ones square in the pen colour: shape and number, not colour alone (Audio.tsx pinStyle). */
+.lp-lx-pin {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--at) * 100%);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  font-style: normal;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Pins sit above the playhead; the one it is parked on gets an ink ring. Base = Q12. */
+.lp-lx-pin {
+  z-index: 1;
+}
+.lp-lx-pin--12 {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+}
+.lp-lx-pin[data-wrong] {
+  border-color: var(--lp-pen);
+  border-radius: 4px;
+  color: var(--lp-pen);
+}
+.lp-lx-head {
+  --at: 0.44;
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: calc(var(--at) * 100% - 1px);
+  width: 2px;
+  background: var(--ink);
+}
+.lp-lx-time {
+  flex: none;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.lp-lx-t11 {
+  display: none;
+}
+.lp-lx-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 8px 20px 20px;
+}
+.lp-lx-transcript {
+  display: grid;
+  gap: 8px;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.lp-lx-transcript > p {
+  margin: 0;
+}
+.lp-lx-line {
+  position: relative;
+  padding-left: 40px;
+}
+.lp-lx-qtag {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lp-lx-line mark {
+  padding: 1px 3px;
+  margin: 0 -3px;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  transition: background-color 280ms var(--ease-emerge);
+}
+/* The focused line: ink, its tag in the pen, the evidence underlined. Base = Q12. */
+.lp-lx-line--12 {
+  color: var(--ink);
+}
+.lp-lx-line--12 .lp-lx-qtag {
+  border-color: var(--lp-pen);
+  color: var(--lp-pen);
+}
+.lp-lx-line--12 mark {
+  background: color-mix(in srgb, var(--lp-pen) 18%, transparent); /* a highlighter pass on the words that held it */
+  text-decoration: underline var(--lp-pen) 2px;
+  text-underline-offset: 4px;
+}
+.lp-lx-details {
+  display: grid;
+}
+.lp-lx-detail {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 0.875rem;
+}
+.lp-lx-detail > p {
+  margin: 0;
+}
+.lp-lx-dq {
+  font-weight: 600;
+}
+.lp-lx-detail s {
+  text-decoration-color: var(--lp-pen);
+  text-decoration-thickness: 1.5px;
+}
+.lp-lx-dwhy {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.lp-lx-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lp-lx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  margin-top: 2px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.lp-lx-detail--11 {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* ---------- Steps (desktop, motion allowed). Step 3 is the base. ---------- */
+@media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+  .lp-lx-exam,
+  .lp-lx-result,
+  .lp-lx-review {
+    transition:
+      transform 420ms var(--ease-emerge),
+      opacity 320ms var(--ease-emerge),
+      visibility 0s;
+  }
+  /* 0: the exam alone, centred on the desk; answers being typed (scrubbed below). */
+  .lp-stage[data-step='0'] .lp-lx-exam {
+    transform: translateX(39%);
+  }
+  .lp-stage:not([data-past~='1']) .lp-lx-gap[data-wrong] .lp-lx-typed {
+    text-decoration-color: transparent;
+  }
+  .lp-stage:not([data-past~='1']) .lp-lx-result {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(48px);
+    transition:
+      transform 320ms var(--ease-emerge),
+      opacity 240ms var(--ease-emerge),
+      visibility 0s 320ms;
+  }
+  /* 1: the result lands over the exam's right edge; the exam steps back a touch. */
+  .lp-stage[data-past~='1'] .lp-lx-exam {
+    transform: scale(0.98);
+    transform-origin: 0 0;
+  }
+  .lp-stage:not([data-past~='2']) .lp-lx-review {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(64px);
+    transition:
+      transform 320ms var(--ease-emerge),
+      opacity 240ms var(--ease-emerge),
+      visibility 0s 320ms;
+  }
+  /* 2: the review rises on top, the playhead on Q11. */
+  .lp-stage[data-step='2'] .lp-lx-head {
+    --at: 0.3;
+  }
+  .lp-stage[data-step='2'] .lp-lx-rail {
+    --p: 0.3;
+  }
+  .lp-lx-rail .lp-lx-wplayed {
+    transition: clip-path 420ms var(--ease-emerge);
+  }
+  .lp-lx-head {
+    transition: left 420ms var(--ease-emerge);
+  }
+  .lp-stage[data-step='2'] .lp-lx-pin--11 {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+  }
+  .lp-stage[data-step='2'] .lp-lx-pin--12 {
+    box-shadow: none;
+  }
+  .lp-stage[data-step='2'] .lp-lx-t11 {
+    display: inline;
+  }
+  .lp-stage[data-step='2'] .lp-lx-t12 {
+    display: none;
+  }
+  .lp-stage[data-step='2'] .lp-lx-line--11 {
+    color: var(--ink);
+  }
+  .lp-stage[data-step='2'] .lp-lx-line--11 .lp-lx-qtag {
+    border-color: var(--lp-pen);
+    color: var(--lp-pen);
+  }
+  .lp-stage[data-step='2'] .lp-lx-line--11 mark {
+    background: color-mix(in srgb, var(--lp-pen) 18%, transparent);
+    text-decoration: underline var(--lp-pen) 2px;
+    text-underline-offset: 4px;
+  }
+  .lp-stage[data-step='2'] .lp-lx-line--12 {
+    color: var(--muted);
+  }
+  .lp-stage[data-step='2'] .lp-lx-line--12 .lp-lx-qtag {
+    border-color: var(--line-strong);
+    color: var(--muted);
+  }
+  .lp-stage[data-step='2'] .lp-lx-line--12 mark {
+    background: none;
+    text-decoration: none;
+  }
+  .lp-lx-detail {
+    transition:
+      opacity 280ms var(--ease-emerge),
+      transform 280ms var(--ease-emerge),
+      visibility 0s;
+  }
+  .lp-stage[data-step='2'] .lp-lx-detail--11 {
+    opacity: 1;
+    visibility: visible;
+  }
+  .lp-stage[data-step='2'] .lp-lx-detail--12 {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+  }
+}
+
+/* Scrubbed on the pin: the recording plays and the answers are typed in, one gap after another, during step 0. */
+@supports (animation-timeline: view()) {
+  @media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+    .lp-lx-recwave .lp-lx-wplayed {
+      animation: lp-lx-rec linear both;
+      animation-timeline: --lp-track;
+      animation-range: contain 0% contain 24%;
+    }
+    .lp-lx-typed {
+      animation: lp-lx-type linear both;
+      animation-timeline: --lp-track;
+      animation-range: contain calc(var(--i) * 4%) contain calc(4% + var(--i) * 4%);
+    }
+  }
+}
+@keyframes lp-lx-rec {
+  from {
+    clip-path: inset(0 90% 0 0);
+  }
+  to {
+    clip-path: inset(0 38% 0 0);
+  }
+}
+@keyframes lp-lx-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Short desktops: the instructions and the navigator go; the cards sit tighter. */
+@media (min-width: 48rem) and (max-height: 50rem) {
+  .lp-lx-ninstr,
+  .lp-lx-nav {
+    display: none;
+  }
+  .lp-lx-nrow {
+    min-height: 36px;
+  }
+  .lp-lx-review {
+    top: 11rem;
+  }
+  .lp-lx-desk {
+    min-height: 29rem;
+  }
+}
+
+/* ---------- Phones: unpinned, the three cards stacked with a small overlap, final step ---------- */
+@media (max-width: 47.999rem) {
+  .lp-lx-frame {
+    height: auto;
+    padding-block: 72px 48px;
+  }
+  .lp-lx-desk {
+    display: grid;
+    min-height: 0;
+  }
+  .lp-lx-exam,
+  .lp-lx-result,
+  .lp-lx-review {
+    position: relative;
+    inset: auto;
+    width: 100%;
+  }
+  .lp-lx-result,
+  .lp-lx-review {
+    margin-top: -16px;
+  }
+  .lp-lx-result {
+    width: calc(100% - 24px);
+    justify-self: end;
+  }
+  .lp-lx-where,
+  .lp-lx-nav,
+  .lp-lx-time,
+  .lp-lx-rec .lp-lx-cap {
+    display: none;
+  }
+  .lp-lx-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-lx-tabs {
+    gap: 16px;
+  }
+}

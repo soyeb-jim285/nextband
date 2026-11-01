@@ -1,0 +1,601 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+/* Hallmark · dismissed 54 · SectionHead renders the h2 that carries mock-title; the static pass cannot see inside the component */
+/* Hallmark · dismissed 62 · past/later cards and the waiting slot are deck states React renders from the Stage step; the page is a client-rendered SPA, the final step (card 3, the slot in ink with filled bars) is what reduced motion, no IO and phones show, so no content waits on a script */
+/* Hallmark · answered F7 · the pill radius sits on the four mini band bars and on the three Speaking choice pills copied from SpeakingChoice.tsx; boxes (cards, slot) use the card radius */
+
+/* Base = the final step-4 composition (all nodes done, line drawn, card 3 crisp, slot in ink). Step states override it at 768px+.
+   The head sits at the top of the pinned frame, so it is on screen right after the hero, with no unlabelled frame. */
+.lp-mock-inner {
+  display: grid;
+  align-content: center; /* the act sits in the middle of the pinned frame, so no half of the screen waits empty */
+  min-block-size: 100%;
+  padding-block: calc(var(--lp-header-h, 4rem) + 16px) 32px;
+}
+
+.lp-mock-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  grid-template-rows: auto auto;
+  column-gap: 32px;
+  margin-top: clamp(32px, 6svh, 56px);
+}
+
+/* ---------- Track: four nodes joined by a hairline ---------- */
+.lp-mock-track {
+  --node: 56px;
+  grid-row: 1;
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-mock-col {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  row-gap: 12px;
+}
+.lp-mock-node {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--node);
+  height: var(--node);
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--ink);
+}
+.lp-mock-node::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  opacity: 0;
+}
+.lp-mock-letter {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--surface);
+}
+.lp-mock-cap {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.3;
+  color: var(--ink);
+  text-align: center;
+}
+.lp-mock-npill {
+  display: block;
+  width: 44px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--lp-skel);
+  /* Its final (merged) state lives inside the slot, so the per-node pill is only seen mid-pin. */
+  opacity: 0;
+  visibility: hidden;
+}
+.lp-mock-seg {
+  position: absolute;
+  top: calc(var(--node) / 2 - 0.75px);
+  right: calc(50% + var(--node) / 2 + 8px);
+  width: calc(100% - var(--node) - 16px); /* static layout, never animated */
+  height: 1.5px;
+}
+.lp-mock-seg::before,
+.lp-mock-seg > i {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.lp-mock-seg::before {
+  background: var(--lp-hair);
+}
+.lp-mock-seg > i {
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+/* ---------- Deck: the real between-section cards, one crisp, the next soft behind it ---------- */
+.lp-mock-deck {
+  grid-row: 2;
+  grid-column: 1;
+  display: grid;
+  margin-top: 40px;
+}
+.lp-mock-card {
+  --cw: min(100%, 460px);
+  grid-area: 1 / 1;
+  justify-self: start;
+  width: var(--cw);
+  /* Each card sits under its own node (card k centred on track column k, kept inside the deck): the Listening card
+     under L, "Next: Reading" under R. Percent margins resolve against the deck, which spans the four columns. */
+  margin-left: clamp(0px, calc((var(--k) + 0.5) * 25% - var(--cw) / 2), calc(100% - var(--cw)));
+}
+.lp-mock-cardbody {
+  display: grid;
+  gap: 12px;
+  padding: 24px 28px;
+}
+.lp-mock-cardbody > p {
+  margin: 0;
+}
+.lp-mock-line {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.lp-mock-line--2 {
+  margin-top: -4px; /* the two lines read as one note */
+  color: var(--ink);
+}
+.lp-mock-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.lp-mock-pill {
+  height: 36px;
+  padding-inline: 16px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+}
+.lp-mock-pill:not(.lp-pill--ink) {
+  border-color: var(--line-strong);
+}
+
+/* Sample scores: tabular figures so the bands line up; the tag says plainly that the numbers are an example. */
+.lp-mock-score,
+.lp-mock-bnum {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.lp-mock-score {
+  font-weight: 600;
+}
+.lp-mock-bnum {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.lp-mock-sample {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-mock-score,
+  .lp-mock-bnum {
+    animation: lp-mock-land 360ms var(--ease-emerge) both;
+  }
+}
+@keyframes lp-mock-land {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---------- Overall slot: MockResult in miniature, "?.?" never a digit ---------- */
+.lp-mock-slot {
+  position: relative;
+  isolation: isolate;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: end;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: min(100%, 360px);
+  min-height: 300px;
+  row-gap: 12px;
+  padding: 24px 28px;
+  border-radius: var(--lp-radius-card, 12px);
+  border: 1px solid var(--lp-hair);
+  background-color: var(--surface);
+}
+.lp-mock-slot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: var(--lp-shadow-float);
+}
+.lp-mock-slotcap {
+  color: var(--muted);
+}
+.lp-mock-glyph {
+  align-self: center;
+  justify-self: center;
+  font-size: clamp(4.5rem, 2.5rem + 4vw, 6.5rem);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink);
+}
+.lp-mock-time {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance;
+}
+.lp-mock-mini {
+  display: grid;
+  gap: 12px;
+}
+/* A band for each section: its name, "?.?", and a bar (an empty track and an ink fill). Proportions only, never a score. */
+.lp-mock-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+.lp-mock-bname {
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.lp-mock-bq {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+.lp-mock-bar {
+  grid-column: 1 / -1;
+  position: relative;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--lp-skel);
+}
+.lp-mock-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ink);
+  transform: scaleX(var(--f));
+  transform-origin: 0 50%;
+}
+
+/* ---------- Step states (motion only: reduced motion shows the final step). Nodes, line and slot at every width (phones
+   play the steps on a timer); the deck at 768+. ---------- */
+@media (prefers-reduced-motion: no-preference) {
+.lp-mock-node[data-lp='todo'] {
+    background-color: var(--surface);
+    border-color: var(--line-strong);
+  }
+  .lp-mock-node[data-lp='todo'] .lp-mock-letter {
+    color: var(--muted);
+  }
+  .lp-mock-node[data-lp='todo']::after {
+    transform: scale(0.8);
+  }
+  .lp-mock-node[data-lp='active'] {
+    background-color: var(--surface);
+  }
+  .lp-mock-node[data-lp='active'] .lp-mock-letter {
+    color: var(--ink);
+  }
+  .lp-mock-node[data-lp='active']::after {
+    opacity: 1;
+  }
+  .lp-mock-cap[data-lp='todo'] {
+    color: var(--muted);
+  }
+
+  .lp-mock-seg[data-lp='off'] > i {
+    transform: scaleX(0);
+  }
+
+  .lp-mock-npill[data-lp='on'] {
+    opacity: 1;
+    visibility: visible;
+  }
+  .lp-mock-npill[data-lp='off'] {
+    transform: scale(0.9);
+  }
+  .lp-mock-npill[data-lp='merged'] {
+    transform: translateX(24px) scale(0.9); /* hidden by the base rule: its final state lives in the slot */
+  }
+
+  /* Each section's bar fills as that section ends; the overall glyph waits in the muted ink (AA) until all four are in. */
+  .lp-mock-slot[data-lp='wait'] .lp-mock-glyph {
+    color: var(--muted);
+  }
+  .lp-mock-band[data-lp='off'] .lp-mock-bar::after {
+    transform: scaleX(0);
+  }
+}
+
+@media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+  .lp-mock-card[data-lp='active'] {
+    z-index: 3;
+  }
+  /* Each card waits hidden under its own node and slides in from the left as the ink reaches it; spent cards leave. */
+  .lp-mock-card[data-lp='next'] {
+    z-index: 2;
+    transform: translateX(-32px);
+  }
+  /* Deck states, not reveals: the card that is out of play is simply not shown (card 3 is the resting state). */
+  .lp-mock-card:is([data-lp='next'], [data-lp='past'], [data-lp='later']) {
+    opacity: 0;
+    visibility: hidden;
+  }
+  .lp-mock-card[data-lp='past'] {
+    z-index: 1;
+    transform: translateY(-16px);
+  }
+  .lp-mock-card[data-lp='later'] {
+    transform: translateY(28px) scale(0.92);
+  }
+}
+
+/* Short desktops: keep the composition inside one screen. */
+@media (min-width: 48rem) and (max-height: 45rem) {
+  .lp-mock-line--2 {
+    display: none;
+  }
+  .lp-mock-grid {
+    margin-top: 32px;
+  }
+  .lp-mock-deck {
+    margin-top: 24px;
+  }
+  .lp-mock-slot {
+    min-height: 240px;
+  }
+  .lp-mock-glyph {
+    font-size: 4.5rem;
+  }
+}
+
+/* ---------- Phones: unpinned, one static stack (track, card 3, slot) ---------- */
+@media (max-width: 47.999rem) {
+  .lp-mock-inner {
+    min-height: auto;
+    padding-block: 72px 64px;
+  }
+  .lp-mock-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    row-gap: 28px;
+    margin-top: 32px;
+  }
+  .lp-mock-track,
+  .lp-mock-deck,
+  .lp-mock-slot {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .lp-mock-track {
+    --node: 40px;
+  }
+  .lp-mock-cap,
+  .lp-mock-time,
+  .lp-mock-bname {
+    font-size: 0.875rem; /* wireframe words are 14px or more on a phone */
+  }
+  .lp-mock-deck {
+    margin-top: 0;
+  }
+  .lp-mock-card {
+    --cw: 100%;
+  }
+  .lp-mock-card:not([data-k='3']) {
+    display: none;
+  }
+  .lp-mock-cardbody {
+    padding: 20px;
+  }
+  .lp-mock-slot {
+    justify-self: stretch;
+    width: 100%;
+    min-height: auto;
+    padding: 20px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    row-gap: 16px;
+    align-items: center;
+  }
+  .lp-mock-glyph {
+    justify-self: end;
+    font-size: 3.5rem;
+  }
+  .lp-mock-mini {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px;
+  }
+}
+
+/* ---------- Timed polish on step changes (forward delays only, so scrolling back snaps); every transition 420ms or less ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-mock-node {
+    transition:
+      background-color var(--dur-slow) var(--ease-emerge),
+      border-color var(--dur-slow) var(--ease-emerge);
+  }
+  .lp-mock-letter,
+  .lp-mock-cap {
+    transition: color var(--dur-slow) var(--ease-emerge);
+  }
+  .lp-mock-node::after {
+    transition:
+      opacity 320ms var(--ease-emerge),
+      transform 320ms var(--ease-emerge);
+  }
+  .lp-mock-node[data-lp='active']::after {
+    transition-delay: 120ms;
+  }
+  .lp-mock-seg > i {
+    transition: transform 420ms var(--ease-emerge);
+  }
+
+  .lp-mock-npill {
+    transition:
+      opacity 200ms var(--ease-emerge),
+      transform 200ms var(--ease-emerge),
+      visibility 0s 200ms;
+  }
+  .lp-mock-npill[data-lp='on'] {
+    transition:
+      opacity 320ms var(--ease-emerge) 160ms,
+      transform 320ms var(--ease-emerge) 160ms,
+      visibility 0s;
+  }
+  .lp-mock-npill[data-lp='merged'] {
+    transition:
+      opacity 360ms var(--ease-emerge) calc(var(--i) * 40ms),
+      transform 360ms var(--ease-emerge) calc(var(--i) * 40ms),
+      visibility 0s 520ms;
+  }
+}
+@media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+  .lp-mock-card {
+    transition:
+      opacity 420ms var(--ease-emerge),
+      transform 420ms var(--ease-emerge),
+      visibility 0s;
+  }
+  .lp-mock-card[data-lp='active'] {
+    transition:
+      opacity 420ms var(--ease-emerge) 80ms,
+      transform 420ms var(--ease-emerge) 80ms,
+      visibility 0s;
+  }
+  /* The reference unmask: out over 320ms, the incoming card starts 80ms later and takes 520ms. */
+  .lp-mock-card[data-lp='past'] {
+    transition:
+      opacity 320ms var(--ease-emerge),
+      transform 320ms var(--ease-emerge),
+      visibility 0s 320ms;
+  }
+  .lp-mock-card[data-lp='later'] {
+    transition:
+      opacity 320ms var(--ease-emerge),
+      transform 320ms var(--ease-emerge),
+      visibility 0s 320ms;
+  }
+
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-mock-glyph {
+    transition: color 200ms var(--ease-emerge);
+  }
+  .lp-mock-bar::after {
+    transition: transform 360ms var(--ease-emerge);
+  }
+  /* Step 4: the last bar fills, then "?.?" turns ink. */
+  .lp-mock-slot[data-lp='focus'] .lp-mock-glyph {
+    transition: color 300ms var(--ease-emerge) 300ms;
+  }
+}
+
+/* ---------- Scrubbed: entrance before the pin, ink run during it (track timeline: stuck elements cannot use view()) ---------- */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 48rem) {
+    .lp-mock-col {
+      animation: lp-mock-rise linear both;
+      animation-timeline: --lp-track;
+      animation-range: entry calc(5% + var(--order) * 5%) entry calc(30% + var(--order) * 5%);
+    }
+    .lp-mock-deck {
+      animation: lp-mock-in linear backwards;
+      animation-timeline: --lp-track;
+      animation-range: entry 10% entry 40%;
+    }
+    .lp-mock-slot {
+      animation: lp-mock-in linear backwards;
+      animation-timeline: --lp-track;
+      animation-range: entry 10% entry 40%;
+    }
+    /* Each run ends 1% before its node's step (steps flip at contain 20/40/60%). */
+    .lp-mock-seg > i {
+      animation: lp-mock-seg linear both;
+      animation-timeline: --lp-track;
+    }
+    .lp-mock-seg[data-k='1'] > i {
+      animation-range: contain 8% contain 19%;
+    }
+    .lp-mock-seg[data-k='2'] > i {
+      animation-range: contain 28% contain 39%;
+    }
+    .lp-mock-seg[data-k='3'] > i {
+      animation-range: contain 48% contain 59%;
+    }
+  }
+
+  /* Phones: nothing is stuck, so plain view() reveals. */
+  @media (prefers-reduced-motion: no-preference) and (max-width: 47.999rem) {
+    .lp-mock-col {
+      animation: lp-emerge linear both;
+      animation-timeline: view();
+      animation-range: entry calc(8% + var(--order) * 6%) entry calc(42% + var(--order) * 6%);
+    }
+    /* The line is drawn by the timed steps; the card and the slot rise in (opacity and transform only). */
+    .lp-mock-card,
+    .lp-mock-slot {
+      animation: lp-sharpen-sm linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 120px;
+    }
+  }
+}
+
+@keyframes lp-mock-rise {
+  from {
+    opacity: 0.4;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-mock-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-mock-seg {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-mock-inner *,
+  .lp-mock-inner *::before,
+  .lp-mock-inner *::after {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* The act's action sits in the pinned frame, right under the composition: no lone button after the pin. */
+.lp-mock-cta {
+  margin-top: clamp(16px, 3svh, 32px);
+  padding-block: 0;
+}

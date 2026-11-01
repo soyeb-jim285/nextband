@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { redirect } from '@tanstack/react-router';
 import { ApiError, type Me } from './api';
-import { isAccount, meQuery, queryClient, useMe } from './query';
+import { isAccount, meQuery, queryClient, rememberAccount, useMe } from './query';
 
 export type EmailStatus = { status: 'sent' | 'failed' | 'none'; sentAt: string | null; maskedEmail: string | null; resendAvailableIn: number; alreadySent: boolean; error: 'rate_limited' | 'rejected' | 'network' | 'unavailable' | null };
 
@@ -60,17 +60,18 @@ export function otpError(e: AuthError) {
 }
 
 /** Only same-app paths: blocks open redirects like `//evil.com`. */
-export const safeRedirect = (to: unknown) => (typeof to === 'string' && to.startsWith('/') && !to.startsWith('//') ? to : '/');
+export const safeRedirect = (to: unknown) => (typeof to === 'string' && to.startsWith('/') && !to.startsWith('//') ? to : '/overview');
 
 export async function signOut() {
   await authClient.signOut();
+  rememberAccount(false);
   queryClient.clear();
 }
 
 /** beforeLoad for sign-in and sign-up: bounce signed-in users to the dashboard. A guest session stays: it is linked to the account on sign-in. */
 export async function redirectIfSignedIn({ context }: { context: { queryClient: QueryClient } }) {
   const me = await context.queryClient.fetchQuery(meQuery).catch(() => null);
-  if (isAccount(me)) throw redirect({ to: '/' });
+  if (isAccount(me)) throw redirect({ to: '/overview' });
 }
 
 /**

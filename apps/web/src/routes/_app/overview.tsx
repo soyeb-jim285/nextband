@@ -1,9 +1,8 @@
 import { queryOptions, useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { ArrowRight, Compass, Flame } from 'lucide-react';
 import { coachQuery } from '@/components/coach/data';
 import { FixNext } from '@/components/dashboard/FixNext';
-import { GuestHome } from '@/components/dashboard/GuestHome';
 import { MockPanel } from '@/components/dashboard/MockPanel';
 import { NextUp } from '@/components/dashboard/NextUp';
 import { Onboarding } from '@/components/dashboard/Onboarding';
@@ -14,23 +13,20 @@ import { Alert, buttonStyles, Card, PageContainer, PageHeader } from '@/componen
 import { call, client } from '@/lib/api';
 import { formatMinutes, plural } from '@/lib/format';
 import { lrProgressQuery } from '@/lib/lr';
-import { isAccount, meQuery, useAccount, useMe } from '@/lib/query';
+import { isAccount, meQuery, useMe } from '@/lib/query';
 import { cn } from '@/lib/utils';
 
 const progressQuery = queryOptions({ queryKey: ['progress'], queryFn: () => call(client.GET('/api/progress')), staleTime: 0 });
 const dueCountQuery = queryOptions({ queryKey: ['cards', 'due'], queryFn: () => call(client.GET('/api/cards/due')), staleTime: 0 });
 
-export const Route = createFileRoute('/_app/')({
-  // Guests (no session) get a static intro and load nothing personal.
-  loader: async ({ context }) => {
-    if (isAccount(await context.queryClient.ensureQueryData(meQuery))) await Promise.all([context.queryClient.ensureQueryData(progressQuery), context.queryClient.ensureQueryData(dueCountQuery), context.queryClient.ensureQueryData(lrProgressQuery)]);
+/** The account dashboard. A visitor or a guest has no dashboard: they get the landing page at '/' (which shows a guest's recent tests). */
+export const Route = createFileRoute('/_app/overview')({
+  beforeLoad: async ({ context }) => {
+    if (!isAccount(await context.queryClient.ensureQueryData(meQuery))) throw redirect({ to: '/', replace: true });
   },
-  component: Home,
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(progressQuery), context.queryClient.ensureQueryData(dueCountQuery), context.queryClient.ensureQueryData(lrProgressQuery)]),
+  component: Dashboard,
 });
-
-function Home() {
-  return useAccount() ? <Dashboard /> : <GuestHome />;
-}
 
 /** Midnight to 5am is "Hello": nobody wants "Good evening" at 3am. */
 export const greeting = (h = new Date().getHours()) => (h < 5 ? 'Hello' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');

@@ -1,0 +1,457 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+
+/*
+ * 07b-bank: the H2 is the value of a search field; under it, the question bank card. The base rules are step 1 (the
+ * Writing list), which is also what reduced motion and a still phone show. Step 0 (Speaking) and step 2 (the "bus"
+ * search) exist only inside the no-preference block. No blur anywhere in this act.
+ */
+
+/* ---------- Frame ---------- */
+.lp-bank {
+  --lp-bank-row: 4.25rem;
+}
+.lp-bank-frame {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 40px;
+  height: 100%;
+  padding-block: calc(var(--lp-header-h, 4rem) + 32px) 48px;
+}
+.lp-bank-head,
+.lp-bank-card {
+  width: 100%;
+  max-width: 65rem;
+  margin-inline: auto;
+}
+
+/* ---------- Head: the H2 typed into a wide search field ---------- */
+.lp-bank-head {
+  display: grid;
+  gap: 16px;
+}
+.lp-bank-field {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 12px 32px 12px 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.lp-bank-field-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.lp-bank-h2 {
+  line-height: 1.12; /* the shared .lp-h2 size: one H2 step across the page */
+}
+.lp-bank-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  margin-inline-start: 0.08em;
+  vertical-align: -0.1em;
+  background: var(--ink);
+}
+/* the sub starts under the H2's first letter: field padding + icon + gap */
+.lp-bank-head .lp-sub {
+  padding-inline-start: 64px;
+}
+
+/* ---------- Card: tools row ---------- */
+.lp-bank-card {
+  border: 1px solid var(--lp-hair);
+  overflow: clip;
+}
+.lp-bank-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--lp-hair);
+}
+.lp-bank-seg {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+.lp-bank-seg-thumb {
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-start: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--ink); /* ink ring on a tint: the labels stay ink on both sides, so no frame has a label on the wrong colour */
+  transform: translateX(100%); /* on Writing */
+}
+.lp-bank-seg-opt {
+  position: relative;
+  padding: 4px 16px;
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--ink);
+}
+.lp-bank-tabset {
+  display: grid;
+  min-width: 0;
+  overflow: clip;
+}
+.lp-bank-tabs {
+  grid-area: 1 / 1;
+  display: flex;
+  gap: 20px;
+}
+.lp-bank-tabs--s {
+  opacity: 0;
+}
+.lp-bank-tab {
+  padding-block: 8px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.lp-bank-tab--on {
+  color: var(--ink);
+  box-shadow: inset 0 -2px var(--ink);
+}
+.lp-bank-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 16rem;
+  height: 36px;
+  margin-inline-start: auto;
+  padding-inline: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+}
+.lp-bank-search svg {
+  flex-shrink: 0;
+}
+.lp-bank-search-text {
+  display: grid;
+  min-width: 0;
+}
+.lp-bank-placeholder,
+.lp-bank-typed {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-bank-typed {
+  color: var(--ink);
+  clip-path: inset(0 100% 0 0);
+}
+
+/* ---------- Card: the list (three layers in one cell, fixed row height, so nothing reflows between steps) ---------- */
+.lp-bank-list {
+  display: grid;
+  overflow: clip;
+}
+.lp-bank-layer {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-bank-layer--s,
+.lp-bank-layer--q {
+  opacity: 0; /* alternate states, not reveals: the Writing layer is the visible base */
+}
+.lp-bank-layer--s {
+  transform: translateY(-6px);
+}
+.lp-bank-layer--q {
+  padding-top: var(--lp-bank-row); /* its rows fill the slots under the hit, which rides up to slot 0 */
+}
+.lp-bank-row {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr) 7.5rem auto;
+  align-items: center;
+  column-gap: 16px;
+  height: var(--lp-bank-row);
+  padding-inline: 20px;
+  border-bottom: 1px solid var(--lp-hair);
+  background: var(--surface);
+}
+.lp-bank-layer--w .lp-bank-row--hit {
+  position: relative;
+  z-index: 1;
+}
+.lp-bank-layer > .lp-bank-row:last-child {
+  border-bottom: 0;
+}
+.lp-bank-type {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-bank-topic {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* two lines of the real prompt: a row never ends on half a sentence */
+.lp-bank-prompt {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink);
+  line-height: 1.35;
+}
+.lp-bank-go {
+  border-color: var(--line-strong);
+}
+.lp-bank-chev {
+  display: none;
+  color: var(--muted);
+}
+.lp-bank-mark {
+  position: relative;
+}
+.lp-bank-mark::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+/* ---------- The closing action ---------- */
+.lp-bank-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+.lp-bank-skills .lp-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* a full touch target for each skill link */
+  padding-inline: 4px;
+}
+
+/* 768 to 1023: the search field takes its own line under the filters. */
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .lp-bank-search {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+  .lp-bank-row {
+    grid-template-columns: 11rem minmax(0, 1fr) auto;
+  }
+  .lp-bank-topic {
+    display: none;
+  }
+}
+/* Short desktop viewports: tighter rows and frame so the card stays inside the 100dvh stage. */
+@media (min-width: 48rem) and (max-height: 51.25rem) {
+  .lp-bank {
+    --lp-bank-row: 3.875rem;
+  }
+  .lp-bank-frame {
+    gap: 28px;
+    padding-block: calc(var(--lp-header-h, 4rem) + 20px) 32px;
+  }
+}
+
+/* ---------- Phones: unpinned, the field wraps the heading, rows go two-line ---------- */
+@media (max-width: 47.999rem) {
+  .lp-bank {
+    --lp-bank-row: 6rem;
+  }
+  .lp-bank-frame {
+    height: auto;
+    gap: 32px;
+    padding-block: 88px 16px;
+  }
+  .lp-bank-field {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 18px;
+  }
+  .lp-bank-field-icon {
+    width: 20px;
+    height: 20px;
+    margin-top: 0.4rem;
+  }
+  .lp-bank-head .lp-sub {
+    padding-inline-start: 0;
+  }
+  .lp-bank-tools {
+    padding: 12px 16px;
+  }
+  .lp-bank-seg {
+    width: 100%;
+  }
+  .lp-bank-tabset {
+    width: 100%;
+  }
+  .lp-bank-search {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+  .lp-bank-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'type chev'
+      'prompt chev';
+    align-content: center;
+    row-gap: 4px;
+    column-gap: 12px;
+    padding-inline: 16px;
+  }
+  .lp-bank-type {
+    grid-area: type;
+  }
+  .lp-bank-prompt {
+    grid-area: prompt;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2; /* two readable lines of the real prompt on a phone */
+    white-space: normal;
+  }
+  .lp-bank-chev {
+    display: block;
+    grid-area: chev;
+  }
+  .lp-bank-row .lp-bank-topic,
+  .lp-bank-row .lp-bank-go {
+    display: none; /* the row's own selector outranks .lp-pill's display */
+  }
+}
+
+/* ---------- Motion ---------- */
+/* Hiding is done on whole layers (opacity); rows only ever arrive through keyframes that end visible, so nothing waits on
+   a script to be seen. */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-bank-caret {
+    /* ponytail: an infinite compositor-only blink; pause it off screen if the layer count audit flags it */
+    animation: lp-bank-blink 1s steps(1) infinite;
+  }
+  .lp-bank-seg-thumb {
+    transition: transform 320ms var(--ease-emerge);
+  }
+  .lp-bank-tabs {
+    transition: opacity 200ms var(--ease-emerge) 80ms;
+  }
+  .lp-bank-layer {
+    transition:
+      opacity 160ms var(--ease-emerge),
+      transform 160ms var(--ease-emerge);
+  }
+  .lp-bank-layer--w .lp-bank-row {
+    transition:
+      opacity 140ms var(--ease-emerge),
+      transform 280ms var(--ease-emerge);
+  }
+  .lp-bank-mark::after {
+    transition: transform 120ms var(--ease-emerge);
+  }
+
+  /* Step 0: Speaking. The Writing layer steps back as a whole. */
+  .lp-bank .lp-stage[data-step='0'] .lp-bank-seg-thumb {
+    transform: none;
+  }
+  .lp-bank .lp-stage[data-step='0'] .lp-bank-tabs--s {
+    opacity: 1;
+  }
+  .lp-bank .lp-stage[data-step='0'] .lp-bank-tabs--w {
+    opacity: 0;
+  }
+  .lp-bank .lp-stage[data-step='0'] .lp-bank-layer--s {
+    opacity: 1;
+    transform: none;
+  }
+  .lp-bank .lp-stage[data-step='0'] .lp-bank-layer--w {
+    opacity: 0;
+  }
+
+  /* Step 1: the Writing rows rise in, staggered (also when a search is cleared on the way back up). */
+  .lp-bank .lp-stage[data-step='1'] .lp-bank-layer--w .lp-bank-row {
+    animation: lp-bank-rise 320ms var(--ease-emerge) calc(120ms + var(--i, 0) * 40ms) backwards;
+  }
+
+  /* Step 2: "bus" typed; the hit rides up to slot 0, the other rows fade, the real matches fill in under it. */
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-placeholder {
+    opacity: 0;
+  }
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-typed {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path 360ms steps(3, jump-start);
+  }
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-layer--w .lp-bank-row:not(.lp-bank-row--hit) {
+    opacity: 0;
+    transition-delay: 300ms; /* after "bus" is typed; gone in 140ms, never a resting ghost */
+  }
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-layer--w .lp-bank-row--hit {
+    transform: translateY(calc(-1 * var(--lp-bank-row)));
+    transition-delay: 380ms;
+  }
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-layer--q {
+    opacity: 1;
+    transition: none;
+  }
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-layer--q .lp-bank-row {
+    animation: lp-bank-rise 320ms var(--ease-emerge) calc(640ms + var(--i, 0) * 50ms) backwards;
+  }
+  .lp-bank .lp-stage[data-step='2'] .lp-bank-mark::after {
+    transform: none;
+    transition-duration: 320ms;
+    transition-delay: calc(780ms + var(--i, 0) * 50ms);
+  }
+
+  /* Speaking rows rise in as the act scrolls up into view (scrubbed on the shared track; they are step 0's rows). */
+  @supports (animation-timeline: view()) {
+    .lp-bank-layer--s .lp-bank-row {
+      animation: lp-bank-rise linear backwards;
+      animation-timeline: --lp-track;
+      animation-range: entry calc(35% + var(--i, 0) * 6%) entry calc(70% + var(--i, 0) * 6%);
+    }
+  }
+}
+
+@keyframes lp-bank-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes lp-bank-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reduced motion: the base above is already the Writing list with a steady caret; nothing to undo here. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-bank-caret {
+    opacity: 1;
+  }
+}

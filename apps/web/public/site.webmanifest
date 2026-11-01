@@ -2,7 +2,7 @@
   "name": "NextBand",
   "short_name": "NextBand",
   "description": "Practise IELTS Speaking, Writing, Listening and Reading with timed real-format tests and band scores.",
-  "start_url": "/",
+  "start_url": "/overview",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0a111c",
@@ -12,6 +12,6 @@
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "/icon.svg?v=nb", "sizes": "any", "type": "image/svg+xml" }
   ]
 }

@@ -1,0 +1,1297 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+/* Hallmark · answered F8 · the hero intro is one timed pass (the sheet rises, the three sister sheets spring up from behind it, three red fixes land by 0.9s, the last sentence types itself, the ?.? is stamped on its slip at about 1s) that re-marks a new set on a slow cycle while the hero is on screen, with the text always in full ink; ambient floats, voice bars and the root-scroll parallax are transform only; nothing fades on exit and nothing pins; a visible Pause animation button stops it all */
+
+/*
+ * Hero: copy left (the headline runs on into the gap before the desk), the marking desk right. Base = the settled
+ * composition: a marked sheet (strike, then the fix as a red chip right after the struck word), the typed sentence,
+ * filled bars, the Overall slip with its large ?.?, the three sisters fanned above the sheet (also the reduced-motion,
+ * no-JS and no-timeline frame). Intro: timed, fill-mode backwards, so every part detaches when it ends. Each new set
+ * remounts the marks (01-hero.tsx key): the sentences swap in place in 180ms at full ink and only the marks redraw; the
+ * bars slide to the new proportions. No blur anywhere in the hero: it is transform and opacity only.
+ */
+
+.lp-hero {
+  position: relative;
+  --t: 0.5; /* marking tempo: every marking delay is multiplied by it (0.4 on phones) */
+  --m0: 100ms; /* the first pass starts as the sheet rises; later passes start at once */
+}
+
+.lp-hero-in {
+  --G: clamp(32px, 4.4vw, 64px);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'copy' 'desk';
+  row-gap: 28px;
+  padding-top: calc(var(--lp-header-h, 4rem) + 24px);
+  padding-bottom: 48px;
+}
+
+/* ---------- Copy ---------- */
+.lp-hero-copy {
+  grid-area: copy;
+  min-width: 0;
+  position: relative;
+  z-index: 4;
+}
+.lp-hero-title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(2.75rem, 1.25rem + 3.6vw, 4.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+  min-width: 0;
+}
+.lp-hero-line {
+  display: block;
+}
+.lp-hero-w {
+  display: inline-block;
+}
+.lp-hero-sub {
+  margin-top: 20px;
+  max-width: 27em;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.lp-hero-actions {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.lp-hero-btn {
+  min-height: 52px;
+  padding-inline: 24px;
+  font-size: 1rem;
+}
+.lp-hero-btn:active {
+  transform: translateY(1px); /* same press as .lp-btn in landing.css; restated so this folder's lint group sees it */
+}
+/* One line of facts, all verifiable: skills, price, ways to pay, refund. */
+.lp-hero-proof {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--lp-fs-xs);
+  line-height: 1.4;
+  color: var(--muted);
+}
+.lp-hero-proof li {
+  display: inline-flex;
+  align-items: center;
+}
+.lp-hero-meta {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 16px;
+}
+.lp-hero-micro {
+  font-size: var(--lp-fs-xs);
+  color: var(--muted);
+}
+.lp-hero-last {
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* WCAG 2.2.2: the desk re-marks, the clocks tick and a few loops run; this stops them all (wire.tsx setPaused). */
+.lp-hero-pause {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 4px;
+  border-radius: var(--lp-radius-chip);
+  font-size: var(--lp-fs-xs);
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out-quart);
+}
+.lp-hero-pause[aria-pressed='true'] {
+  color: var(--ink);
+}
+.lp-hero-pause:hover {
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero-pause {
+    display: none; /* nothing moves, so there is nothing to pause */
+  }
+}
+@media (min-width: 40rem) {
+  .lp-hero-sub {
+    font-size: 1.1875rem;
+  }
+  .lp-hero-actions {
+    margin-top: 28px;
+  }
+}
+
+/* ---------- The desk: the three sister sheets fanned above the Writing sheet ---------- */
+.lp-hero-desk {
+  grid-area: desk;
+  position: relative;
+  min-width: 0;
+  padding-top: 112px; /* the sisters show their heads, content and answers above the sheet; only their feet tuck under it */
+}
+.lp-hero-fan {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 0;
+  margin: 0;
+  pointer-events: none;
+}
+/* Side by side with a gap, so no sheet ever covers another sheet's words. */
+.lp-sis-pos {
+  position: absolute;
+  top: 0;
+  width: 32%;
+}
+.lp-sis-pos--l {
+  left: 0;
+  top: 14px;
+}
+.lp-sis-pos--r {
+  left: 34%;
+}
+.lp-sis-pos--s {
+  right: 0;
+  top: 8px;
+}
+.lp-sis {
+  --r: 0deg;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 150px;
+  padding: 12px 16px;
+  border: 1px solid var(--lp-hair);
+  rotate: var(--r);
+  transform-origin: 50% 100%;
+}
+.lp-sis--l {
+  --r: -2.5deg;
+}
+.lp-sis--s {
+  --r: 2.5deg;
+}
+.lp-sis--r {
+  --r: -0.5deg;
+}
+.lp-sis-cap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--lp-fs-xs);
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lp-sis-title {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.22;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.lp-sis-text {
+  font-size: var(--lp-fs-xs);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.lp-sis-text mark {
+  padding: 0 0.2em;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.lp-sis-text b {
+  margin-inline-start: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.lp-sis-ans {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--lp-fs-xs);
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lp-sis-ans > span {
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--lp-radius-chip);
+  color: var(--ink);
+  font-weight: 600;
+}
+.lp-sis-chip {
+  margin-inline-start: auto;
+  min-height: 1.25rem;
+}
+.lp-sis-ring {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+}
+.lp-sis-ring::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+/* Bars: the Listening one is a played-so-far track (static); the Speaking one is a voice that moves while the hero is live. */
+.lp-sis-wave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+}
+.lp-sis-wave > i {
+  flex: 1 1 0;
+  max-width: 5px;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink);
+  transform: scaleY(var(--h));
+}
+.lp-sis-wave--l > i:nth-child(n + 8) {
+  background: var(--line-strong);
+}
+
+/* ---------- The sheet: a typeset Writing answer sheet, marked ---------- */
+.lp-sheet-par {
+  position: relative;
+  z-index: 2;
+}
+.lp-sheet {
+  --R: clamp(42px, 5.4svh, 56px); /* one ruled row */
+  --base: calc(var(--R) * 0.6); /* where Newsreader's baseline falls inside a row (font size scales with --R) */
+  --rule: calc(var(--base) + 4px); /* the ruled line, just under the baseline */
+  --pad: clamp(18px, 2.2vw, 28px);
+  --mw: 7rem; /* margin column for the tags */
+  position: relative;
+  container: lp-sheet / inline-size;
+  margin: 0;
+  border: 1px solid var(--lp-hair);
+  box-shadow: var(--lp-shadow-sheet);
+}
+.lp-sheet-full {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--pad);
+}
+.lp-sheet-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  min-width: 0;
+}
+.lp-sheet-prompt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+.lp-sheet-clock {
+  flex: none;
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+
+.lp-sheet-body {
+  position: relative;
+  padding-block: 12px 8px;
+  border-block: 1px solid var(--lp-hair);
+}
+.lp-sheet-body::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: calc(var(--mw) + 8px);
+  width: 1px;
+  background: var(--lp-hair); /* the margin rule */
+}
+.lp-marks {
+  display: grid;
+}
+.lp-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--mw) minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: baseline; /* tag and sentence share one baseline */
+  min-height: var(--R);
+}
+/* Each row draws its own rule, from the text column only (clear of the margin tags), just under the baseline. */
+.lp-row::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--mw) + 16px);
+  right: 0;
+  top: var(--rule);
+  height: 1px;
+  background: var(--lp-hair);
+}
+.lp-row-t {
+  grid-column: 2;
+  position: relative;
+  isolation: isolate;
+  margin: 0;
+  padding-inline-start: 6px;
+  font-family: var(--font-serif);
+  padding-inline-end: 0.75em; /* clear of the rule's end */
+  font-size: calc(var(--R) * 0.4);
+  line-height: var(--R);
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* The reading sweep: one soft bar runs left to right under the row being read. Present only during a pass. */
+.lp-row-t::before {
+  content: '';
+  position: absolute;
+  inset: 6px -8px 0 -2px;
+  z-index: -1;
+  border-radius: var(--lp-radius-chip);
+  background: var(--surface-2);
+  opacity: 0;
+  transform-origin: 0 50%;
+}
+.lp-mk-tag {
+  font-size: var(--lp-fs-xs);
+  line-height: 1.2;
+  color: var(--muted);
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* The typed sentence: a paper-coloured cover slides off it in letter steps; its left edge is the caret while it types. */
+.lp-type {
+  position: relative;
+  display: inline-block;
+  overflow: clip; /* the cover leaves through the right edge of the sentence, not across the sheet */
+}
+.lp-type::after {
+  content: '';
+  position: absolute;
+  inset: 0 -2px 0 0;
+  border-inline-start: 1.5px solid var(--ink);
+  background: var(--surface);
+  opacity: 0;
+}
+.lp-type-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-inline-start: 2px;
+  vertical-align: -0.12em;
+  background: var(--ink);
+  opacity: 0; /* the caret exists only while it blinks (below); the settled frame has none */
+}
+
+/* Marks: the pen. The strike and the wave are red; the fix is a red chip that follows the struck word on its own line. */
+.lp-mk {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+.lp-mk--strike::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: calc(var(--base) - 0.3em);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--lp-pen);
+  transform-origin: 0 50%;
+}
+.lp-mk-under {
+  position: absolute;
+  overflow: visible;
+  left: -1px;
+  width: calc(100% + 2px);
+  top: calc(var(--base) + 1px);
+  height: 6px;
+  fill: none;
+  stroke: var(--lp-pen);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transform-origin: 0 50%;
+}
+.lp-mk-under path {
+  vector-effect: non-scaling-stroke;
+}
+.lp-mk-fix {
+  display: inline-block;
+  margin-inline: 0.35em 0.15em;
+  padding: 0 0.5em;
+  border-radius: var(--lp-radius-chip);
+  background: var(--lp-pen);
+  color: var(--lp-pen-ink);
+  font-family: var(--font-sans);
+  font-size: 0.78em;
+  font-weight: 600;
+  line-height: 1.55;
+  vertical-align: 0.1em;
+  transform-origin: 0 60%;
+}
+.lp-mk-fix--ins::before {
+  content: '+';
+  margin-inline-end: 0.3em;
+}
+
+/* Foot: four criterion bars (proportions only, never a score) beside the Overall slip. */
+.lp-sheet-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+}
+.lp-sheet-crit {
+  display: grid;
+  gap: 8px;
+}
+.lp-crit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(64px, 30%, 7rem);
+  align-items: center;
+  gap: 12px;
+}
+.lp-crit-name {
+  font-size: var(--lp-fs-xs);
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-crit-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--lp-skel);
+  overflow: hidden;
+}
+.lp-crit-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink);
+  transform: scaleX(var(--f));
+  transform-origin: 0 50%;
+}
+/* The slip: its own card, a stamped "?.?" in full ink at display size. On a phone it is a row under the bars. */
+.lp-slip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 8px 16px;
+  border: 1px solid var(--lp-hair);
+  border-radius: var(--lp-radius-card);
+  background: var(--surface);
+  box-shadow: var(--lp-shadow-float);
+}
+.lp-slip-cap {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+.lp-slip-q {
+  display: block;
+  grid-row: 1;
+  grid-column: 1;
+  font-size: 4.5rem;
+  line-height: 1;
+  color: var(--ink);
+}
+@media (min-width: 40rem) {
+  .lp-sheet-foot {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+  }
+}
+
+/* ---------- Desktop: copy left, the desk right; the slip hangs off the sheet's bottom-right corner ---------- */
+@media (min-width: 64rem) {
+  .lp-hero-in {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-areas: 'copy desk';
+    column-gap: var(--G);
+    align-items: center;
+    min-height: 100svh;
+    padding-top: var(--lp-header-h, 4rem);
+    padding-bottom: 24px;
+  }
+  /* "Know what to fix." at display size is a little wider than its column: it runs on into the gap, never into the desk. */
+  .lp-hero-title {
+    width: max-content;
+  }
+  .lp-hero-desk {
+    padding: clamp(124px, 17svh, 152px) 0 48px;
+    /* on a wide screen the desk grows into the right gutter (up to 48px) so the sheet is as large as the page allows */
+    margin-right: calc(-1 * min(3rem, (100vw - 80rem) / 2));
+  }
+  .lp-sheet-foot {
+    grid-template-columns: minmax(0, 1fr) 13.5rem;
+    gap: 20px;
+  }
+  .lp-slip {
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 0;
+    padding: 12px 20px 8px;
+    rotate: -2deg;
+    translate: 28px 36px; /* hung off the corner; its column keeps the bars clear of it */
+  }
+  .lp-slip-cap {
+    grid-row: 1;
+  }
+  .lp-slip-q {
+    grid-row: 2;
+    font-size: 6rem;
+  }
+  .lp-hero-cue {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    width: 1px;
+    height: 36px;
+    overflow: hidden;
+    background: var(--lp-hair);
+  }
+  .lp-hero-cue > i {
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 5px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--ink);
+  }
+}
+@media (min-width: 64rem) and (max-width: 71.999rem) {
+  .lp-sis-chip {
+    display: none; /* the sisters are about 150px wide here: heads and content only */
+  }
+}
+@media (min-width: 64rem) and (max-width: 79.999rem) {
+  .lp-slip {
+    translate: 8px 36px; /* the 32px gutter is narrower than the wide-screen overhang */
+  }
+}
+.lp-hero-cue {
+  display: none;
+  pointer-events: none;
+}
+
+/* ---------- Phones: a shorter sheet, the slip in the footer row, the sisters as compact heads ---------- */
+@media (max-width: 39.999rem) {
+  .lp-hero {
+    --t: 0.4;
+    --m0: 80ms;
+  }
+  .lp-hero-in {
+    row-gap: 20px;
+    padding-top: calc(var(--lp-header-h, 4rem) + 20px);
+  }
+  .lp-hero-title {
+    line-height: 1.06;
+  }
+  .lp-hero-actions {
+    gap: 8px;
+  }
+  .lp-hero-btn {
+    padding-inline: 20px;
+  }
+  .lp-hero-desk {
+    padding-top: 96px;
+  }
+  .lp-sis {
+    min-height: 118px;
+    padding: 8px 12px;
+    gap: 4px;
+  }
+  .lp-sis-title {
+    font-size: 0.9375rem;
+  }
+  .lp-sis-ans > span {
+    padding: 0 4px;
+  }
+  .lp-sis-chip,
+  .lp-sis-wave,
+  .lp-sis-text {
+    display: none;
+  }
+  .lp-sheet {
+    --R: 38px;
+    --pad: 16px;
+  }
+  .lp-sheet-body {
+    padding-block: 8px 8px;
+  }
+  .lp-sheet-foot {
+    gap: 12px;
+    padding-top: 12px;
+  }
+  .lp-sheet-crit {
+    gap: 8px;
+  }
+  .lp-slip-q {
+    font-size: 4rem;
+  }
+}
+/* A narrow sheet (phones, and the 1024 to 1279 desk) drops the margin column: tags sit at the right, above the row. */
+@container lp-sheet (max-width: 34rem) {
+  .lp-sheet-body::before {
+    display: none;
+  }
+  .lp-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-row::after {
+    left: 0;
+  }
+  .lp-row-t {
+    grid-column: 1;
+    padding-inline-start: 0;
+  }
+  .lp-mk-tag {
+    position: absolute;
+    right: 0;
+    top: calc(var(--base) - var(--R) + 10px);
+    line-height: 1;
+  }
+}
+/* A narrow sheet also puts the slip on its own row under the bars (the bars need their names). */
+@container lp-sheet (max-width: 34rem) {
+  .lp-sheet-foot {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .lp-slip {
+    grid-template-columns: auto 1fr;
+    justify-items: stretch;
+    gap: 4px 16px;
+    padding: 8px 16px;
+    rotate: none;
+    translate: none;
+  }
+  .lp-slip-cap {
+    grid-row: auto;
+  }
+  .lp-slip-q {
+    grid-row: 1;
+    font-size: 4rem;
+  }
+}
+/* Phones keep the three marked rows and the typed last sentence; the other plain one needs a wider sheet. */
+@container lp-sheet (max-width: 26rem) {
+  .lp-row--rest:not(.lp-row--type) {
+    display: none;
+  }
+}
+@media (max-width: 23.999rem) {
+  .lp-row-t {
+    font-size: calc(var(--R) * 0.38); /* 320px phones: each sentence still fits its one ruled row */
+  }
+}
+
+/* ---------- Intro and the marking pass (timed, fill-mode backwards: each part detaches when it ends) ---------- */
+@keyframes lp-hero-word {
+  from {
+    opacity: 0.01;
+    transform: translateY(0.4em);
+  }
+}
+@keyframes lp-hero-up {
+  from {
+    opacity: 0.01;
+    transform: translateY(8px);
+  }
+}
+/* The sheet rises into place at full ink: transform only. */
+@keyframes lp-hero-arrive {
+  from {
+    transform: translateY(40px) scale(0.97);
+  }
+}
+/* The hero's large moment: each sister springs up from behind the sheet into its place. */
+@keyframes lp-hero-fan {
+  from {
+    translate: 0 var(--fy);
+    scale: 0.94;
+    rotate: 0deg;
+  }
+}
+@keyframes lp-hero-float {
+  from {
+    transform: translateY(-4px);
+  }
+  to {
+    transform: translateY(4px);
+  }
+}
+@keyframes lp-hero-voice {
+  from {
+    transform: scaleY(var(--h));
+  }
+  to {
+    transform: scaleY(calc(var(--h) * 0.4 + 0.1));
+  }
+}
+/* A new set's sentences swap in place: a 180ms settle, never a resting ghost. */
+@keyframes lp-hero-swap {
+  from {
+    opacity: 0.6;
+    transform: translateY(3px);
+  }
+}
+@keyframes lp-hero-sweep {
+  0% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+  45% {
+    opacity: 1;
+    transform: none;
+  }
+  75% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+@keyframes lp-hero-strike {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes lp-hero-fix {
+  from {
+    opacity: 0.01;
+    transform: translateY(5px) scale(0.7);
+  }
+}
+@keyframes lp-hero-tag {
+  from {
+    opacity: 0.01;
+    transform: translateX(-6px);
+  }
+}
+@keyframes lp-hero-fill {
+  from {
+    transform: scaleX(0.04);
+  }
+}
+@keyframes lp-hero-type {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+}
+/* One animation for the caret: dark until its delay passes, then it blinks. */
+@keyframes lp-hero-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+/* The band slip drops in at about a second; the ?.? is then stamped on it. Later passes pulse it. */
+@keyframes lp-hero-slip {
+  from {
+    opacity: 0.01;
+    translate: 28px 8px;
+  }
+}
+@keyframes lp-hero-stamp {
+  from {
+    opacity: 0.01;
+    transform: scale(1.5) rotate(5deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.95) rotate(0deg);
+  }
+}
+@keyframes lp-hero-qpulse {
+  40% {
+    transform: scale(1.06);
+  }
+}
+/* The point between the hooks breathes while the hero is live: scale only. */
+@keyframes lp-hero-cue {
+  0% {
+    transform: translateY(-14px);
+  }
+  60%,
+  100% {
+    transform: translateY(40px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-hero {
+    --ease-q: cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  .lp-marks.is-again,
+  .lp-slip-q.is-again {
+    --m0: 0ms;
+  }
+  /* Headline: 3 + 4 words, 70ms apart, line 2 a beat later; settled by about 0.9s. */
+  .lp-hero-w {
+    animation: lp-hero-word 520ms var(--ease-emerge) backwards;
+    animation-delay: calc(40ms + var(--i) * 70ms + var(--l) * 60ms);
+  }
+  /* The conversion target: sub, buttons and the note are fully opaque by 300ms. */
+  .lp-hero-sub,
+  .lp-hero-actions,
+  .lp-hero-proof,
+  .lp-hero-micro {
+    animation: lp-hero-up 260ms var(--ease-emerge) 40ms backwards;
+  }
+  .lp-hero-proof,
+  .lp-hero-micro {
+    animation-delay: 160ms;
+  }
+  /* The sheet rises at once and is never below full ink. */
+  .lp-sheet {
+    animation: lp-hero-arrive 600ms var(--ease-emerge) backwards;
+  }
+  /* The sisters spring up from behind the sheet (100 to 900ms), then float while the hero is live. */
+  .lp-sis {
+    animation:
+      lp-hero-fan 720ms var(--ease-back) var(--fd) backwards,
+      lp-hero-float var(--fl) ease-in-out 1.2s infinite alternate;
+    animation-play-state: running, paused;
+  }
+  .lp-hero[data-live] .lp-sis {
+    animation-play-state: running, running;
+  }
+  .lp-sis--l {
+    --fy: 90px;
+    --fd: 100ms;
+    --fl: 7s;
+  }
+  .lp-sis--r {
+    --fy: 110px;
+    --fd: 200ms;
+    --fl: 9s;
+  }
+  .lp-sis--s {
+    --fy: 90px;
+    --fd: 300ms;
+    --fl: 8s;
+  }
+  .lp-sis-wave--s > i {
+    animation: lp-hero-voice 1.1s ease-in-out var(--d) infinite alternate;
+    animation-play-state: paused;
+  }
+  .lp-hero[data-live] .lp-sis-wave--s > i {
+    animation-play-state: running;
+  }
+
+  /* A new set: the sentences settle in place at full ink, top to bottom, all done by 360ms. */
+  .lp-marks.is-again .lp-row-t {
+    animation: lp-hero-swap 180ms var(--ease-emerge) backwards;
+    animation-delay: calc(var(--k) * 45ms);
+  }
+  .lp-row:not(.lp-row--rest) > .lp-row-t::before {
+    animation: lp-hero-sweep 520ms var(--ease-emerge);
+    animation-delay: calc(var(--m0) + var(--t) * (480ms + var(--k) * 400ms));
+  }
+  .lp-mk--strike::after {
+    animation: lp-hero-strike 240ms var(--ease-q) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * 700ms);
+  }
+  .lp-mk-under {
+    animation: lp-hero-strike 280ms var(--ease-q) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * 1080ms);
+  }
+  .lp-mk-fix {
+    animation: lp-hero-fix 300ms var(--ease-back) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * (880ms + var(--k) * 360ms));
+  }
+  .lp-mk-fix--ins {
+    animation-delay: calc(var(--m0) + var(--t) * 1560ms);
+  }
+  .lp-marks:not(.is-again) .lp-mk-tag {
+    animation: lp-hero-tag 260ms var(--ease-emerge) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * (920ms + var(--k) * 340ms));
+  }
+  .lp-crit-bar > i {
+    animation: lp-hero-fill 420ms var(--ease-emerge) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * (1440ms + var(--k) * 70ms));
+  }
+  /* The last sentence types in after the third mark (about 28ms a letter); the caret then blinks while the hero is live. */
+  .lp-type::after {
+    animation: lp-hero-type calc(var(--n) * 28ms) steps(var(--n), end) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * 1700ms);
+  }
+  .lp-type-caret {
+    animation: lp-hero-blink 1s steps(1, end) calc(var(--m0) + var(--t) * 1700ms + var(--n) * 28ms) infinite;
+    animation-play-state: paused;
+  }
+  /* Later passes type the new last sentence at once, while the marks land above it. */
+  .lp-marks.is-again .lp-type::after {
+    animation-delay: 220ms;
+  }
+  .lp-marks.is-again .lp-type-caret {
+    animation-delay: calc(220ms + var(--n) * 28ms);
+  }
+  .lp-hero[data-live] .lp-type-caret {
+    animation-play-state: running;
+  }
+  /* Slip: drops in about a second in, the ?.? is stamped on it a beat later (once); later passes pulse it. */
+  .lp-slip {
+    animation: lp-hero-slip 300ms var(--ease-emerge) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * 1600ms);
+  }
+  .lp-slip-q {
+    transform-origin: 30% 70%;
+    animation: lp-hero-stamp 480ms var(--ease-back) backwards;
+    animation-delay: calc(var(--m0) + var(--t) * 1700ms);
+  }
+  .lp-slip-q.is-again {
+    animation: lp-hero-qpulse 420ms var(--ease-emerge);
+    animation-delay: calc(var(--t) * 1600ms);
+  }
+  .lp-sheet-prompt {
+    animation: lp-hero-up 300ms var(--ease-emerge) backwards;
+  }
+
+  /* Between sets the bars slide from the old proportions to the new ones; they never drain. */
+  .lp-crit-bar > i {
+    transition: transform 600ms var(--ease-emerge);
+  }
+
+  /* Three bounces, then it rests (2.2.2: no endless motion beside the copy). */
+  .lp-hero-cue > i {
+    animation: lp-hero-cue 2.4s var(--ease-emerge) 2.6s 3;
+    animation-play-state: paused;
+  }
+  .lp-hero[data-live] .lp-hero-cue > i {
+    animation-play-state: running;
+  }
+}
+/* The visitor's Pause animation switch freezes every loop in the hero too. */
+.landing[data-paused] :is(.lp-sis-wave--s > i, .lp-type-caret) {
+  animation-play-state: paused !important;
+}
+
+/* ---------- Scroll: a light parallax on wide screens; the copy leaves at its own speed and never fades ---------- */
+@keyframes lp-hero-par-sheet {
+  to {
+    transform: translateY(-32px);
+  }
+}
+@keyframes lp-hero-par-l {
+  to {
+    transform: translateX(-10px) rotate(-2deg);
+  }
+}
+@keyframes lp-hero-par-s {
+  to {
+    transform: translateX(10px) rotate(2deg);
+  }
+}
+@keyframes lp-hero-par-r {
+  to {
+    transform: translateY(-10px) rotate(-1deg);
+  }
+}
+@keyframes lp-hero-cue-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-hero-cue {
+      animation: lp-hero-cue-out linear forwards;
+      animation-timeline: scroll(root);
+      animation-range: 0 8vh;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) and (min-width: 64rem) {
+    .lp-sheet-par,
+    .lp-sis-pos {
+      animation: lp-hero-par-sheet linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 60vh;
+    }
+    .lp-sis-pos--l {
+      animation-name: lp-hero-par-l;
+    }
+    .lp-sis-pos--s {
+      animation-name: lp-hero-par-s;
+    }
+    .lp-sis-pos--r {
+      animation-name: lp-hero-par-r;
+    }
+  }
+}
+
+/* index.html painted the headline, sub and buttons before the script ran (its static shell): they stay put. */
+html[data-lp-pre] .lp-hero :is(.lp-hero-w, .lp-hero-sub, .lp-hero-actions, .lp-hero-micro) {
+  animation: none;
+}
+
+/* ---------- The media strip: what is being marked, at a glance (one 44px row for every skill, so the sheet never jumps) ---------- */
+.lp-media {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.lp-audio {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.lp-audio-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.lp-audio-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: var(--accent-ink);
+}
+.lp-audio--speaking .lp-audio-btn {
+  background: transparent;
+  border: 1.5px solid var(--line-strong);
+}
+.lp-audio-btn > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lp-pen); /* recording */
+}
+.lp-audio-wave {
+  position: relative;
+  height: 44px;
+  overflow: hidden;
+}
+.lp-audio-bars {
+  position: absolute;
+  inset: 16px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lp-audio-bars > i {
+  width: 3px;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transform: scaleY(var(--h));
+}
+.lp-audio-played {
+  clip-path: inset(0 30% 0 0);
+}
+.lp-audio-played > i {
+  background: var(--ink);
+}
+/* The playhead: a full-width layer whose right edge is the line, moved with transform only. */
+.lp-audio-head {
+  position: absolute;
+  inset: 12px 0 0;
+  border-right: 2px solid var(--ink);
+  transform: translateX(-30%);
+}
+.lp-audio-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--x) * 100%);
+  padding-left: 4px;
+  border-left: 2px solid var(--lp-pen);
+  font-size: 0.6875rem;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--lp-pen);
+}
+.lp-audio-time {
+  font-size: var(--lp-fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lp-media-text {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  color: var(--muted);
+}
+.lp-media-para {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--lp-radius-chip);
+  font-family: var(--font-sans);
+  font-size: var(--lp-fs-xs);
+  font-weight: 600;
+  color: var(--ink);
+}
+.lp-media-line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lp-media-line mark {
+  padding: 0 0.2em;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--lp-pen);
+}
+.lp-media-q {
+  flex: none;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-size: var(--lp-fs-xs);
+  font-weight: 600;
+}
+.lp-wc {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-size: var(--lp-fs-xs);
+  color: var(--muted);
+}
+.lp-wc-n {
+  font-weight: 600;
+  color: var(--ink);
+}
+.lp-wc-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--lp-skel);
+}
+.lp-wc-bar > i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ink);
+  transform: scaleX(var(--f));
+  transform-origin: 0 50%;
+}
+.lp-wc-bar > b {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  left: calc(var(--x) * 100%);
+  width: 2px;
+  background: var(--lp-pen);
+}
+@container lp-sheet (max-width: 26rem) {
+  .lp-audio-time,
+  .lp-wc-min {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes lp-audio-play {
+    from {
+      clip-path: inset(0 82% 0 0);
+    }
+  }
+  @keyframes lp-audio-head {
+    from {
+      transform: translateX(-82%);
+    }
+  }
+  .lp-audio-played {
+    animation: lp-audio-play 4.2s linear backwards;
+  }
+  .lp-audio-head {
+    animation: lp-audio-head 4.2s linear backwards;
+  }
+  .lp-wc-bar > i {
+    animation: lp-hero-fill 900ms var(--ease-emerge) backwards;
+  }
+  .lp-audio-tick {
+    animation: lp-hero-tag 260ms var(--ease-emerge) backwards;
+    animation-delay: calc(var(--x) * 4.2s - 0.6s);
+  }
+}
+.landing[data-paused] :is(.lp-audio-played, .lp-audio-head, .lp-audio-tick) {
+  animation: none;
+}
+
+/* Reduced motion: no animation at all; the base above is the settled, marked composition. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero *,
+  .lp-hero *::before,
+  .lp-hero *::after {
+    animation: none;
+    transition: none;
+  }
+}

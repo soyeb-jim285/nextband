@@ -3,12 +3,17 @@ import { Compass, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button, buttonStyles, EmptyState, PageContainer } from '@/components/ui';
 import { ApiError } from '@/lib/api';
+import { useHome } from '@/lib/query';
 
-const home = (
-  <Link to="/" className={buttonStyles({ variant: 'outline' })}>
-    Back to dashboard
-  </Link>
-);
+function HomeLink() {
+  const home = useHome();
+  return (
+    <Link to={home.to} className={buttonStyles({ variant: 'outline' })}>
+      Back to {home.label.toLowerCase()}
+    </Link>
+  );
+}
+const home = <HomeLink />;
 
 // Server 404 messages ("Attempt not found", "Prompt not found", …) → what the user can do about it.
 const NOT_FOUND = [

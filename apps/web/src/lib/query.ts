@@ -23,10 +23,34 @@ function takeInlineMe() {
   });
 }
 
+/**
+ * A synchronous "this browser has an account" hint (localStorage, no personal data), read by index.html and the '/'
+ * route before /api/me answers: an account waits for its redirect to /overview, a visitor gets the landing at once.
+ */
+export const ACCOUNT_HINT = 'nb-acct';
+export function rememberAccount(on: boolean) {
+  try {
+    if (on) localStorage.setItem(ACCOUNT_HINT, '1');
+    else localStorage.removeItem(ACCOUNT_HINT);
+  } catch {
+    /* storage blocked: the '/' route falls back to waiting briefly */
+  }
+}
+export function hasAccountHint() {
+  try {
+    return localStorage.getItem(ACCOUNT_HINT) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export const meQuery = queryOptions({
   queryKey: ['me'],
   // A guest is a normal state, not an error: 401 resolves to null.
-  queryFn: () => call<Schemas['Me'] | null>(takeInlineMe() ?? client.GET('/api/me')).catch((e) => (e instanceof ApiError && e.status === 401 ? null : Promise.reject(e))),
+  queryFn: () =>
+    call<Schemas['Me'] | null>(takeInlineMe() ?? client.GET('/api/me'))
+      .catch((e) => (e instanceof ApiError && e.status === 401 ? null : Promise.reject(e)))
+      .then((me) => (rememberAccount(isAccount(me)), me)),
   staleTime: 5 * 60_000,
 });
 
@@ -41,6 +65,9 @@ export const useAccount = () => {
   const me = useMe().data;
   return isAccount(me) ? me : null;
 };
+
+/** Where "home" is: the dashboard for an account; the landing page for a visitor or a guest (they have no dashboard). */
+export const useHome = () => (useAccount() ? ({ to: '/overview', label: 'Dashboard' } as const) : ({ to: '/', label: 'Home' } as const));
 
 /** Loader helper for personal pages: runs `load` only for a signed-in account. A visitor or a guest gets the page's sign-up gate and no request that would answer 403. */
 export async function loadForAccount(qc: QueryClient, load: () => unknown) {

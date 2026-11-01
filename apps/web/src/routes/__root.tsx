@@ -1,13 +1,30 @@
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
-import { lazy, Suspense } from 'react';
-import { FeedbackDialog } from '@/components/layout/FeedbackButton';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { RouteError } from '@/components/layout/RouteError';
 import { ReplayRecorder } from '@/components/ReplayRecorder';
 import { Toaster } from '@/components/ui';
 import { meQuery } from '@/lib/query';
 
 const NotFoundInShell = lazy(() => import('@/components/layout/NotFoundInShell'));
+const FeedbackDialog = lazy(() => import('@/components/layout/FeedbackButton').then((m) => ({ default: m.FeedbackDialog })));
+const FEEDBACK_EVENT = 'ielts:feedback'; // same as FeedbackButton's; importing it would pull the dialog into the entry
+
+/** Mounts the report dialog on the first openFeedback() only, so its dialog code is not in every page's first load. */
+function LazyFeedback() {
+  const [opener, setOpener] = useState<HTMLElement | null | undefined>(undefined);
+  useEffect(() => {
+    const on = (e: Event) => setOpener((e as CustomEvent<HTMLElement | null | undefined>).detail ?? null);
+    window.addEventListener(FEEDBACK_EVENT, on, { once: true });
+    return () => window.removeEventListener(FEEDBACK_EVENT, on);
+  }, []);
+  if (opener === undefined) return null;
+  return (
+    <Suspense fallback={null}>
+      <FeedbackDialog openedBy={opener} />
+    </Suspense>
+  );
+}
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: () => (
@@ -15,7 +32,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       <Outlet />
       <Toaster />
       <ReplayRecorder />
-      <FeedbackDialog />
+      <LazyFeedback />
     </>
   ),
   notFoundComponent: NotFound,

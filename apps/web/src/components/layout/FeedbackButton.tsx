@@ -5,7 +5,7 @@ import { Button, Dialog, Textarea, toast } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 
 const MAX = 2000;
-const EVENT = 'ielts:feedback';
+const EVENT = 'ielts:feedback'; // __root.tsx listens for the same name to lazy-mount the dialog
 /** Open the report dialog from any entry point (sidebar row, More sheet, exam bar). `returnTo` gets focus back on close when the opener unmounts. */
 export const openFeedback = (returnTo?: HTMLElement | null) => window.dispatchEvent(new CustomEvent(EVENT, { detail: returnTo }));
 const sid = () => {
@@ -16,11 +16,14 @@ const sid = () => {
   }
 };
 
-/** "Report a problem" message dialog, mounted once at the root and opened by openFeedback(); sends the current page and replay session id. */
-export function FeedbackDialog() {
+/**
+ * "Report a problem" message dialog, opened by openFeedback(); sends the current page and replay session id. The root loads
+ * it lazily on the first openFeedback() (so its Radix code stays out of the entry) and passes that first opener in.
+ */
+export function FeedbackDialog({ openedBy }: { openedBy?: HTMLElement | null } = {}) {
   const { pathname, searchStr } = useLocation();
-  const [open, setOpen] = useState(false);
-  const returnFocus = useRef<HTMLElement | null>(null);
+  const [open, setOpen] = useState(openedBy !== undefined);
+  const returnFocus = useRef<HTMLElement | null>(openedBy ?? null);
   useEffect(() => {
     const on = (e: Event) => {
       returnFocus.current = (e as CustomEvent<HTMLElement | null | undefined>).detail ?? null;

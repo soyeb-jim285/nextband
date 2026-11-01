@@ -11,13 +11,17 @@ async function fillSignup(page: Page, to: string, confirm = 'correct-horse-batte
 }
 
 test.describe('guest browsing', () => {
-  test('login is not the first screen: the dashboard explains the product and the free tests', async ({ page }) => {
+  test('login is not the first screen: the landing page explains the product and starts a free test', async ({ page }) => {
     await page.goto('/');
-    await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Practise IELTS Speaking and Writing' })).toBeVisible();
-    await expect(page.getByText('Example, not a real score').first()).toBeVisible();
-    await expect(page.getByRole('main').getByRole('link', { name: 'Try a speaking test' })).toBeVisible();
-    await expect(page.getByRole('main').getByText('1 test left this week').first()).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Know your band. Know what to fix.' })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('link', { name: /free/i })).toHaveAttribute('href', /\/writing$/);
+    await expect(page.getByRole('contentinfo').getByRole('navigation', { name: 'Legal' })).toBeVisible();
+  });
+
+  test('a visitor has no dashboard: /overview goes to the landing page', async ({ page }) => {
+    await page.goto('/overview');
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test('hubs and the prompt bank open without an account (no Cambridge prompts)', async ({ page }) => {
@@ -50,7 +54,7 @@ test.describe('sign up', () => {
   test('lands on the dashboard', async ({ page }) => {
     await page.goto('/signup');
     await fillSignup(page, email('e2e'));
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/overview$/);
     await expect(page.getByRole('heading', { name: 'Get your first band' })).toBeVisible();
   });
 });

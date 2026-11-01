@@ -4,14 +4,14 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
-/** Preload the latin variable fonts used above the fold so they download with the HTML, not after the CSS is parsed (vite doesn't hash-resolve hand-written preload hrefs). */
+/** Preload the serif (the hero H1; the sans body face loads with the CSS, so it does not compete with the entry script on a slow link) so it downloads with the HTML, not after the CSS is parsed (vite doesn't hash-resolve hand-written preload hrefs). */
 const preloadFonts = (): Plugin => ({
   name: 'preload-fonts',
   transformIndexHtml: {
     order: 'post',
     handler: (_html, ctx) =>
       Object.keys(ctx.bundle ?? {})
-        .filter((f) => /(hanken-grotesk|newsreader)-latin-wght-normal.*\.woff2$/.test(f))
+        .filter((f) => /newsreader-latin-wght-normal.*\.woff2$/.test(f))
         .map((f) => ({ tag: 'link', attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: `/${f}` }, injectTo: 'head' as const })),
   },
 });
@@ -27,8 +27,35 @@ const stubStyleguide = (): Plugin => ({
       : null,
 });
 
+/**
+ * The landing page ('/') is the first thing a visitor opens, and its lazy route chunk, that chunk's CSS and its imports
+ * only start downloading after the entry has run. Preload them early so they arrive with the entry (one round trip less
+ * before the hero paints on a slow mobile link). Every route shares this HTML, so the links are added by a tiny inline
+ * script only when index.html marked the page as the landing (data-lp-pre: '/' and no account hint): deep links such as
+ * /writing or /overview never download the landing.
+ */
+const preloadLanding = (): Plugin => ({
+  name: 'preload-landing',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler: (_html, ctx) => {
+      const bundle = ctx.bundle ?? {};
+      const landing = Object.values(bundle).find((c) => c.type === 'chunk' && /[\\/]src[\\/]routes[\\/]index\.tsx/.test(c.facadeModuleId ?? ''));
+      if (!landing || landing.type !== 'chunk') return [];
+      const entry = new Set(ctx.chunk ? [ctx.chunk.fileName, ...ctx.chunk.imports] : []); // already preloaded by Vite
+      const links = [
+        ...[landing.fileName, ...landing.imports].filter((f) => !entry.has(f)).map((f) => ['modulepreload', `/${f}`]),
+        ...[...(landing.viteMetadata?.importedCss ?? [])].map((f) => ['style', `/${f}`]),
+      ];
+      const js = `if(document.documentElement.hasAttribute('data-lp-pre'))for(const[r,h]of ${JSON.stringify(links)}){const l=document.createElement('link');if(r==='style'){l.rel='preload';l.as='style'}else{l.rel=r;l.crossOrigin=''}l.href=h;document.head.appendChild(l)}`;
+      return [{ tag: 'script', children: js, injectTo: 'head' as const }];
+    },
+  },
+});
+
 export default defineConfig({
-  plugins: [stubStyleguide(), tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss(), preloadFonts()],
+  plugins: [stubStyleguide(), tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss(), preloadFonts(), preloadLanding()],
   build: {
     rolldownOptions: {
       // The ui barrel (components/ui/index.ts) re-exports every primitive; its modules only declare components, so importing Button must not drag in the menu/dialog/slider code too.

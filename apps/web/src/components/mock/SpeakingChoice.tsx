@@ -65,7 +65,7 @@ export function SpeakingChoice({ mockId, onLive, liveBusy, error }: { mockId: st
           </Button>
         </Option>
         <Option icon={<Clock />} meta="Within 7 days" title="Do it later" body="Your mock stays open. Come back from the dashboard when you are ready.">
-          <Link to="/" className={buttonStyles({ variant: 'outline', className: 'max-sm:w-full' })}>
+          <Link to="/overview" className={buttonStyles({ variant: 'outline', className: 'max-sm:w-full' })}>
             Back to dashboard
           </Link>
         </Option>

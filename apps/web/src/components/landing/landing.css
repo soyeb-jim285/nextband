@@ -1,0 +1,979 @@
+/* Hallmark · shape: film in acts · genre: modern-minimal · theme: custom (locked DESIGN.md, landing scope) · job: try · idea: "know your band, know what to fix: the product marking real answers" · vibe: "grey wireframes full of real words, crisp at rest" · hero: copy left, a marked essay sheet right with an "Overall ?.?" slip on its corner and the Listening, Reading and Speaking sheets fanned behind it · nav: fixed bar, logo left, two links and a pill right, hairline after 240px · footer: legal only (logo, mail, Practise and Legal navs, company address); the FAQ is its own section · imagery: the product drawn as grey wireframes with real text · signature: marks landing on real text, plus the ?.? slip (light question marks around an ink point) that settles into the Overall card; the page closes on the same slip
+ * axes: achromatic paper/Newsreader/ink · posture: restrained · contrast: pass · fold: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R4 V5 · weakest: E, fourteen sections of motion; nothing rests blurred: scrubbed keyframes are opacity and transform only, blur is a timed 400ms-or-less entry on at most one element per section */
+/* Hallmark · answered F8 · one choreography family (view() emerge, sharpen and exit) plus sticky Stage tracks, all from these primitives */
+/* Hallmark · answered F7 · the pill radius sits on controls (buttons, links, skip link) and on progress bars (criterion bars, rail bars), whose round caps are the wireframe look */
+/* Hallmark · material: a brief filter blur (4px or less, 400ms or less, timed, never scrubbed) is allowed on one element per section as it enters; content at rest is always crisp */
+/* Hallmark · waive 59 · the owner asked for more sections that show more of the product; each act still holds one idea per screen · fourteen acts walk through every part of the product: mock, Listening, Reading, Writing, Speaking, habits, plan, question bank, pricing and answers */
+/* Hallmark · owner waiver (not a gate waiver, gate 58 is Floor and stays reported) · the owner lifted the 450-word page budget and asked for real readable content inside every wireframe; the per-screen counts sloplint reports include that wireframe text */
+/* Hallmark · waive 77 · habits visual is a pinned stage, clamp(370px, 48dvh, 430px) tall, three piles plus the review card across the container · the static capture reads the scattered step-0 chips as thin; while pinned the piles and the card fill the frame */
+
+/*
+ * NextBand landing page. Scope: .landing (Landing.tsx). DESIGN.md stays the system; this file holds the two
+ * landing-only exceptions the owner asked for: a monochrome palette and scroll-driven motion.
+ * Contract and API notes: see Stage.tsx, wire.tsx, Rail.tsx (the slip chip), and scratchpad contract-notes.md.
+ */
+
+/* ---------- Token block: every raw colour of the landing page lives here (the brand's cool slate ramp, the pen, shadows).
+   The ramp follows DESIGN.md (Ocean Teal): 50 = --bg, 100 = --surface-2, 200 = --line, 600 = --muted, 950 = --ink;
+   dark 1000/900/850/800/150. Accent, status and chart colours are the app's own tokens (styles.css). ---------- */
+:root {
+  --lp-g-0: #ffffff;
+  --lp-g-50: #f7f9fb;
+  --lp-g-100: #eef2f6;
+  --lp-g-150: #e8edf3;
+  --lp-g-200: #e3e8ef;
+  --lp-g-250: #d5dde7;
+  --lp-g-300: #c3cdd9;
+  --lp-g-400: #94a3b8;
+  --lp-g-500: #7a8a9e;
+  --lp-g-550: #64748b;
+  --lp-g-600: #5b6b80;
+  --lp-g-700: #3d4a5c;
+  --lp-g-800: #1d293b;
+  --lp-g-850: #172338;
+  --lp-g-900: #111b2b;
+  --lp-g-950: #0f172a;
+  --lp-g-1000: #0a111c;
+  --lp-pen-l: #be123c; /* the proofreader's pen (the app's --bad): marks only (strikes, underlines, fix chips) */
+  --lp-pen-d: #fb7185;
+  --lp-brand-l: #0f766e; /* the app's --accent, for the pre-paint shell in index.html (lp-pre.test.ts) */
+  --lp-brand-d: #2dd4bf;
+  --lp-brand-ink-d: #042f2c;
+  --lp-sh-card-l: 0 1px 2px rgb(15 23 42 / 0.04);
+  --lp-sh-pop-l: 0 0 0 1px rgb(15 23 42 / 0.06), 0 12px 32px -8px rgb(15 23 42 / 0.14);
+  --lp-sh-float-l: 0 1px 2px rgb(15 23 42 / 0.05), 0 6px 16px -8px rgb(15 23 42 / 0.14);
+  --lp-sh-card-d: 0 1px 0 rgb(255 255 255 / 0.02) inset;
+  --lp-sh-pop-d: 0 0 0 1px rgb(255 255 255 / 0.06), 0 16px 40px -8px rgb(0 0 0 / 0.6);
+  --lp-sh-float-d: 0 0 0 1px rgb(255 255 255 / 0.05), 0 8px 20px -8px rgb(0 0 0 / 0.6);
+  --lp-sh-sheet-l: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.16), 0 32px 64px -32px rgb(15 23 42 / 0.18);
+  --lp-sh-sheet-d: 0 0 0 1px rgb(255 255 255 / 0.05), 0 12px 32px -12px rgb(0 0 0 / 0.7), 0 40px 72px -32px rgb(0 0 0 / 0.6);
+}
+
+/* ---------- Landing scope: surfaces on the slate ramp (the app's values), plus the landing's own tokens. ---------- */
+.landing {
+  --bg: var(--lp-g-50);
+  --surface: var(--lp-g-0);
+  --surface-2: var(--lp-g-100);
+  --sidebar: var(--lp-g-100);
+  --sidebar-accent: var(--lp-g-150);
+  --ink: var(--lp-g-950);
+  --muted: var(--lp-g-600);
+  --line: var(--lp-g-200);
+  --line-strong: var(--lp-g-500);
+
+
+  --shadow-card: var(--lp-sh-card-l);
+  --shadow-pop: var(--lp-sh-pop-l);
+
+  --lp-pen: var(--lp-pen-l); /* 5.9:1 or better on the paper and the card; teacher's marks only, teal is the action colour */
+  --lp-pen-ink: var(--lp-g-0); /* text on a pen fill */
+  --lp-ghost: var(--lp-g-250); /* glyph-field marks */
+  --lp-skel: var(--lp-g-150); /* empty bar track */
+  --lp-skel-2: var(--lp-g-250); /* darker bar track (rail) */
+  --lp-hair: var(--lp-g-200); /* decorative hairline */
+  --lp-shadow-float: var(--lp-sh-float-l); /* floating wireframe card */
+  --lp-shadow-sheet: var(--lp-sh-sheet-l); /* the hero's answer sheet: a deeper, layered lift */
+
+  --lp-fs-xs: 0.8125rem; /* the one sub-14px size: wireframe labels, chips, captions (13px) */
+  --lp-header-h: 4rem;
+  --lp-radius-card: 0.75rem;
+  --lp-radius-chip: 0.375rem;
+  --ease-emerge: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  min-height: 100dvh;
+}
+/* A returning guest sees the ContinueStrip under the header from the first paint, where they look for it. */
+.landing:has(.lp-continue) {
+  --lp-header-h: 6.5rem;
+}
+
+.dark .landing {
+  --bg: var(--lp-g-1000);
+  --surface: var(--lp-g-900);
+  --surface-2: var(--lp-g-850);
+  --sidebar: var(--lp-g-900);
+  --sidebar-accent: var(--lp-g-850);
+  --ink: var(--lp-g-150);
+  --muted: var(--lp-g-400);
+  --line: var(--lp-g-800);
+  --line-strong: var(--lp-g-550);
+
+
+  --shadow-card: var(--lp-sh-card-d);
+  --shadow-pop: var(--lp-sh-pop-d);
+
+  --lp-pen: var(--lp-pen-d); /* 6.5:1 or better on the dark card */
+  --lp-pen-ink: var(--lp-g-1000);
+  --lp-ghost: var(--lp-g-800);
+  --lp-skel: var(--lp-g-850);
+  --lp-skel-2: var(--lp-g-800);
+  --lp-hair: var(--lp-g-850);
+  --lp-shadow-float: var(--lp-sh-float-d);
+  --lp-shadow-sheet: var(--lp-sh-sheet-d);
+}
+
+/* Floor: no sideways scroll at any width (clip keeps sticky working; hidden would not). */
+html:has(.landing),
+html:has(.landing) body {
+  overflow-x: clip;
+}
+html:has(.landing) {
+  scroll-padding-top: 5rem; /* anchors (#pricing) land below the fixed header */
+  background: var(--lp-g-50);
+}
+.dark:has(.landing) {
+  background: var(--lp-g-1000);
+  color: var(--lp-g-150);
+}
+.landing ::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/* ---------- Layout ---------- */
+.lp-container {
+  width: 100%;
+  max-width: 80rem; /* 1280 including gutters: at 1920 the gutters grow, the measure does not */
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 48rem) {
+  .lp-container {
+    padding-inline: 2rem;
+  }
+}
+@media (min-width: 80rem) {
+  .lp-container {
+    padding-inline: 3rem;
+  }
+}
+
+/* ---------- Type (body face for labels, sentence case; Newsreader for heads; mono only for timers in wireframes) ---------- */
+.lp-h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 1.3rem + 2.6vw, 3.25rem);
+  line-height: 1.04;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.lp-sub {
+  font-size: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+  max-width: 46ch;
+}
+.lp-label {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.lp-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* ---------- Actions: the page's one primary recipe and one secondary ---------- */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding-inline: 1.25rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out-quart),
+    border-color var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+.lp-btn:active {
+  transform: translateY(1px);
+}
+.lp-btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.lp-btn--primary:hover {
+  background: var(--accent-hover);
+}
+.lp-btn--secondary {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: transparent;
+}
+.lp-btn--secondary:hover {
+  background: var(--hover);
+}
+.lp-btn--sm {
+  min-height: 2.25rem;
+  padding-inline: 1rem;
+  font-size: 0.875rem;
+}
+.lp-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.lp-link:hover {
+  text-decoration-thickness: 2px;
+}
+/* Focus: instant, ink, offset so it reads on both the pill and the paper. */
+.landing a:focus-visible,
+.landing button:focus-visible,
+.landing [tabindex]:not([tabindex='-1']):focus-visible,
+.lp-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.landing main:focus-visible {
+  outline: none; /* the skip link's target; it only receives programmatic focus */
+}
+
+/* ---------- Pause animation switch (wire.tsx PauseButton): hero, header and footer ---------- */
+.lp-pause {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 2.75rem;
+  padding-inline: 0.25rem;
+  border-radius: var(--lp-radius-chip);
+  font-size: var(--lp-fs-xs);
+  color: var(--muted);
+  cursor: pointer;
+}
+.lp-pause:hover,
+.lp-pause[aria-pressed='true'] {
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-pause {
+    display: none; /* nothing moves, so there is nothing to pause */
+  }
+}
+
+/* ---------- Skip link ---------- */
+.lp-skip {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  z-index: 70;
+  padding: 0.625rem 1rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+.lp-skip:focus-visible {
+  transform: none;
+}
+
+/* ---------- Header ---------- */
+.lp-header {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  background: var(--bg);
+}
+.lp-header::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: var(--line);
+}
+.lp-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 4rem;
+}
+.lp-header-logo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  border-radius: var(--radius);
+  color: var(--ink);
+}
+.lp-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.lp-header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline: 0.75rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out-quart);
+}
+.lp-header-link:hover {
+  color: var(--ink);
+}
+.lp-header-nav .lp-btn {
+  position: relative;
+  margin-inline-start: 0.5rem;
+}
+.lp-header-nav .lp-btn--sm::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+.lp-btn-short {
+  display: none;
+}
+.lp-header-pause {
+  display: none;
+}
+@media (min-width: 40rem) and (prefers-reduced-motion: no-preference) {
+  .lp-header-pause {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 2.75rem;
+  }
+}
+.lp-header-link--jump {
+  display: none;
+}
+@media (min-width: 64rem) {
+  .lp-header-link--jump {
+    display: inline-flex; /* jump links to the Writing and Speaking acts */
+  }
+}
+@media (max-width: 30rem) {
+  .lp-header-link--wide {
+    display: none; /* Pricing: the section is on this page; Sign in stays */
+  }
+  .lp-header-link {
+    padding-inline: 0.5rem;
+  }
+  .lp-header-nav .lp-btn {
+    margin-inline-start: 0.25rem;
+  }
+}
+@media (max-width: 30rem) {
+  .lp-btn-full {
+    display: none;
+  }
+  .lp-btn-short {
+    display: inline;
+  }
+}
+
+/* ---------- Continue strip (a guest who already took tests) ---------- */
+.lp-continue {
+  border-top: 1px solid var(--line);
+}
+.lp-continue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 2.5rem;
+  font-size: 0.875rem;
+}
+.lp-continue-label {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.lp-continue-link {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  border-radius: var(--lp-radius-chip);
+}
+.lp-continue-meta {
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 40rem) {
+  .lp-continue-label {
+    display: none;
+  }
+}
+/* ---------- Section head: H2 in the left half, the sub in the right, baseline aligned ---------- */
+.lp-head {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 48rem) {
+  .lp-head--split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 2rem 4rem;
+  }
+}
+/* stacked: the H2 over its sub, left; centred: both on the axis */
+.lp-head--stacked {
+  max-width: 40rem;
+}
+.lp-head--centred {
+  justify-items: center;
+  text-align: center;
+  margin-inline: auto;
+  max-width: 48rem;
+}
+/* end: the head in the right column, H2 over sub (04b-task1) */
+@media (min-width: 48rem) {
+  .lp-head--end {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .lp-head--end > * {
+    grid-column: 2;
+  }
+}
+/* the quiet action that closes an act, placed after its pin so it never sits inside a sticky frame */
+.lp-act-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding-block: 1.5rem 2.5rem;
+}
+.lp-act-cta p {
+  color: var(--muted);
+}
+.lp-act-cta--centre {
+  justify-content: center;
+}
+/* Pinned acts end on a centred frame with spare paper under it: the action rides up into that spare. Below 820px tall
+   there is no spare (the essay frame fills a 720px screen), so the action stays under the frame. */
+@media (min-width: 48rem) and (min-height: 51.25rem) and (prefers-reduced-motion: no-preference) {
+  .lp-act-cta {
+    position: relative;
+    z-index: 2;
+    margin-top: -10svh;
+  }
+}
+
+/* ---------- Wireframe kit (wire.tsx) ---------- */
+.lp-card {
+  background: var(--surface);
+  border-radius: var(--lp-radius-card);
+  box-shadow: var(--lp-shadow-float);
+}
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.75rem;
+  padding-inline: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.8125rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.lp-pill--ink {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.5rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--lp-radius-chip);
+  background: var(--surface-2);
+  font-size: 0.8125rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* ---------- Stage (Stage.tsx): a tall track with a pinned 100dvh frame ---------- */
+.lp-track {
+  position: relative;
+  height: var(--lp-track-h, 180svh);
+  view-timeline: --lp-track block;
+}
+.lp-stage {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: clip;
+}
+.lp-stage:focus-within {
+  overflow: visible; /* a focused link is never cut off by its pinned frame */
+}
+.lp-sentinel {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  visibility: hidden;
+}
+@media (max-width: 47.999rem) {
+  .lp-track {
+    height: calc(var(--lp-track-h, 180svh) * 0.8);
+  }
+}
+/* Phones and short screens (laptops with browser bars, 200% zoom): a pinned 100dvh frame would cut its own content,
+   so every act unpins and plays once (Stage.tsx SHORT). */
+@media (max-width: 47.999rem), (max-height: 43.75rem) {
+  .lp-track--mobile-flat {
+    height: auto;
+  }
+  .lp-track--mobile-flat .lp-stage {
+    position: relative;
+    height: auto;
+    overflow: visible;
+  }
+}
+
+/* ---------- The unknown band, "?.?" (wire.tsx BandQ): two pen-drawn hooks and one baseline point, in ink ---------- */
+.lp-q {
+  display: inline-block;
+  line-height: 1;
+  color: var(--ink);
+}
+.lp-q svg {
+  display: block;
+  height: 0.8em;
+  width: auto;
+  overflow: visible;
+}
+.lp-q-hook {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lp-q-pt {
+  fill: var(--lp-pen);
+}
+
+/* ---------- The pen (wire.tsx Pen): the page's one accent, drawn under or around a headline word ---------- */
+.lp-pen {
+  position: relative;
+  display: inline-block;
+}
+.lp-pen-s {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--lp-pen);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+.lp-pen-s path {
+  vector-effect: non-scaling-stroke;
+}
+.lp-pen--underline .lp-pen-s {
+  bottom: -0.1em;
+  height: 0.16em;
+}
+.lp-pen--loop .lp-pen-s {
+  inset: -0.14em -0.2em;
+  width: calc(100% + 0.4em);
+  height: calc(100% + 0.28em);
+}
+@keyframes lp-pen-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-pen-s {
+      animation: lp-pen-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 30% entry 90%; /* fully drawn once the heading is in the lower third */
+    }
+  }
+}
+
+/* ---------- Rail (Rail.tsx): the slip chip. Right edge, from 1280px up; each cell fills with the pen as its skill passes ---------- */
+/* The skills rail (Rail.tsx): a track with a stop per skill, from 1280px up. */
+.lp-rail {
+  display: none;
+}
+@media (min-width: 80rem) {
+  .lp-rail {
+    position: fixed;
+    top: 50%;
+    right: 18px;
+    z-index: 30;
+    display: block;
+    translate: 0 -50%;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--dur) var(--ease-emerge),
+      visibility 0s var(--dur);
+  }
+  .lp-rail[data-show] {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+}
+.lp-rail ol {
+  position: relative;
+  display: grid;
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* the track behind the stops, and its fill down to the skill on screen */
+.lp-rail ol::before,
+.lp-rail ol::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  right: 13px;
+  width: 2px;
+  height: calc(100% - 28px);
+  border-radius: 1px;
+  background: var(--line-strong);
+}
+.lp-rail ol::after {
+  background: var(--ink);
+  transform: scaleY(var(--fill, 0));
+  transform-origin: top;
+  transition: transform 420ms var(--ease-emerge);
+}
+.lp-rail a {
+  position: relative;
+  z-index: 1;
+  min-height: 28px; /* every row the dot's height, so the track's fill lines up with the stop index */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.lp-rail-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-inline: 8px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  transition:
+    background-color var(--dur) var(--ease-emerge),
+    border-color var(--dur) var(--ease-emerge),
+    transform var(--dur) var(--ease-emerge);
+}
+.lp-rail-name {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--lp-shadow-float);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    opacity var(--dur) var(--ease-emerge),
+    transform var(--dur) var(--ease-emerge);
+  pointer-events: none;
+}
+.lp-rail ol {
+  gap: 14px;
+}
+[data-state='done'] .lp-rail-dot {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+[data-state='on'] .lp-rail-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  transform: scale(1.35);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+[data-state='on'] .lp-rail-name,
+.lp-rail a:is(:hover, :focus-visible) .lp-rail-name {
+  opacity: 1;
+  transform: none;
+}
+[data-state='next'] a:hover .lp-rail-dot {
+  border-color: var(--ink);
+}
+
+/* Back to top: bottom right at every width, once the hero is behind. */
+.lp-totop {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--lp-shadow-float);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition:
+    opacity var(--dur) var(--ease-emerge),
+    transform var(--dur) var(--ease-emerge),
+    background-color var(--dur) var(--ease-emerge),
+    visibility 0s var(--dur);
+}
+.lp-totop[data-show] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+.lp-totop:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+@media (forced-colors: active) {
+  .lp-rail ol::after,
+  [data-state='done'] .lp-rail-dot,
+  [data-state='on'] .lp-rail-dot {
+    background: CanvasText;
+    color: Canvas;
+  }
+}
+
+/* ---------- Motion primitives. Default = the final, visible state. ---------- */
+@keyframes lp-close-gap {
+  from {
+    transform: translateY(64px);
+  }
+}
+@keyframes lp-emerge {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Scrubbed, so no blur: a scrubbed blur rests blurred wherever the reader stops scrolling. Names kept for the sections. */
+@keyframes lp-sharpen {
+  from {
+    opacity: 0.4;
+    transform: translateY(24px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-resolve {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lp-draw-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes lp-hairline {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lp-draw-x {
+  transform-origin: 0 50%;
+}
+.lp-draw-x:dir(rtl) {
+  transform-origin: 100% 50%;
+}
+
+
+/* Scrubbed: linear, the scroll is the ease. Shorthand first, then timeline, then range (the shorthand resets both). */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-header::after {
+      animation: lp-hairline linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 240px;
+    }
+    /* Every act after the hero closes the gap the same way: its frame rides up 64px as it enters, done by the time
+       its top is 60% up the screen (or 60% of a short section's height). One rule for all sections (pinned or not), so none arrives differently. */
+    /* The timeline is the section's, not the frame's: a frame inside a sticky stage has a stalled view(). */
+    .landing section[id]:not(#hero) {
+      view-timeline: --lp-sec block;
+    }
+    .landing section[id]:not(#hero) > .lp-container,
+    .landing section[id]:not(#hero) > .lp-track > .lp-stage > .lp-container {
+      animation: lp-close-gap linear both;
+      animation-timeline: --lp-sec;
+      animation-range: entry 0% entry 60%;
+    }
+    /* Capped in pixels as well as percent, so a tall block (a footer nav, a card) is never half-faded mid-screen. */
+    .lp-emerge {
+      animation: lp-emerge linear both;
+      animation-timeline: view();
+      animation-range: entry min(calc(8% + var(--order, 0) * 6%), calc(16px + var(--order, 0) * 24px)) entry min(calc(42% + var(--order, 0) * 6%), calc(140px + var(--order, 0) * 24px));
+    }
+    /* Done within the first 160px a card shows, whatever its height: it never rests faded where the scroll stops. */
+    .lp-sharpen {
+      animation: lp-sharpen linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 160px;
+    }
+    .lp-draw-x {
+      animation: lp-draw-x linear both;
+      animation-timeline: view();
+      /* drawn within the lowest quarter of the screen, so no rule sits half-drawn mid-page */
+      animation-range: cover 0% cover 25%;
+    }
+  }
+}
+
+/* Phones: any lp-sharpen animation (the shared class or a section's own use of the keyframes) runs the shallow
+   version, done by the time it is half in. */
+@keyframes lp-sharpen-sm {
+  from {
+    opacity: 0.4;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) and (max-width: 47.999rem) {
+    .landing .lp-sharpen {
+      animation-name: lp-sharpen-sm;
+      animation-range: entry 0% entry 120px;
+    }
+  }
+}
+
+/* Keyboard focus inside a block that is still emerging shows it whole: the ring and the label never sit faded. */
+.landing :is(.lp-emerge, .lp-sharpen):focus-within {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+/* Reduced motion: nothing moves; every primitive above already rests at its final state. Stages show their last step,
+   so the tall tracks would only add dead scroll under a frozen frame: they unpin and take their content's height. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-track {
+    height: auto;
+  }
+  .lp-stage {
+    position: relative;
+    height: auto;
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Infinite loops: only on screen (data-live, Landing.tsx), and never once the visitor pauses (wire.tsx) ---------- */
+.landing :is(.lp-bank-caret, .lp-sxe-viz > i, .lp-sxe-meter > i, .lp-sxe-caret) {
+  animation-play-state: paused !important;
+}
+.landing:not([data-paused]) section[data-live] :is(.lp-bank-caret, .lp-sxe-viz > i, .lp-sxe-meter > i, .lp-sxe-caret) {
+  animation-play-state: running !important;
+}
+.landing[data-paused] :is(.lp-sis, .lp-type-caret, .lp-hero-cue > i) {
+  animation-play-state: paused !important;
+}
+
+/* ---------- Off-screen acts skip style, layout and paint until they come near (the hero always renders) ----------
+   Only the unpinned acts: a pinned act owns a tall track whose height is its own, so a guessed intrinsic size would
+   resize the page as it renders. Each unpinned act's size is its measured height at 1440 wide. */
+.landing main > section:not(#hero):not(:has(.lp-track)) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1100px;
+}
+.landing main > #faq {
+  contain-intrinsic-size: auto 1200px;
+}
+.landing main > #close {
+  contain-intrinsic-size: auto 640px;
+}
+
+/* ---------- Handoffs: every gap between two acts is evened out by useEvenHandoffs (Landing.tsx), which sets each act's
+   margin-top. While it measures, lazily rendered acts are laid out so their content has a size. ---------- */
+.landing main.lp-measuring > section {
+  content-visibility: visible !important;
+}
+
+/* ---------- Windows High Contrast: selected segments and tracks keep a visible edge ---------- */
+@media (forced-colors: active) {
+  .lp-bank-seg-thumb {
+    box-shadow: none;
+    border: 2px solid Highlight;
+    forced-color-adjust: none;
+  }
+  .lp-address-track,
+  .lp-crit-bar,
+  .lp-mock-bar {
+    border: 1px solid CanvasText;
+  }
+  .lp-card {
+    border: 1px solid CanvasText;
+  }
+}

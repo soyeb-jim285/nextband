@@ -97,7 +97,7 @@ export const TEMPLATES = {
             { label: 'Listening and Reading', value: 'Every test' },
           ],
         },
-        { type: 'button', label: 'Start practising', url: '/', variant: 'solid' },
+        { type: 'button', label: 'Start practising', url: '/overview', variant: 'solid' },
         { type: 'text', text: 'Happy practising!' },
       ],
     },

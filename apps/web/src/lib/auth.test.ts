@@ -44,8 +44,8 @@ describe('email codes', () => {
 describe('safeRedirect', () => {
   it('keeps same-app paths (with their query) and rejects anything else', () => {
     expect(safeRedirect('/speaking/session?mode=p1')).toBe('/speaking/session?mode=p1');
-    expect(safeRedirect('//evil.com')).toBe('/');
-    expect(safeRedirect('https://evil.com')).toBe('/');
-    expect(safeRedirect(undefined)).toBe('/');
+    expect(safeRedirect('//evil.com')).toBe('/overview');
+    expect(safeRedirect('https://evil.com')).toBe('/overview');
+    expect(safeRedirect(undefined)).toBe('/overview');
   });
 });

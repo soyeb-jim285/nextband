@@ -1,0 +1,346 @@
+/* Hallmark · section part of landing.css: stamp, critique and waivers live there */
+
+/*
+ * 03b-practice, the Reading act. Desk, cards, result, tabs, details and the step timing come from 03-address.css
+ * (lp-lx-*); this file holds only what Reading adds: the passage-and-questions split, chosen answers, marks by type, the
+ * answer keys and the evidence marks. Base rules are step 3 (question 5 in focus).
+ */
+
+/* ---------- Exam: passage beside the questions (Runner) ---------- */
+.lp-rx-exam {
+  width: 60%;
+}
+.lp-rx-aa {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-weight: 600;
+}
+.lp-rx-aa + .lp-lx-clock {
+  margin-left: 0;
+}
+.lp-rx-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.lp-rx-passage,
+.lp-rx-questions {
+  padding: 16px 20px;
+}
+.lp-rx-passage {
+  border-right: 1px solid var(--lp-hair);
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.lp-rx-passage > p {
+  margin: 0 0 10px;
+}
+.lp-rx-ptitle {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.lp-rx-hl {
+  /* the reader's own highlight (Marks.tsx): grey, not the pen, so it never reads as marking */
+  padding: 0 2px;
+  background: var(--lp-g-200, var(--surface-2));
+  color: inherit;
+}
+.lp-rx-qhead {
+  margin: 0;
+  font-weight: 600;
+}
+.lp-rx-questions ol {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.lp-rx-q {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 6px;
+}
+.lp-rx-q > span {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+.lp-rx-tf {
+  padding: 1px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+/* Once marked (step 1 on), a wrong choice is struck in the pen. */
+.lp-rx-tf[data-wrong] {
+  border-color: var(--lp-pen);
+  color: var(--lp-pen);
+  text-decoration: line-through 1.5px;
+}
+.lp-lx-nums > i[data-flag] {
+  background: linear-gradient(225deg, var(--ink) 6px, transparent 6px);
+}
+
+.lp-rx-qhead--2 {
+  margin-top: 14px;
+}
+.lp-rx-sent {
+  display: block !important;
+}
+/* A completion gap: the typed word in a box, not a choice pill. */
+.lp-rx-gap {
+  display: inline-block;
+  min-width: 5.5rem;
+  margin-right: 2px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.lp-rx-typed {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* ---------- Result: marks by question type ---------- */
+.lp-rx-types {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+.lp-rx-types > li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 3px;
+}
+.lp-rx-tnum {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.lp-rx-types i {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) calc(var(--f) * 100%), var(--lp-g-200, var(--surface-2)) 0);
+}
+.lp-rx-chips {
+  display: flex;
+  gap: 4px;
+}
+
+/* ---------- Review: answer keys, the passage with evidence marks ---------- */
+.lp-rx-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 16px 20px 6px;
+}
+.lp-rx-keys > .lp-lx-cap {
+  margin-right: 6px;
+}
+.lp-rx-key {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-style: normal;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.lp-rx-key[data-wrong] {
+  border-color: var(--lp-pen);
+  border-radius: 4px;
+  color: var(--lp-pen);
+}
+.lp-rx-key--5 {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+}
+.lp-rx-text {
+  align-content: start;
+  display: grid;
+  gap: 8px;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.lp-rx-text > p {
+  margin: 0;
+}
+.lp-rx-text > p:nth-child(2) {
+  color: var(--ink);
+}
+.lp-rx-text > .lp-rx-legend {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-sans);
+}
+.lp-rx-ev {
+  padding: 1px 3px;
+  margin: 0 -3px;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  transition: background-color 280ms var(--ease-emerge);
+}
+.lp-rx-ev--5 {
+  background: color-mix(in srgb, var(--lp-pen) 18%, transparent);
+  text-decoration: underline var(--lp-pen) 2px;
+  text-underline-offset: 4px;
+}
+.lp-rx-para {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.lp-rx-para > span:not(.lp-lx-cap) {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+.lp-rx-para > span:last-child {
+  box-shadow: inset 0 -2px 0 var(--lp-pen);
+}
+.lp-rx-detail--3 {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* The distractor: in the passage, not the answer. Dashed and grey, apart from the pen-marked evidence. */
+.lp-rx-trap {
+  text-decoration: underline dashed var(--muted) 1.5px;
+  text-underline-offset: 4px;
+}
+.lp-rx-bh {
+  margin-top: 4px !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.lp-rx-rule {
+  padding: 6px 10px;
+  border-left: 2px solid var(--ink);
+  background: var(--surface);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.lp-rx-rule b {
+  margin-right: 4px;
+}
+
+/* ---------- CTA after the pinned scene ---------- */
+.lp-practice .lp-practice-cta {
+  margin-top: 0;
+}
+.lp-practice-cta .lp-label {
+  flex-basis: 100%;
+}
+.lp-practice-cta .lp-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 4px;
+}
+
+/* ---------- Steps (desktop, motion allowed); the card moves themselves are 03-address.css's ---------- */
+@media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+  .lp-stage[data-step='0'] .lp-rx-exam {
+    transform: translateX(33%);
+  }
+  .lp-stage:not([data-past~='1']) .lp-rx-tf[data-wrong] {
+    border-color: var(--ink);
+    color: inherit;
+    text-decoration-color: transparent;
+  }
+  .lp-rx-tf {
+    transition:
+      color 280ms var(--ease-emerge),
+      border-color 280ms var(--ease-emerge);
+  }
+  .lp-stage[data-step='2'] .lp-rx-key--3 {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+  }
+  .lp-stage[data-step='2'] .lp-rx-key--5 {
+    box-shadow: none;
+  }
+  .lp-stage[data-step='2'] .lp-rx-ev--3 {
+    background: color-mix(in srgb, var(--lp-pen) 18%, transparent);
+    text-decoration: underline var(--lp-pen) 2px;
+    text-underline-offset: 4px;
+  }
+  .lp-stage[data-step='2'] .lp-rx-legend {
+    visibility: hidden;
+  }
+  .lp-stage[data-step='2'] .lp-rx-ev--5,
+  .lp-stage[data-step='2'] .lp-rx-trap {
+    background: none;
+    text-decoration: none;
+  }
+  .lp-stage[data-step='2'] .lp-rx-detail--3 {
+    opacity: 1;
+    visibility: visible;
+  }
+  .lp-stage[data-step='2'] .lp-rx-detail--5 {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+  }
+}
+
+/* Scrubbed on the pin: the answers are chosen one after another during step 0. */
+@supports (animation-timeline: view()) {
+  @media (min-width: 48rem) and (prefers-reduced-motion: no-preference) {
+    .lp-rx-tf {
+      animation: lp-rx-pick linear both;
+      animation-timeline: --lp-track;
+      animation-range: contain calc(var(--i) * 5%) contain calc(3% + var(--i) * 5%);
+    }
+  }
+}
+@keyframes lp-rx-pick {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+/* Short desktops: the third paragraph goes. */
+@media (min-width: 48rem) and (max-height: 50rem) {
+  .lp-rx-more {
+    display: none;
+  }
+}
+
+/* ---------- Phones: stacked (03-address.css); the split becomes one column ---------- */
+@media (max-width: 47.999rem) {
+  .lp-rx-exam {
+    width: 100%;
+  }
+  .lp-rx-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-rx-passage {
+    border-right: 0;
+    border-bottom: 1px solid var(--lp-hair);
+  }
+  .lp-rx-more,
+  .lp-rx-aa {
+    display: none;
+  }
+}

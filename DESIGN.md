@@ -161,3 +161,12 @@ Lucide only, 1.75 stroke set once in CSS (`.lucide { stroke-width: 1.75 }`). 16p
 - No em dashes in UI copy; no "Oops!", no exclamation marks in success messages, no filler verbs (elevate, seamless, unleash).
 - No hard-coded hex, pixel radii or one-off control heights in screens; use tokens.
 - No animation of layout properties, no `window` scroll listeners, no motion without a reason.
+
+## 10. Landing page exception (`.landing`, apps/web/src/components/landing)
+
+The visitor page at `/` uses the Ocean Teal system above, with scroll motion the app does not allow.
+
+- **Palette:** the landing's ramp (`--lp-g-*` in `landing.css` `:root`) is the brand's cool slate, so its surfaces, ink, lines and muted text match the app's tokens; accent, status and chart colours are the app's own. Teal means act here or you are here: buttons, the logo's N, active tabs, score bars, the rail's current stop, selected chips. Raw colour values live only in that file's `:root` block and, for the pre-paint shell, in `index.html` (`lp-pre.test.ts` keeps the two in step).
+- **The pen:** `--lp-pen` (the app's `--bad` rose, `#BE123C` light and `#FB7185` dark) is used only for marks a teacher would make: strikes, underlines, correction chips. Never for buttons, links or decoration. Text on a pen fill uses `--lp-pen-ink`.
+- **The unknown band:** the landing shows no band number except sample results tagged "Sample". `?.?` is drawn as two hooks and one baseline point (`BandQ`), in ink.
+- **Motion:** scroll-driven, pinned acts and timed entrances are allowed here (section 6 bans them in the app). Blur is a 400ms-or-less entry on at most one element per section; content at rest is always crisp. A "Pause animation" switch is in the hero, the header and the footer.
