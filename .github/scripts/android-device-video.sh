@@ -3,11 +3,13 @@
 # Taps find their target by dumping the UI (uiautomator) and reading the bounds of a text / content-description, no hardcoded coordinates.
 # Demo mode (see apps/android/.../core/Demo.kt) opens each screen on fixtures. Output: device-video/*.mp4 plus dumps/ for debugging.
 set -u
-APK=apps/android/app/build/outputs/apk/debug/app-debug.apk
+APK=apps/android/app/build/outputs/apk/release/app-release.apk
 PKG=com.soyeb.ieltspractice
 OUT=device-video
 mkdir -p "$OUT/dumps"
 adb install -r "$APK"
+# Compile now like a Play install would (profileinstaller would otherwise wait for idle dexopt).
+adb shell cmd package compile -m speed-profile -f "$PKG" || true
 adb shell pm grant "$PKG" android.permission.RECORD_AUDIO || true
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS || true
 adb shell settings put global hide_error_dialogs 1

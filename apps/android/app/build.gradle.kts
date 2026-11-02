@@ -25,6 +25,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // ponytail: debug keystore so CI's release APK installs for testing; real upload key when we ship to Play.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -82,6 +84,7 @@ dependencies {
     implementation(libs.androidx.compose.icons.core)
     implementation(libs.androidx.compose.icons.extended)
     implementation(libs.androidx.browser)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
