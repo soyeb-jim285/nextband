@@ -8,7 +8,7 @@ import { countBefore, emailStatus, finishRequest, isPurpose, releaseAttempt, res
 import { auth, clearBearerCache, sessionMiddleware } from './auth';
 import { env, R2_CONFIGURED } from './env';
 import { ApiError } from './errors';
-import { clientIpHash } from './ip';
+import { clientIp, clientIpHash } from './ip';
 import { anonSignInOk, authStatusOk, codeCheckOk, codeRequestOk } from './ratelimit';
 import { MAX_AUDIO_BYTES, requestOrigin, storage, verifyLocal } from './storage';
 import type { AppEnv } from './types';
@@ -68,14 +68,17 @@ export function createApp() {
   app.use('*', async (c, next) => {
     await next();
     c.header('X-Frame-Options', 'DENY');
-    c.header('Content-Security-Policy', "frame-ancestors 'none'");
+    // Stored files relayed from our origin (storage.ts) are untrusted content: no script, no plugins, own sandbox (an SVG can't run JS here).
+    c.header('Content-Security-Policy', c.req.path.startsWith('/api/local-storage/') ? "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'" : "frame-ancestors 'none'");
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     c.header('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self), payment=(), usb=()'); // the mic is for Speaking
   });
 
   // No JSON body anywhere comes near this (an essay is 12k chars; replay chunks have their own, tighter 1 MB cap with its own error); without a cap a few 100 MB bodies exhaust memory.
-  app.use('/api/*', bodyLimit({ maxSize: 2 * 1024 * 1024, onError: (c) => c.json({ error: 'Request too large' }, 413) }));
+  const jsonLimit = bodyLimit({ maxSize: 2 * 1024 * 1024, onError: (c) => c.json({ error: 'Request too large' }, 413) });
+  // The storage relay takes recordings (up to MAX_AUDIO_BYTES, checked there); everything else is JSON.
+  app.use('/api/*', (c, next) => (c.req.path.startsWith('/api/local-storage/') ? next() : jsonLimit(c, next)));
 
   // gzip/deflate for JSON and (in production) static files; skips responses already encoded (precompressed assets) or < 1 KB.
   app.use('*', compress());
@@ -137,8 +140,33 @@ export function createApp() {
 
   registerRoutes(app);
 
-  // Dev-only: serves localDisk storage's signed URLs when R2 isn't configured (never in production — env.ts enforces R2 there).
-  if (!R2_CONFIGURED) {
+  // PostHog reverse proxy (docs: posthog.com/docs/advanced/proxy/proxy-reference): analytics and session replay go through our
+  // own origin, so ad blockers and networks that block third-party hosts don't drop them. US cloud.
+  app.on(['GET', 'POST'], '/ingest/*', async (c) => {
+    const path = c.req.path.slice('/ingest'.length);
+    const host = path.startsWith('/static/') || path.startsWith('/array/') ? 'us-assets.i.posthog.com' : 'us.i.posthog.com';
+    const headers = new Headers({ host });
+    for (const [k, v] of c.req.raw.headers) {
+      const n = k.toLowerCase();
+      if (n.startsWith('posthog-') || n === 'content-type' || n === 'content-encoding' || n === 'user-agent') headers.set(k, v);
+      else if (n === 'authorization' && v.startsWith('Bearer phc_')) headers.set(k, v);
+    }
+    const ip = clientIp(c);
+    if (ip) headers.set('x-forwarded-for', ip);
+    const r = await fetch(`https://${host}${path}${new URL(c.req.url).search}`, {
+      method: c.req.method, headers, body: c.req.method === 'POST' ? c.req.raw.body : undefined,
+      duplex: 'half', // Node fetch needs this for a streamed request body
+    });
+    const out = new Headers(r.headers);
+    out.delete('content-encoding'); // fetch already decoded the body
+    out.delete('content-length');
+    out.delete('set-cookie');
+    return new Response(r.body, { status: r.status, headers: out });
+  });
+
+  // Serves storage.presignGet/presignPut URLs: the dev disk, or (production) a relay to R2 so clients never need to reach
+  // *.r2.cloudflarestorage.com (blocked on some networks; see storage.ts).
+  {
     const MIME: Record<string, string> = { webm: 'audio/webm', m4a: 'audio/mp4', mp4: 'audio/mp4', wav: 'audio/wav', mp3: 'audio/mpeg', ogg: 'audio/ogg', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml' };
     // /api/local-storage is what presigned URLs use (covered by the web dev proxy); /local-storage stays for URLs issued earlier.
     app.on(['GET', 'PUT', 'OPTIONS'], ['/api/local-storage/*', '/local-storage/*'], async (c) => {
@@ -148,15 +176,28 @@ export function createApp() {
       const method = c.req.method as 'GET' | 'PUT';
       if (!verifyLocal(method, key, Number(c.req.query('exp')), c.req.query('sig') ?? '')) return c.text('Forbidden', 403, cors);
       if (method === 'PUT') {
+        if (Number(c.req.header('content-length') ?? 0) > MAX_AUDIO_BYTES) return c.text('Too large', 413, cors);
         const body = new Uint8Array(await c.req.arrayBuffer());
         if (body.length > MAX_AUDIO_BYTES) return c.text('Too large', 413, cors);
         await storage.put(key, body, c.req.header('content-type') ?? 'application/octet-stream');
         return c.body(null, 200, cors);
       }
+      const type = MIME[key.split('.').pop() ?? ''] ?? 'application/octet-stream';
+      if (storage.stream) {
+        // R2: stream, passing Range through (no whole-object buffering; <audio> asks for many ranges).
+        const range = c.req.header('range');
+        const r = await storage.stream(key, range && /^bytes=\d*-\d*$/.test(range) ? range : undefined);
+        if (r.status === 404) return c.text('Not found', 404, cors);
+        if (r.status === 416 || !r.body) return c.body(null, 416, cors);
+        const h: Record<string, string> = { ...cors, 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=3600' };
+        if (r.contentRange) h['Content-Range'] = r.contentRange;
+        if (r.length != null) h['Content-Length'] = String(r.length);
+        return c.body(r.body, r.status as 200 | 206, h);
+      }
       const size = await storage.size(key);
       if (size == null) return c.text('Not found', 404, cors);
       const data = await storage.get(key);
-      const headers = { ...cors, 'Content-Type': MIME[key.split('.').pop() ?? ''] ?? 'application/octet-stream', 'Accept-Ranges': 'bytes' };
+      const headers = { ...cors, 'Content-Type': type, 'Accept-Ranges': 'bytes' };
       // HTTP Range so <audio> can seek (Listening practice mode); R2's presigned URLs support it natively.
       const m = /^bytes=(\d*)-(\d*)$/.exec(c.req.header('range') ?? '');
       if (m && (m[1] || m[2])) {

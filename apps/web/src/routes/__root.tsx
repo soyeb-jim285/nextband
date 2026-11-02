@@ -3,6 +3,7 @@ import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { RouteError } from '@/components/layout/RouteError';
 import { ReplayRecorder } from '@/components/ReplayRecorder';
+import { PostHog } from '@/components/PostHog';
 import { Toaster } from '@/components/ui';
 import { meQuery } from '@/lib/query';
 
@@ -32,6 +33,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       <Outlet />
       <Toaster />
       <ReplayRecorder />
+      <PostHog />
       <LazyFeedback />
     </>
   ),

@@ -44,6 +44,10 @@ const Env = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional().transform((v) => v || undefined),
   LOCAL_STORAGE_DIR: z.string().default('../../data/local-storage'),
   R2_BUCKET: z.string().default('ielts-practice'),
+  /** true: hand clients R2's own presigned URLs instead of relaying through the app (storage.ts). */
+  R2_DIRECT: z.string().optional().transform((v) => v === 'true'),
+  /** Public custom domain on the R2 bucket (https://media.nextband.app). A WAF rule there lets only lr/ and speaking/ through; those shared files skip the relay. */
+  MEDIA_URL: z.string().url().optional(),
   RESEND_API_KEY: z.string().optional().transform((v) => v || undefined),
   EMAIL_FROM: z.string().default('NextBand <noreply@example.com>'),
   CAMBRIDGE_ALLOWED_EMAILS: z

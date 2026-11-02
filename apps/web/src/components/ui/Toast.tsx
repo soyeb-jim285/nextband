@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { track } from '@/components/PostHog';
 
 type Opts = { tone?: 'neutral' | 'good' | 'bad'; action?: { label: string; onClick: () => void }; durationMs?: number };
 
@@ -15,6 +16,7 @@ export const dismissToast = (id?: string | number) => void import('sonner').then
 
 /** Fire-and-forget notice (sonner): toast('Saved'), toast('Upload failed', { tone: 'bad', action: { label: 'Retry', onClick } }). */
 export function toast(message: ReactNode, { tone = 'neutral', action, durationMs }: Opts = {}) {
+  if (tone === 'bad') track('error_shown', { via: 'toast', message: typeof message === 'string' ? message : undefined });
   open();
   void Promise.all([listening, import('sonner')]).then(([, { toast: sonner }]) => {
     const fn = tone === 'good' ? sonner.success : tone === 'bad' ? sonner.error : sonner;

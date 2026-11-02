@@ -13,6 +13,8 @@ export type Storage = {
   size(key: string): Promise<number | null>;
   put(key: string, body: Uint8Array, contentType: string): Promise<void>;
   get(key: string): Promise<Uint8Array>;
+  /** Ranged streaming read for the relay (R2 only; other stores return undefined and the relay reads whole objects). */
+  stream?(key: string, range?: string): Promise<{ body?: ReadableStream; status: number; contentRange?: string; length?: number; contentType?: string }>;
   deletePrefix(prefix: string): Promise<void>;
 };
 
@@ -32,10 +34,18 @@ const s3 = new S3Client({
 });
 const Bucket = env.R2_BUCKET;
 
+// Clients get URLs on our own origin (relayed by app.ts /api/local-storage/*), not R2's: some networks (seen on campus/ISP
+// networks in Dhaka, 2026-11-02) block *.r2.cloudflarestorage.com, which broke Listening audio, examiner lines and uploads.
+// ponytail: every byte now passes through the app server; R2_DIRECT=true restores direct links if that bandwidth ever matters.
+// Same for every user (Listening/Reading assets, examiner lines): served by Cloudflare's cache on MEDIA_URL. Must match the WAF allow-list there.
+const PUBLIC_PREFIXES = ['lr/', 'speaking/'];
 const r2: Storage = {
-  presignPut: (key, contentType, expiresS = 300) =>
-    getSignedUrl(s3, new PutObjectCommand({ Bucket, Key: key, ContentType: contentType }), { expiresIn: expiresS }),
-  presignGet: (key, expiresS = 3600) => getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: key }), { expiresIn: expiresS }),
+  presignPut: async (key, contentType, expiresS = 300) =>
+    env.R2_DIRECT ? getSignedUrl(s3, new PutObjectCommand({ Bucket, Key: key, ContentType: contentType }), { expiresIn: expiresS }) : localUrl('PUT', key, expiresS),
+  presignGet: async (key, expiresS = 3600) =>
+    env.MEDIA_URL && PUBLIC_PREFIXES.some((p) => key.startsWith(p)) ? `${env.MEDIA_URL}/${key.split('/').map(encodeURIComponent).join('/')}`
+    : env.R2_DIRECT ? getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: key }), { expiresIn: expiresS })
+    : localUrl('GET', key, expiresS),
   async size(key) {
     try {
       return (await s3.send(new HeadObjectCommand({ Bucket, Key: key }))).ContentLength ?? null;
@@ -45,6 +55,16 @@ const r2: Storage = {
   },
   async put(key, body, contentType) {
     await s3.send(new PutObjectCommand({ Bucket, Key: key, Body: body, ContentType: contentType }));
+  },
+  async stream(key, range) {
+    try {
+      const r = await s3.send(new GetObjectCommand({ Bucket, Key: key, Range: range }));
+      return { body: r.Body!.transformToWebStream(), status: r.ContentRange ? 206 : 200, contentRange: r.ContentRange, length: r.ContentLength, contentType: r.ContentType };
+    } catch (e) {
+      const status = (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+      if (status === 404 || status === 416) return { status };
+      throw e;
+    }
   },
   async get(key) {
     const r = await s3.send(new GetObjectCommand({ Bucket, Key: key }));
@@ -86,8 +106,9 @@ const pathFor = (key: string) => {
   if (!p.startsWith(ROOT_DIR + '/')) throw new Error('bad key');
   return p;
 };
-export const signLocal = (method: 'GET' | 'PUT', key: string, exp: number) =>
-  createHmac('sha256', env.BETTER_AUTH_SECRET).update(`${method}:${key}:${exp}`).digest('hex');
+export function signLocal(method: 'GET' | 'PUT', key: string, exp: number) {
+  return createHmac('sha256', env.BETTER_AUTH_SECRET).update(`${method}:${key}:${exp}`).digest('hex');
+}
 export function verifyLocal(method: 'GET' | 'PUT', key: string, exp: number, sig: string) {
   if (!(exp > Date.now() / 1000)) return false;
   const a = Buffer.from(signLocal(method, key, exp)), b = Buffer.from(sig);
@@ -96,10 +117,10 @@ export function verifyLocal(method: 'GET' | 'PUT', key: string, exp: number, sig
 /** Origin of the request being served (app.ts sets it): dev presigned URLs point back at the host the client used, not a detected LAN IP
  *  or a configured BETTER_AUTH_URL that the client may not reach. Under the Vite proxy that is the web origin, hence the /api prefix it proxies. */
 export const requestOrigin = new AsyncLocalStorage<string>();
-const localUrl = (method: 'GET' | 'PUT', key: string, expiresS: number) => {
+function localUrl(method: 'GET' | 'PUT', key: string, expiresS: number) {
   const exp = Math.floor(Date.now() / 1000) + expiresS;
   return `${requestOrigin.getStore() ?? env.BETTER_AUTH_URL}/api/local-storage/${key}?exp=${exp}&sig=${signLocal(method, key, exp)}`;
-};
+}
 export const localDisk: Storage = {
   presignPut: async (key, _ct, expiresS = 900) => localUrl('PUT', key, expiresS),
   presignGet: async (key, expiresS = 3600) => localUrl('GET', key, expiresS),

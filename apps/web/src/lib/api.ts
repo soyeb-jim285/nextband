@@ -1,5 +1,6 @@
 import type { Settings } from '@server/settings';
 import createClient from 'openapi-fetch';
+import { endpoint, track } from '@/components/PostHog';
 import type { components, paths } from './schema';
 
 export class ApiError extends Error {
@@ -28,9 +29,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T;
 }
 
+const EXAM = /\/api\/(lr|mock|attempts)\b/;
+
 const apiError = (res: Response, body: unknown) => {
   const b = body && typeof body === 'object' ? (body as Record<string, unknown>) : undefined;
   const text = typeof b?.error === 'string' && b.error;
+  if (res.status !== 401) track('api_error', { status: res.status, endpoint: endpoint(res.url), code: b?.code, message: text || undefined }); // 401 = guest, normal
   return new ApiError(res.status, text || (res.status >= 500 ? 'Something went wrong on our side. Try again.' : res.statusText || 'Request failed'), typeof b?.code === 'string' ? b.code : undefined, b);
 };
 
@@ -39,10 +43,19 @@ const apiError = (res: Response, body: unknown) => {
  * so a server change that breaks the web fails `typecheck`. Prefer it over `api` for new code: `await call(client.GET('/api/progress'))`.
  */
 export const client = createClient<paths>({ credentials: 'include' });
+// ponytail: exam steps (start, submit, mock sections) inferred from successful POSTs, not hand-placed per screen; name them if funnels need it
+client.use({
+  onResponse: ({ request, response }) => {
+    if (request.method === 'POST' && response.ok && EXAM.test(response.url)) track('exam_step', { endpoint: endpoint(response.url) });
+  },
+});
 
 /** Unwraps an openapi-fetch result to its data, or throws ApiError like `api` does. */
 export async function call<D>(req: Promise<{ data?: D; error?: unknown; response: Response }>): Promise<D> {
-  const { data, error, response } = await req;
+  const { data, error, response } = await req.catch((e) => {
+    track('api_error', { status: 0, message: String(e) }); // offline / blocked / CORS: never reached the server
+    throw e;
+  });
   if (!response.ok) throw apiError(response, error);
   return data as D;
 }

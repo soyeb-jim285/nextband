@@ -1,6 +1,7 @@
 import { clusterMoments } from '@ielts/core';
 import { Pause, Play, RotateCcw, RotateCw, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { track } from '@/components/PostHog';
 import { Button, Segmented } from '@/components/ui';
 import { formatClock } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -236,12 +237,15 @@ export function useExamPlaylist(urls: string[], startElapsed: number, checkEndsA
     let dead = false;
     Promise.all(
       urls.map(
-        (u) =>
+        (u, part) =>
           new Promise<number>((res, rej) => {
             const a = new Audio();
             a.preload = 'metadata';
             a.onloadedmetadata = () => res(a.duration);
-            a.onerror = () => rej(new Error('audio'));
+            a.onerror = () => {
+              track('audio_error', { part, code: a.error?.code, message: a.error?.message, host: new URL(u, location.origin).host, online: navigator.onLine });
+              rej(new Error('audio'));
+            };
             a.src = u;
           }),
       ),

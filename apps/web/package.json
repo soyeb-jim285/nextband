@@ -25,6 +25,7 @@
     "livekit-client": "^2.15.6",
     "lucide-react": "^1.48.0",
     "openapi-fetch": "^0.17.0",
+    "posthog-js": "^1.444.0",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

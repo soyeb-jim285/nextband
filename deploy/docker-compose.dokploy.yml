@@ -42,6 +42,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/ielts
+      MEDIA_URL: https://media.nextband.app # R2 custom domain for shared lr/ + speaking/ files (storage.ts); WAF blocks other prefixes
     depends_on: [db] # list form: Swarm rejects conditions (and ignores order); the boot migration fails until db is up and the task restarts
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/api/health"]
