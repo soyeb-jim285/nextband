@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { S3Client, CopyObjectCommand, PutObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -37,17 +37,46 @@ const Bucket = env.R2_BUCKET;
 // Clients get URLs on our own origin (relayed by app.ts /api/local-storage/*), not R2's: some networks (seen on campus/ISP
 // networks in Dhaka, 2026-11-02) block *.r2.cloudflarestorage.com, which broke Listening audio, examiner lines and uploads.
 // ponytail: every byte now passes through the app server; R2_DIRECT=true restores direct links if that bandwidth ever matters.
-// Same for every user and not access-controlled: our own generated Listening/Reading assets and examiner lines, served by Cloudflare's
-// cache on MEDIA_URL. Cambridge assets (lr/lr/cambridge/, restricted tests) stay on signed relay URLs. Must match the WAF allow-list there.
-// ponytail: plan-limited generated tests are guessable here too; they're our own content, move them to the relay if that matters.
-const PUBLIC_PREFIXES = ['lr/lr/gen/', 'speaking/'];
+// Served by Cloudflare's cache on MEDIA_URL (no server load). Must match the WAF allow-list there (/pub/, /speaking/; everything else blocked).
+// - Our generated Listening/Reading assets (lr/lr/gen/) get an unguessable copy at pub/<hmac>.<ext>, made on first use, so a free-plan
+//   user can't fetch tests outside their plan by guessing names. A URL someone has seen still works forever (unlike a signed one).
+// - Examiner lines (speaking/) are already named by a hash of their text.
+// - Cambridge (lr/lr/cambridge/, restricted tests) and users' recordings stay on signed relay URLs.
+const HIDDEN_PREFIX = 'lr/lr/gen/';
+const publicKey = (key: string) =>
+  `pub/${createHmac('sha256', env.R2_SECRET_ACCESS_KEY ?? '').update(`media:${key}`).digest('hex').slice(0, 32)}${key.slice(key.lastIndexOf('.'))}`;
+const published = new Map<string, Promise<string>>();
+/** pub/ copy of `key`, created once (CopyObject inside R2) and remembered per process. */
+function publish(key: string): Promise<string> {
+  let p = published.get(key);
+  if (!p) {
+    const pk = publicKey(key);
+    p = s3.send(new HeadObjectCommand({ Bucket, Key: pk })).then(
+      () => pk,
+      async (e) => {
+        if ((e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode !== 404) throw e;
+        await s3.send(new CopyObjectCommand({ Bucket, Key: pk, CopySource: `${Bucket}/${key.split('/').map(encodeURIComponent).join('/')}` }));
+        return pk;
+      },
+    );
+    p.catch(() => published.delete(key));
+    published.set(key, p);
+  }
+  return p;
+}
+const mediaUrl = (key: string) => `${env.MEDIA_URL}/${key.split('/').map(encodeURIComponent).join('/')}`;
 const r2: Storage = {
   presignPut: async (key, contentType, expiresS = 300) =>
     env.R2_DIRECT ? getSignedUrl(s3, new PutObjectCommand({ Bucket, Key: key, ContentType: contentType }), { expiresIn: expiresS }) : localUrl('PUT', key, expiresS),
-  presignGet: async (key, expiresS = 3600) =>
-    env.MEDIA_URL && PUBLIC_PREFIXES.some((p) => key.startsWith(p)) ? `${env.MEDIA_URL}/${key.split('/').map(encodeURIComponent).join('/')}`
-    : env.R2_DIRECT ? getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: key }), { expiresIn: expiresS })
-    : localUrl('GET', key, expiresS),
+  async presignGet(key, expiresS = 3600) {
+    if (env.MEDIA_URL && key.startsWith('speaking/')) return mediaUrl(key);
+    if (env.MEDIA_URL && key.startsWith(HIDDEN_PREFIX)) {
+      const pk = await publish(key).catch((e) => (console.error('media publish failed', key, e), null)); // fall back to the relay
+      if (pk) return mediaUrl(pk);
+    }
+    return env.R2_DIRECT ? getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: key }), { expiresIn: expiresS })
+    : localUrl('GET', key, expiresS);
+  },
   async size(key) {
     try {
       return (await s3.send(new HeadObjectCommand({ Bucket, Key: key }))).ContentLength ?? null;
