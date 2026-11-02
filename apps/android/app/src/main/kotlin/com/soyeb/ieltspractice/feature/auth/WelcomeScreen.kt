@@ -45,9 +45,8 @@ import com.soyeb.ieltspractice.nav.Onboarding
 
 /** The NextBand wordmark. Its colours come from values(-night)/colors.xml, resolved for the app's theme (Settings can differ from the device). */
 @Composable
-fun Logo(modifier: Modifier = Modifier, height: Dp = 26.dp) {
+fun Logo(modifier: Modifier = Modifier, height: Dp = 26.dp, dark: Boolean = NB.colors.isDark) {
     val context = LocalContext.current
-    val dark = NB.colors.isDark
     val vector = remember(context, dark) {
         val c = Configuration(context.resources.configuration)
         c.uiMode = (c.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or (if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)

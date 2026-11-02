@@ -75,6 +75,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.animateContentSize
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.model.EmailStatus
@@ -88,7 +103,6 @@ import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.NbTextField
-import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.feature.you.SITE
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Onboarding
@@ -128,6 +142,7 @@ private class AuthForm(email: String) {
  * [reason] is why a guest was sent here (nav.requireAccount); finishing then continues that action. Otherwise the user lands on Today
  * (or Onboarding the first time). The primary button sits at the bottom, above the keyboard.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     val graph = LocalGraph.current
@@ -243,44 +258,114 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
         AuthStep.Reset -> ::updatePassword
     }
 
-    Column(Modifier.fillMaxSize().background(c.bg)) {
-        Row(Modifier.statusBarsPadding().padding(start = 4.dp, end = NB.space.gutter, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            NbIconButton(if (step.top) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack, if (step.top) "Close" else "Back to sign in", ::leave)
-            Spacer(Modifier.weight(1f))
-            Logo()
-        }
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter).padding(top = 12.dp, bottom = 24.dp)) {
+    // Light: deep teal header with white type (7:1). Dark: a teal-tinted night surface, ink type and the bright teal for accents.
+    val hero = if (c.isDark) c.brandSoft else c.brandText
+    val onHero = if (c.isDark) c.ink else Color.White
+    val onHeroMuted = if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f)
+    val keyboard = WindowInsets.isImeVisible
+
+    Box(Modifier.fillMaxSize().background(hero)) {
+        BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 96.dp, y = (-40).dp).size(300.dp))
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.statusBarsPadding().padding(start = 4.dp, end = NB.space.gutter, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                NbIconButton(if (step.top) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack, if (step.top) "Close" else "Back to sign in", ::leave, tint = onHero)
+                Spacer(Modifier.weight(1f))
+                Logo(height = 24.dp, dark = true)
+            }
             AnimatedContent(
                 targetState = step,
                 transitionSpec = {
                     if (reduced) EnterTransition.None togetherWith ExitTransition.None
-                    else (fadeIn(tween(220, delayMillis = 90)) + slideInHorizontally(tween(260)) { it / 10 }) togetherWith fadeOut(tween(90))
+                    else fadeIn(tween(200, delayMillis = 60)) togetherWith fadeOut(tween(90))
                 },
-                label = "authStep",
+                modifier = Modifier.animateContentSize(tween(if (reduced) 0 else 220)),
+                label = "authTitle",
             ) { s ->
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    val (title, lede) = stepCopy(s, f)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(title, style = NB.type.headline, color = c.ink, modifier = Modifier.semantics { heading() })
-                        Text(lede, style = NB.type.body, color = c.muted)
+                val (title, lede) = stepCopy(s, f)
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = NB.space.gutter).padding(top = if (keyboard) 4.dp else 20.dp, bottom = if (keyboard) 20.dp else 36.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        title, style = if (keyboard) NB.type.title1 else NB.type.headline.copy(fontSize = 32.sp, lineHeight = 38.sp),
+                        color = onHero, modifier = Modifier.semantics { heading() },
+                    )
+                    if (!keyboard) Text(lede, style = NB.type.body, color = onHeroMuted, modifier = Modifier.widthIn(max = 420.dp))
+                }
+            }
+            // The form rises over the header as a sheet; the primary action and the switch sit at its foot, in thumb reach.
+            Column(Modifier.weight(1f).fillMaxWidth().clip(NB.shape.sheet).background(c.surface)) {
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter).padding(top = 28.dp, bottom = 16.dp)) {
+                    AnimatedContent(
+                        targetState = step,
+                        transitionSpec = {
+                            if (reduced) EnterTransition.None togetherWith ExitTransition.None
+                            else (fadeIn(tween(220, delayMillis = 90)) + slideInHorizontally(tween(260)) { it / 10 }) togetherWith fadeOut(tween(90))
+                        },
+                        label = "authStep",
+                    ) { s ->
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            f.banner?.let { Banner(it, Icons.Rounded.ErrorOutline, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Bad) }
+                            if (s == AuthStep.SignIn) f.info?.let { Banner(it, Icons.Rounded.CheckCircle, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Good) }
+                            when (s) {
+                                AuthStep.SignIn, AuthStep.SignUp -> CredentialsStep(s == AuthStep.SignUp, f, reason, primary) { go(it) }
+                                AuthStep.Verify -> VerifyStep(f, demoStatus, ::verify)
+                                AuthStep.Forgot -> ForgotStep(f, primary) { go(AuthStep.SignIn) }
+                                AuthStep.Reset -> ResetStep(f, demoStatus, primary) { go(it) }
+                            }
+                        }
                     }
-                    f.banner?.let { Banner(it, Icons.Rounded.ErrorOutline, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Bad) }
-                    if (s == AuthStep.SignIn) f.info?.let { Banner(it, Icons.Rounded.CheckCircle, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Good) }
-                    when (s) {
-                        AuthStep.SignIn, AuthStep.SignUp -> CredentialsStep(s == AuthStep.SignUp, f, reason, primary) { go(it) }
-                        AuthStep.Verify -> VerifyStep(f, demoStatus, ::verify)
-                        AuthStep.Forgot -> ForgotStep(f, primary) { go(AuthStep.SignIn) }
-                        AuthStep.Reset -> ResetStep(f, demoStatus, primary) { go(it) }
+                }
+                Column(
+                    Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    NbButton(
+                        when (step) { AuthStep.SignIn -> "Sign in"; AuthStep.SignUp -> "Create account"; AuthStep.Verify -> "Verify email"; AuthStep.Forgot -> "Send code"; AuthStep.Reset -> "Update password" },
+                        primary, fill = true, size = BtnSize.Large, loading = f.busy, haptic = true,
+                    )
+                    if ((step == AuthStep.SignIn || step == AuthStep.SignUp) && !keyboard) {
+                        val signUp = step == AuthStep.SignUp
+                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (signUp) "Already have an account?" else "New to NextBand?", style = NB.type.bodySmall, color = c.muted)
+                            NbButton(
+                                if (signUp) "Sign in" else "Create an account",
+                                { go(if (signUp) AuthStep.SignIn else AuthStep.SignUp); f.info = null; f.confirm = "" },
+                                kind = BtnKind.Text, size = BtnSize.Small,
+                            )
+                        }
                     }
                 }
             }
         }
-        StickyActionBar {
-            NbButton(
-                when (step) { AuthStep.SignIn -> "Sign in"; AuthStep.SignUp -> "Create account"; AuthStep.Verify -> "Verify email"; AuthStep.Forgot -> "Send code"; AuthStep.Reset -> "Update password" },
-                primary, fill = true, size = BtnSize.Large, loading = f.busy, haptic = true,
-            )
+    }
+}
+
+/**
+ * The header's one ornament: a band scale drawn like an instrument dial (an arc, a tick per half band, the whole bands
+ * from 5 to 9 longer). Low contrast and hidden from screen readers; it says what NextBand measures without a word.
+ */
+@Composable
+private fun BandScale(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.clearAndSetSemantics { }) {
+        val r = size.minDimension / 2 - 8.dp.toPx()
+        val center = Offset(size.width / 2, size.height / 2)
+        val faint = color.copy(alpha = 0.10f)
+        drawCircle(faint, r, center, style = Stroke(1.5.dp.toPx()))
+        drawCircle(faint, r * 0.72f, center, style = Stroke(1.dp.toPx()))
+        // 5.0 .. 9.0 in half bands across the lower-left quarter (the part that shows on screen).
+        val steps = 8
+        for (i in 0..steps) {
+            val a = Math.toRadians(100.0 + i * (80.0 / steps))
+            val whole = i % 2 == 0
+            val len = (if (whole) 16 else 8).dp.toPx()
+            val outer = Offset(center.x + (r * kotlin.math.cos(a)).toFloat(), center.y + (r * kotlin.math.sin(a)).toFloat())
+            val inner = Offset(center.x + ((r - len) * kotlin.math.cos(a)).toFloat(), center.y + ((r - len) * kotlin.math.sin(a)).toFloat())
+            drawLine(color.copy(alpha = if (whole) 0.28f else 0.16f), inner, outer, strokeWidth = if (whole) 2.dp.toPx() else 1.5.dp.toPx(), cap = StrokeCap.Round)
         }
+        // The target notch: a small dot at band 7.
+        val t = Math.toRadians(100.0 + 4 * (80.0 / steps))
+        drawCircle(color.copy(alpha = 0.55f), 4.dp.toPx(), Offset(center.x + ((r - 28.dp.toPx()) * kotlin.math.cos(t)).toFloat(), center.y + ((r - 28.dp.toPx()) * kotlin.math.sin(t)).toFloat()))
     }
 }
 
@@ -317,13 +402,6 @@ private fun CredentialsStep(signUp: Boolean, f: AuthForm, reason: String?, onDon
             }
         }
         if (signUp) TermsNote()
-        Column {
-            Box(Modifier.fillMaxWidth().height(1.dp).background(NB.colors.line))
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (signUp) "Already have an account?" else "New here?", style = NB.type.bodySmall, color = NB.colors.muted)
-                NbButton(if (signUp) "Sign in" else "Create an account", { go(if (signUp) AuthStep.SignIn else AuthStep.SignUp); f.info = null; f.confirm = "" }, kind = BtnKind.Text, size = BtnSize.Small)
-            }
-        }
     }
 }
 
