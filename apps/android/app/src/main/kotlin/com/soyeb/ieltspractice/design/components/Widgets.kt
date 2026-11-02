@@ -42,7 +42,7 @@ import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.color
 
 /** "mm:ss" (or "h:mm:ss"). */
-fun clock(seconds: Long): String {
+fun clockText(seconds: Long): String {
     val s = seconds.coerceAtLeast(0)
     val h = s / 3600
     val m = (s % 3600) / 60
@@ -74,7 +74,7 @@ fun TimerPill(secondsLeft: Long, modifier: Modifier = Modifier, warnAt: Long = 3
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp), tint = fg)
-        Text(clock(secondsLeft), style = NB.type.num, color = fg)
+        Text(clockText(secondsLeft), style = NB.type.num, color = fg)
     }
 }
 
