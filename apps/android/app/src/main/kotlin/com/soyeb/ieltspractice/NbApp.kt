@@ -33,6 +33,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.soyeb.ieltspractice.design.components.NbSplash
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -89,10 +92,15 @@ fun NbApp(graph: AppGraph, demo: DemoConfig? = null) {
             val onboarded by graph.prefs.onboardingDone.collectAsState(initial = null)
             val signedIn by graph.api.signedIn.collectAsState()
             val done = onboarded
-            if (!ready || done == null) Box(Modifier.fillMaxSize().background(NB.colors.bg))
-            else {
-                val start = remember { demo?.screen?.let { startFor(it) } ?: if (done || signedIn) TodayTab else Welcome }
-                AppShell(graph, start)
+            // Once per process (saveable: not again on rotation); never in demo/screenshot runs (demo screen "splash" forces it, for the video). It also covers session restore.
+            var splash by rememberSaveable { mutableStateOf(demo == null || demo.screen == "splash") }
+            Box(Modifier.fillMaxSize()) {
+                if (!ready || done == null) Box(Modifier.fillMaxSize().background(NB.colors.bg))
+                else {
+                    val start = remember { demo?.screen?.let { startFor(it) } ?: if (done || signedIn) TodayTab else Welcome }
+                    AppShell(graph, start)
+                }
+                if (splash) NbSplash { splash = false }
             }
         }
     }

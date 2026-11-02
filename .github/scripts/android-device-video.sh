@@ -132,8 +132,18 @@ clip_settings() { # segmented control thumb, then the delete sheet with its pass
   rec_stop
 }
 
+clip_splash() { # $1 theme. Cold start: system splash pen-draws the N, then the in-app lockup sequence
+  if [ "$1" = dark ]; then adb shell cmd uimode night yes; else adb shell cmd uimode night no; fi
+  adb shell am force-stop "$PKG"; rec_start "00-splash-$1"
+  adb shell am start -W -n "$PKG/.MainActivity" --ez demo true --es screen splash --es theme "$1" > /dev/null
+  sleep 5
+  rec_stop
+}
+
 ONLY=${ONLY:-}  # e.g. ONLY="clip_tabs:dark clip_bank" for a quick re-run
 if [ -n "$ONLY" ]; then for c in $ONLY; do ${c%%:*} ${c#*:}; done; exit 0; fi
+clip_splash light
+clip_splash dark
 clip_welcome light
 clip_tabs light
 clip_bank
