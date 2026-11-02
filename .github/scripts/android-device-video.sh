@@ -111,7 +111,7 @@ clip_welcome() { # $1 theme. Entrance stagger, then sign-in: field focus rings, 
 clip_tabs() { # $1 theme. Today scroll, then every tab: the accent rule slides and takes the skill's colour.
   launch today "$1"; rec_start "02-tabs-$1"
   sleep 1; swipe_up 900 1.2; swipe_down 700 1
-  for t in Listening Reading Writing Speaking Today; do tap_text "$t" 0 1.4; done
+  for t in Listening Reading Writing Speaking Today; do tap_text "$t" 99 1.6; done  # 99 = last match: the bottom bar, not the Today card rows
   rec_stop
 }
 clip_bank() { # chips animate their fill, the search field shows its focus ring

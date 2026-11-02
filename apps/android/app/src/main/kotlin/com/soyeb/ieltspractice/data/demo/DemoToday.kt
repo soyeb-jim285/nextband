@@ -20,6 +20,8 @@ object DemoToday {
         if (screen !in screens) return
         val fresh = screen == "today-new"
         out["/api/mock/current"] = if (screen == "today-nomock" || fresh) """{"mock":null}""" else OPEN_MOCK
+        // Resume on the Today card opens the hub, which loads the mock by id.
+        out["/api/mock/mk-open"] = AppJson.parseToJsonElement(OPEN_MOCK).jsonObject["mock"].toString()
         out["/api/coach"] = if (fresh) """{"state":"empty"}""" else COACH
         if (!fresh) out["/api/me"]?.let { text ->
             val me = AppJson.parseToJsonElement(text).jsonObject

@@ -20,6 +20,10 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.currentCompositeKeyHash
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,8 +61,16 @@ class Loader<T>(val state: Load<T>, val refreshing: Boolean, val reload: () -> U
  */
 @Composable
 fun <T> rememberLoad(vararg keys: Any?, block: suspend () -> T): Loader<T> {
+    // The last value is kept per destination (its back-stack entry's ViewModel), so coming back to a screen shows its data
+    // at once and refreshes quietly instead of flashing the skeleton (and the return transition has something to land on).
+    val cache = LocalViewModelStoreOwner.current?.let { viewModel<LoadCache>(it) }
+    val cacheKey = currentCompositeKeyHash.toString() + ":" + keys.contentHashCode()
     var attempt by remember { mutableIntStateOf(0) }
-    var state by remember(*keys) { mutableStateOf<Load<T>>(Load.Loading) }
+    var state by remember(*keys) {
+        @Suppress("UNCHECKED_CAST")
+        mutableStateOf<Load<T>>((cache?.values?.get(cacheKey) as? Load.Ready<T>) ?: Load.Loading)
+    }
+    LaunchedEffect(state) { (state as? Load.Ready<T>)?.let { cache?.values?.put(cacheKey, it) } }
     var refreshing by remember { mutableStateOf(false) }
     val current by rememberUpdatedState(block)
     LaunchedEffect(*keys, attempt) {
@@ -75,6 +87,9 @@ fun <T> rememberLoad(vararg keys: Any?, block: suspend () -> T): Loader<T> {
     }
     return Loader(state, refreshing) { attempt++ }
 }
+
+/** Last loaded values for one back-stack entry (see [rememberLoad]). */
+class LoadCache : ViewModel() { val values = HashMap<String, Load<*>>() }
 
 /** Skeleton while loading, [ErrorState] on failure, [content] when ready. */
 @Composable
