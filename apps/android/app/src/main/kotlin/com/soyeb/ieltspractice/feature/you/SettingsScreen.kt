@@ -1,0 +1,257 @@
+package com.soyeb.ieltspractice.feature.you
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.soyeb.ieltspractice.LocalDemo
+import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.data.net.ApiError
+import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.design.components.BtnKind
+import com.soyeb.ieltspractice.design.components.BtnSize
+import com.soyeb.ieltspractice.design.components.LocalSnack
+import com.soyeb.ieltspractice.design.components.NbButton
+import com.soyeb.ieltspractice.design.components.NbCard
+import com.soyeb.ieltspractice.design.components.NbIconButton
+import com.soyeb.ieltspractice.design.components.NbListRow
+import com.soyeb.ieltspractice.design.components.NbTextField
+import com.soyeb.ieltspractice.design.components.PushedList
+import com.soyeb.ieltspractice.design.components.PushedScreen
+import com.soyeb.ieltspractice.design.components.RowDivider
+import com.soyeb.ieltspractice.design.components.RowGroup
+import com.soyeb.ieltspractice.design.components.SectionHeader
+import com.soyeb.ieltspractice.design.components.Segmented
+import com.soyeb.ieltspractice.nav.Nav
+import com.soyeb.ieltspractice.nav.Welcome
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+
+private val appearances = listOf("system", "light", "dark")
+private val sources = listOf("any", "cambridge", "generated")
+
+@Composable
+fun SettingsScreen(nav: Nav) {
+    val graph = LocalGraph.current
+    val api = graph.api
+    val prefs = graph.prefs
+    val scope = rememberCoroutineScope()
+    val snack = LocalSnack.current
+    val me by api.me.collectAsState()
+    val hasAccount by api.hasAccount.collectAsState()
+    val appearance by prefs.appearance.collectAsState(initial = "system")
+    val source by prefs.speakingSource.collectAsState(initial = "any")
+    val scale by prefs.readingTextScale.collectAsState(initial = 1f)
+    val s = me?.settings
+    var deleting by remember { mutableStateOf(LocalDemo.current?.tab == "Delete") }
+
+    /** Save one setting; false (and a snackbar) when the server refused. */
+    suspend fun save(block: suspend () -> Unit): Boolean = try {
+        block(); true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: ApiError) {
+        scope.launch { snack.showSnackbar(e.message) }; false
+    } catch (e: Exception) {
+        scope.launch { snack.showSnackbar("Couldn't save. Try again.") }; false
+    }
+
+    PushedScreen("Settings", nav::back) { pad ->
+        PushedList(pad) {
+            item {
+                Block("Appearance") {
+                    Segmented(listOf("System", "Light", "Dark"), appearances.indexOf(appearance).coerceAtLeast(0), { i -> scope.launch { prefs.setAppearance(appearances[i]) } })
+                }
+            }
+            if (hasAccount && s != null) {
+                item {
+                    Block("Writing") {
+                        RowGroup {
+                            ToggleRow(
+                                "Submit when time runs out", "Off: the timer keeps counting as overtime and the result is flagged.", s.writingAutoSubmit,
+                            ) { v -> save { api.saveSettings(writingAutoSubmit = v) } }
+                            RowDivider()
+                            ToggleRow("Block pasting", "Matches the real test, where you type every word.", s.blockPaste) { v -> save { api.saveSettings(blockPaste = v) } }
+                        }
+                    }
+                }
+            }
+            if (me?.cambridgeAccess == true) item {
+                Block("Speaking questions") {
+                    Segmented(listOf("Mixed", "Cambridge", "Ours"), sources.indexOf(source).coerceAtLeast(0), { i -> scope.launch { prefs.setSpeakingSource(sources[i]) } })
+                    Text("Where random Speaking tests draw their questions from.", style = NB.type.caption, color = NB.colors.muted, modifier = Modifier.padding(horizontal = 4.dp))
+                }
+            }
+            if (hasAccount && s != null) item {
+                Block("Emails") {
+                    RowGroup {
+                        ToggleRow("Product news and tips", "New tests, features and practice advice. A few emails a month at most. Account emails, like sign-in codes, always arrive.", s.productEmails) { v ->
+                            save { api.saveSettings(productEmails = v) }
+                        }
+                    }
+                }
+            }
+            item {
+                Block("Reading text size") {
+                    ReadingSize(scale) { v -> scope.launch { prefs.setReadingTextScale(v) } }
+                }
+            }
+            if (hasAccount) item {
+                Block("Account") {
+                    RowGroup {
+                        NbListRow("Delete account", subtitle = "Removes your recordings, essays, results and review cards. This can't be undone.", titleColor = NB.colors.badText, onClick = { deleting = true }, chevron = false)
+                    }
+                }
+            }
+        }
+    }
+
+    if (deleting) DeleteDialog(
+        onDismiss = { deleting = false },
+        onDelete = { password ->
+            try {
+                api.deleteAccount(password)
+                deleting = false
+                nav.reset(Welcome)
+                null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ApiError) {
+                e.message
+            } catch (e: Exception) {
+                "Couldn't delete the account. Try again."
+            }
+        },
+    )
+}
+
+@Composable
+private fun Block(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeader(title)
+        content()
+    }
+}
+
+/** A whole row that toggles; the switch only shows state. The value follows the tap at once and goes back if the save fails. */
+@Composable
+private fun ToggleRow(title: String, sub: String, value: Boolean, save: suspend (Boolean) -> Boolean) {
+    var on by remember(value) { mutableStateOf(value) }
+    val scope = rememberCoroutineScope()
+    val c = NB.colors
+    NbListRow(
+        title, subtitle = sub,
+        modifier = Modifier.toggleable(on, role = Role.Switch) { v ->
+            on = v
+            scope.launch { if (!save(v)) on = !v }
+        },
+        trailing = {
+            Switch(
+                on, null,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = c.brand, checkedThumbColor = c.onBrand, checkedBorderColor = c.brand,
+                    uncheckedTrackColor = c.surface2, uncheckedThumbColor = c.faint, uncheckedBorderColor = c.faint,
+                ),
+            )
+        },
+    )
+}
+
+/** Slider 0.85 to 1.4 with a live line in the reading face, so the size you pick is the size you get. */
+@Composable
+private fun ReadingSize(saved: Float, onSave: (Float) -> Unit) {
+    var v by remember { mutableFloatStateOf(saved) }
+    LaunchedEffect(saved) { v = saved }
+    val c = NB.colors
+    NbCard {
+        Text(
+            "The examiner asked how the town had changed since she was a child.",
+            style = NB.type.reading.copy(fontSize = (18 * v).sp, lineHeight = (29 * v).sp), color = c.ink,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("A", style = NB.type.bodySmall, color = c.muted)
+            Slider(
+                v, { v = it }, Modifier.weight(1f).padding(horizontal = 8.dp).semantics { contentDescription = "Reading text size" },
+                valueRange = 0.85f..1.4f, onValueChangeFinished = { onSave(v) },
+                colors = SliderDefaults.colors(thumbColor = c.brand, activeTrackColor = c.brand, inactiveTrackColor = c.surface3),
+            )
+            Text("A", style = NB.type.title1, color = c.muted)
+        }
+        Text("${Math.round(v * 100)}%", style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
+    }
+}
+
+/** Confirms with the account password (Better Auth delete-user). [onDelete] returns an error message, or null when it worked. */
+@Composable
+private fun DeleteDialog(onDismiss: () -> Unit, onDelete: suspend (String) -> String?) {
+    var password by remember { mutableStateOf("") }
+    var show by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    fun go() {
+        if (password.isEmpty() || busy) return
+        scope.launch {
+            busy = true
+            error = onDelete(password)
+            busy = false
+        }
+    }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Delete your account?", style = NB.type.title1) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Everything you've recorded and written will be permanently deleted. Confirm with your password.", style = NB.type.body, color = NB.colors.muted)
+                NbTextField(
+                    password, { password = it; error = null }, "Password", error = error,
+                    visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { go() }),
+                    trailing = {
+                        NbIconButton(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Hide password" else "Show password", { show = !show })
+                    },
+                )
+            }
+        },
+        confirmButton = { NbButton("Delete forever", ::go, kind = BtnKind.Destructive, size = BtnSize.Small, enabled = password.isNotEmpty(), loading = busy) },
+        dismissButton = { NbButton("Keep account", onDismiss, kind = BtnKind.Text, size = BtnSize.Small, enabled = !busy) },
+        containerColor = NB.colors.surface, titleContentColor = NB.colors.ink, textContentColor = NB.colors.muted,
+        shape = NB.shape.card,
+    )
+}

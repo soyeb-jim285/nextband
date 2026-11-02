@@ -1,0 +1,508 @@
+package com.soyeb.ieltspractice.feature.auth
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.unit.dp
+import com.soyeb.ieltspractice.LocalDemo
+import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.data.model.EmailStatus
+import com.soyeb.ieltspractice.data.net.ApiError
+import com.soyeb.ieltspractice.design.LocalReducedMotion
+import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.design.Tone
+import com.soyeb.ieltspractice.design.components.Banner
+import com.soyeb.ieltspractice.design.components.BtnKind
+import com.soyeb.ieltspractice.design.components.BtnSize
+import com.soyeb.ieltspractice.design.components.NbButton
+import com.soyeb.ieltspractice.design.components.NbIconButton
+import com.soyeb.ieltspractice.design.components.NbTextField
+import com.soyeb.ieltspractice.design.components.StickyActionBar
+import com.soyeb.ieltspractice.feature.you.SITE
+import com.soyeb.ieltspractice.nav.Nav
+import com.soyeb.ieltspractice.nav.Onboarding
+import com.soyeb.ieltspractice.nav.TodayTab
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+/** Everything the five steps share, kept above the step animation so typed text survives moving between steps. */
+@Stable
+private class AuthForm(email: String) {
+    var name by mutableStateOf("")
+    var email by mutableStateOf(email)
+    var password by mutableStateOf("")
+    var confirm by mutableStateOf("")
+    var code by mutableStateOf("")
+    var showPassword by mutableStateOf(false)
+    var busy by mutableStateOf(false)
+    /** The primary button was pressed once: show what is wrong with each field. */
+    var tried by mutableStateOf(false)
+    var banner by mutableStateOf<String?>(null)
+    var info by mutableStateOf<String?>(null)
+    /** Sign-up with an address that already has an account. */
+    var exists by mutableStateOf(false)
+    var codeIssue by mutableStateOf<String?>(null)
+    /** Verify copy: just signed up (true) or signing in with an unverified address. */
+    var fromSignUp by mutableStateOf(false)
+    /** The address a code was sent to. */
+    var address by mutableStateOf(email.trim())
+    /** Proof of the request that sent the code, for the delivery status. */
+    var token by mutableStateOf<String?>(null)
+}
+
+/**
+ * Sign in, create an account, verify the emailed code, forgot password and reset: one screen, five steps.
+ * [reason] is why a guest was sent here (nav.requireAccount); finishing then continues that action. Otherwise the user lands on Today
+ * (or Onboarding the first time). The primary button sits at the bottom, above the keyboard.
+ */
+@Composable
+fun AuthScreen(nav: Nav, mode: String, reason: String?) {
+    val graph = LocalGraph.current
+    val api = graph.api
+    val prefs = graph.prefs
+    val scope = rememberCoroutineScope()
+    val c = NB.colors
+    val reduced = LocalReducedMotion.current
+    val demoTab = LocalDemo.current?.tab
+    val demoMail = demoTab in listOf("Verify", "Forgot", "Reset")
+    val demoStatus = if (demoTab == "Verify" || demoTab == "Reset") EmailStatus("sent", "2026-10-03T17:59:20Z", "m•••@example.com") else null
+    var step by remember {
+        mutableStateOf(
+            when (demoTab) { "SignIn" -> AuthStep.SignIn; "Signup" -> AuthStep.SignUp; "Verify" -> AuthStep.Verify; "Forgot" -> AuthStep.Forgot; "Reset" -> AuthStep.Reset; else -> stepOf(mode) },
+        )
+    }
+    val f = remember { AuthForm(if (demoMail) "maya@example.com" else "") }
+
+    fun go(s: AuthStep) {
+        step = s
+        f.banner = null; f.codeIssue = null; f.code = ""; f.tried = false; f.exists = false
+    }
+    fun close() { if (reason != null) nav.authFinished(false) else nav.back() }
+    fun leave() { if (step.top) close() else go(AuthStep.SignIn) }
+    BackHandler { leave() }
+
+    /** Signed in: continue what the guest was doing, or land on Today (Onboarding the first time). */
+    fun finished() {
+        if (reason != null) nav.authFinished(true)
+        else scope.launch { if (prefs.onboardingDone.first()) nav.reset(TodayTab) else nav.reset(Onboarding) }
+    }
+
+    /** Run a code step. [codeOnly] puts every failure under the boxes (verify); otherwise only code problems go there. */
+    fun attempt(codeOnly: Boolean, block: suspend () -> Unit) {
+        scope.launch {
+            f.busy = true; f.banner = null; f.codeIssue = null
+            try {
+                block()
+            } catch (x: CancellationException) {
+                throw x
+            } catch (x: ApiError) {
+                val m = otpError(x.status, x.code, x.message)
+                if (codeOnly || isCodeError(x.code)) f.codeIssue = m else f.banner = m
+            } catch (x: Exception) {
+                f.banner = "Something went wrong. Try again."
+            }
+            f.busy = false
+        }
+    }
+
+    fun submit() {
+        f.tried = true
+        val signUp = step == AuthStep.SignUp
+        if (!(if (signUp) signUpErrors(f.name, f.email, f.password, f.confirm) else signInErrors(f.email, f.password)).ok) return
+        scope.launch {
+            f.busy = true; f.banner = null; f.info = null; f.exists = false
+            val a = f.email.trim()
+            try {
+                if (signUp) {
+                    if (api.signUp(f.name.trim(), a, f.password)) finished()
+                    else { f.address = a; f.token = api.statusToken; f.fromSignUp = true; go(AuthStep.Verify) } // the server emailed a code
+                } else {
+                    api.signIn(a, f.password)
+                    finished()
+                }
+            } catch (x: CancellationException) {
+                throw x
+            } catch (x: ApiError) {
+                if (!signUp && (x.code == "EMAIL_NOT_VERIFIED" || x.status == 403)) {
+                    f.token = runCatching { api.sendOtp(a, "email-verification") }.getOrNull()
+                    f.address = a; f.fromSignUp = false; go(AuthStep.Verify)
+                } else if (signUp) {
+                    if (x.status == 422 || x.code == "USER_ALREADY_EXISTS" || x.message.contains("already exists", true)) f.exists = true
+                    else f.banner = x.message.ifEmpty { "Could not create the account." }
+                } else {
+                    f.banner = if (x.status == 401) "That email and password don't match." else x.message.ifEmpty { "Could not sign in. Try again." }
+                }
+            } catch (x: Exception) {
+                f.banner = if (signUp) "Could not create the account." else "Could not sign in. Try again."
+            }
+            f.busy = false
+        }
+    }
+
+    fun verify() {
+        f.tried = true
+        if (codeError(f.code) == null) attempt(codeOnly = true) { api.verifyEmail(f.address, f.code); finished() }
+    }
+
+    fun sendReset() {
+        f.tried = true
+        if (emailError(f.email) == null) attempt(codeOnly = false) {
+            val a = f.email.trim()
+            f.token = api.sendOtp(a, "forget-password"); f.address = a
+            go(AuthStep.Reset)
+        }
+    }
+
+    fun updatePassword() {
+        f.tried = true
+        if (resetErrors(f.code, f.password, f.confirm).ok) attempt(codeOnly = false) {
+            api.resetPassword(f.address, f.code, f.password)
+            f.password = ""; f.confirm = ""
+            go(AuthStep.SignIn)
+            f.info = "Password updated. Sign in with your new password."
+        }
+    }
+
+    val primary: () -> Unit = when (step) {
+        AuthStep.SignIn, AuthStep.SignUp -> ::submit
+        AuthStep.Verify -> ::verify
+        AuthStep.Forgot -> ::sendReset
+        AuthStep.Reset -> ::updatePassword
+    }
+
+    Column(Modifier.fillMaxSize().background(c.bg)) {
+        Row(Modifier.statusBarsPadding().padding(start = 4.dp, end = NB.space.gutter, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            NbIconButton(if (step.top) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack, if (step.top) "Close" else "Back to sign in", ::leave)
+            Spacer(Modifier.weight(1f))
+            Logo()
+        }
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter).padding(top = 12.dp, bottom = 24.dp)) {
+            AnimatedContent(
+                targetState = step,
+                transitionSpec = {
+                    if (reduced) EnterTransition.None togetherWith ExitTransition.None
+                    else (fadeIn(tween(220, delayMillis = 90)) + slideInHorizontally(tween(260)) { it / 10 }) togetherWith fadeOut(tween(90))
+                },
+                label = "authStep",
+            ) { s ->
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    val (title, lede) = stepCopy(s, f)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(title, style = NB.type.headline, color = c.ink, modifier = Modifier.semantics { heading() })
+                        Text(lede, style = NB.type.body, color = c.muted)
+                    }
+                    f.banner?.let { Banner(it, Icons.Rounded.ErrorOutline, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Bad) }
+                    if (s == AuthStep.SignIn) f.info?.let { Banner(it, Icons.Rounded.CheckCircle, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Good) }
+                    when (s) {
+                        AuthStep.SignIn, AuthStep.SignUp -> CredentialsStep(s == AuthStep.SignUp, f, reason, primary) { go(it) }
+                        AuthStep.Verify -> VerifyStep(f, demoStatus, ::verify)
+                        AuthStep.Forgot -> ForgotStep(f, primary) { go(AuthStep.SignIn) }
+                        AuthStep.Reset -> ResetStep(f, demoStatus, primary) { go(it) }
+                    }
+                }
+            }
+        }
+        StickyActionBar {
+            NbButton(
+                when (step) { AuthStep.SignIn -> "Sign in"; AuthStep.SignUp -> "Create account"; AuthStep.Verify -> "Verify email"; AuthStep.Forgot -> "Send code"; AuthStep.Reset -> "Update password" },
+                primary, fill = true, size = BtnSize.Large, loading = f.busy, haptic = true,
+            )
+        }
+    }
+}
+
+private fun stepCopy(s: AuthStep, f: AuthForm): Pair<String, String> = when (s) {
+    AuthStep.SignIn -> "Welcome back" to "Sign in to continue your practice."
+    AuthStep.SignUp -> "Create your account" to "Keep your results, watch your bands and unlock your coach."
+    AuthStep.Verify -> if (f.fromSignUp) "Check your email" to "One step left: verify your address." else "Verify your email" to "One step left before you can sign in."
+    AuthStep.Forgot -> "Reset your password" to "Enter your account email and we'll send you a 6-digit code."
+    AuthStep.Reset -> "Enter your code" to "If an account exists for ${f.address}, we sent it a 6-digit code. It expires in 10 minutes."
+}
+
+@Composable
+private fun CredentialsStep(signUp: Boolean, f: AuthForm, reason: String?, onDone: () -> Unit, go: (AuthStep) -> Unit) {
+    val errs = if (!f.tried) FieldErrors() else if (signUp) signUpErrors(f.name, f.email, f.password, f.confirm) else signInErrors(f.email, f.password)
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (reason != null) Banner(reason, Icons.Rounded.Info)
+        if (signUp) AuthField(f.name, { f.name = it }, "Name", errs.name, keyboard = KeyboardType.Text, capitalize = true, autofill = ContentType.PersonFullName)
+        Column {
+            AuthField(
+                f.email, { f.email = it; f.exists = false }, "Email",
+                errs.email ?: if (f.exists) "An account with this email already exists." else null,
+                keyboard = KeyboardType.Email, autofill = ContentType.EmailAddress,
+            )
+            if (f.exists && errs.email == null) NbButton("Sign in instead", { go(AuthStep.SignIn); f.confirm = "" }, kind = BtnKind.Text, size = BtnSize.Small)
+        }
+        if (signUp) PasswordPair(f, "Password", errs, onDone)
+        else Column {
+            AuthField(
+                f.password, { f.password = it }, "Password", errs.password, keyboard = KeyboardType.Password, ime = ImeAction.Done, onImeAction = onDone,
+                password = true, show = f.showPassword, onToggleShow = { f.showPassword = !f.showPassword }, autofill = ContentType.Password,
+            )
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                NbButton("Forgot password?", { go(AuthStep.Forgot); f.info = null }, kind = BtnKind.Text, size = BtnSize.Small)
+            }
+        }
+        if (signUp) TermsNote()
+        Column {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(NB.colors.line))
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (signUp) "Already have an account?" else "New here?", style = NB.type.bodySmall, color = NB.colors.muted)
+                NbButton(if (signUp) "Sign in" else "Create an account", { go(if (signUp) AuthStep.SignIn else AuthStep.SignUp); f.info = null; f.confirm = "" }, kind = BtnKind.Text, size = BtnSize.Small)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PasswordPair(f: AuthForm, label: String, errs: FieldErrors, onDone: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            AuthField(
+                f.password, { f.password = it }, label, errs.password, keyboard = KeyboardType.Password,
+                password = true, show = f.showPassword, onToggleShow = { f.showPassword = !f.showPassword }, autofill = ContentType.NewPassword,
+            )
+            if (errs.password == null) Text(
+                if (f.password.length >= 8) "8 characters or more" else "At least 8 characters.",
+                style = NB.type.caption, color = if (f.password.length >= 8) NB.colors.goodText else NB.colors.muted, modifier = Modifier.padding(horizontal = 4.dp),
+            )
+        }
+        AuthField(
+            f.confirm, { f.confirm = it }, "Confirm password", errs.confirm ?: liveMismatch(f.password, f.confirm), keyboard = KeyboardType.Password,
+            ime = ImeAction.Done, onImeAction = onDone, password = true, show = f.showPassword, autofill = ContentType.NewPassword,
+        )
+    }
+}
+
+@Composable
+private fun VerifyStep(f: AuthForm, demo: EmailStatus?, onComplete: () -> Unit) {
+    val api = LocalGraph.current.api
+    val errs = if (f.tried) codeError(f.code) else null
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            buildAnnotatedString {
+                append("Enter the 6-digit code for ")
+                pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = NB.colors.ink)); append(f.address); pop()
+                append(". It expires in 10 minutes.")
+            },
+            style = NB.type.body, color = NB.colors.muted,
+        )
+        CodeField(f.code, errs ?: f.codeIssue) { f.code = it; f.codeIssue = null; if (it.length == 6) onComplete() }
+        CodeDelivery(f.token, demo) { api.sendOtp(f.address, "email-verification") }
+    }
+}
+
+@Composable
+private fun ForgotStep(f: AuthForm, onDone: () -> Unit, back: () -> Unit) {
+    val err = if (f.tried) emailError(f.email) else null
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        AuthField(f.email, { f.email = it }, "Email", err, keyboard = KeyboardType.Email, ime = ImeAction.Done, onImeAction = onDone, autofill = ContentType.EmailAddress)
+        NbButton("Back to sign in", back, kind = BtnKind.Text, size = BtnSize.Small)
+    }
+}
+
+@Composable
+private fun ResetStep(f: AuthForm, demo: EmailStatus?, onDone: () -> Unit, go: (AuthStep) -> Unit) {
+    val api = LocalGraph.current.api
+    val errs = if (f.tried) resetErrors(f.code, f.password, f.confirm) else FieldErrors()
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        CodeField(f.code, errs.code ?: f.codeIssue) { f.code = it; f.codeIssue = null }
+        PasswordPair(f, "New password", errs, onDone)
+        Column {
+            CodeDelivery(f.token, demo) { api.sendOtp(f.address, "forget-password") }
+            NbButton("Use a different email", { go(AuthStep.Forgot) }, kind = BtnKind.Text, size = BtnSize.Small)
+        }
+        NbButton("Back to sign in", { go(AuthStep.SignIn) }, kind = BtnKind.Text, size = BtnSize.Small)
+    }
+}
+
+/** A labelled field with show/hide for passwords, IME actions and autofill hints. */
+@Composable
+private fun AuthField(
+    value: String, onChange: (String) -> Unit, label: String, error: String?,
+    keyboard: KeyboardType, ime: ImeAction = ImeAction.Next, onImeAction: () -> Unit = {},
+    password: Boolean = false, show: Boolean = false, onToggleShow: (() -> Unit)? = null,
+    autofill: ContentType? = null, capitalize: Boolean = false,
+) {
+    val focus = LocalFocusManager.current
+    NbTextField(
+        value, onChange, label,
+        modifier = Modifier.semantics { if (autofill != null) contentType = autofill },
+        error = error,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = keyboard, imeAction = ime,
+            capitalization = if (capitalize) androidx.compose.ui.text.input.KeyboardCapitalization.Words else androidx.compose.ui.text.input.KeyboardCapitalization.None,
+        ),
+        keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }, onDone = { onImeAction() }),
+        visualTransformation = if (password && !show) PasswordVisualTransformation() else VisualTransformation.None,
+        trailing = if (password && onToggleShow != null) ({
+            NbIconButton(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Hide password" else "Show password", onToggleShow)
+        }) else null,
+    )
+}
+
+@Composable
+private fun TermsNote() {
+    val link = TextLinkStyles(SpanStyle(color = NB.colors.ink, fontWeight = FontWeight.Medium, textDecoration = TextDecoration.Underline))
+    Text(
+        buildAnnotatedString {
+            append("By creating an account you agree to the ")
+            withLink(LinkAnnotation.Url("$SITE/terms", link)) { append("terms") }
+            append(" and ")
+            withLink(LinkAnnotation.Url("$SITE/privacy", link)) { append("privacy policy") }
+            append(".")
+        },
+        Modifier.fillMaxWidth(), style = NB.type.caption, color = NB.colors.muted, textAlign = TextAlign.Center,
+    )
+}
+
+/**
+ * Six-digit code as six boxes. One invisible BasicTextField holds the value, so the keyboard, paste, Backspace and the
+ * one-time-code autofill all work; the boxes only draw it. Digits only.
+ */
+@Composable
+private fun CodeField(code: String, error: String?, onChange: (String) -> Unit) {
+    val c = NB.colors
+    val focus = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        BasicTextField(
+            value = code, onValueChange = { onChange(otpDigits(it)) }, singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            cursorBrush = SolidColor(Color.Transparent),
+            textStyle = NB.type.body.copy(color = Color.Transparent),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus).onFocusChanged { focused = it.isFocused }
+                .semantics { contentType = ContentType.SmsOtpCode; contentDescription = "6-digit code" },
+            decorationBox = { inner ->
+                Box {
+                    Box(Modifier.size(1.dp)) { inner() }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(6) { i ->
+                            val active = focused && i == minOf(code.length, 5)
+                            Box(
+                                Modifier.weight(1f).height(56.dp).background(c.surface, NB.shape.tile)
+                                    .border(if (active || error != null) 2.dp else 1.dp, if (error != null) c.bad else if (active) c.brand else c.faint, NB.shape.tile),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(code.getOrNull(i)?.toString() ?: "", style = NB.type.title1.copy(fontFeatureSettings = "tnum"), color = c.ink) }
+                        }
+                    }
+                }
+            },
+        )
+        if (error != null) Text(error, style = NB.type.bodySmall, color = c.badText, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+    }
+}
+
+/**
+ * Delivery status plus "Resend code" with a countdown. [first] is the status token of the request that sent the first code (null when that call failed);
+ * the status is polled every 2 s for 20 s after each send. [demo] (screenshots) is shown as is, with no network.
+ */
+@Composable
+private fun CodeDelivery(first: String?, demo: EmailStatus?, send: suspend () -> String?) {
+    val api = LocalGraph.current.api
+    val c = NB.colors
+    var token by remember { mutableStateOf(first) }
+    var status by remember { mutableStateOf(demo) }
+    var wait by remember { mutableIntStateOf(demo?.resendAvailableIn ?: 0) }
+    var sendFailed by remember { mutableStateOf(first == null && demo == null) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(token) {
+        val t = token ?: return@LaunchedEffect
+        if (demo != null) return@LaunchedEffect
+        repeat(10) {
+            runCatching { api.emailStatus(t) }.getOrNull()?.let { status = it; wait = it.resendAvailableIn }
+            delay(2000)
+        }
+    }
+    LaunchedEffect(wait) { if (wait > 0) { delay(1000); wait-- } }
+    val shown = if (sendFailed) EmailStatus("failed", error = "network") else status?.copy(resendAvailableIn = wait)
+    val (line, bad) = emailStatusLine(shown, System.currentTimeMillis())
+    Column {
+        Text(line, style = NB.type.bodySmall, color = if (bad) c.badText else c.muted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        NbButton(
+            if (wait > 0) "Resend code in ${wait}s" else "Resend code",
+            {
+                scope.launch {
+                    sendFailed = false
+                    val t = try { send() } catch (x: CancellationException) { throw x } catch (x: Exception) { null }
+                    if (t == null) sendFailed = true else { status = null; token = t }
+                }
+            },
+            kind = BtnKind.Text, size = BtnSize.Small, enabled = wait == 0,
+        )
+    }
+}

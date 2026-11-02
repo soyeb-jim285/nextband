@@ -2,11 +2,10 @@ package com.soyeb.ieltspractice.feature.history
 
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import com.soyeb.ieltspractice.feature.StubPushed
-import com.soyeb.ieltspractice.feature.StubTab
-import com.soyeb.ieltspractice.nav.Nav
+import androidx.navigation.toRoute
 import com.soyeb.ieltspractice.nav.History
+import com.soyeb.ieltspractice.nav.Nav
 
 fun NavGraphBuilder.historyGraph(nav: Nav) {
-    composable<History> { StubPushed("History", nav) }
+    composable<History> { entry -> HistoryScreen(nav, entry.toRoute<History>().skill) }
 }

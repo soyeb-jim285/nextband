@@ -62,6 +62,8 @@ object DemoCommunity {
             out["/api/me"] = JsonObject(me).toString()
         }
         out["/api/quota"] = quotaJson.toString()
+        DemoToday.apply(out, screen)
+        DemoStudy.apply(out, screen, tab)
         return out
     }
 
