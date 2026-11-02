@@ -204,7 +204,8 @@ fun BrandHero(modifier: Modifier = Modifier, content: @Composable androidx.compo
     val c = NB.colors
     val ink = HeroInk(if (c.isDark) c.ink else Color.White, if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f))
     Box(modifier.fillMaxWidth().clip(NB.shape.card).background(if (c.isDark) c.brandSoft else c.brandText)) {
-        BandScale(ink.fg, Modifier.align(Alignment.TopEnd).offset(x = 90.dp, y = (-70).dp).size(240.dp))
+        // Centre on the top-right corner so the ticks stay in the corner, clear of the copy.
+        BandScale(ink.fg, Modifier.align(Alignment.TopEnd).offset(x = 110.dp, y = (-110).dp).size(220.dp))
         Column(Modifier.fillMaxWidth().padding(20.dp)) { content(ink) }
     }
 }
