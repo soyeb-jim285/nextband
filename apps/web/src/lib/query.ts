@@ -46,10 +46,11 @@ export function hasAccountHint() {
 
 export const meQuery = queryOptions({
   queryKey: ['me'],
-  // A guest is a normal state, not an error: 401 resolves to null.
+  // A guest is a normal state, not an error: 401 resolves to null. So does any other 4xx: Google's renderer cuts this
+  // request off with a 499, and a public page must still render for it (else it indexes the error screen as a soft 404).
   queryFn: () =>
     call<Schemas['Me'] | null>(takeInlineMe() ?? client.GET('/api/me'))
-      .catch((e) => (e instanceof ApiError && e.status === 401 ? null : Promise.reject(e)))
+      .catch((e) => (e instanceof ApiError && e.status < 500 ? null : Promise.reject(e)))
       .then((me) => (rememberAccount(isAccount(me)), me)),
   staleTime: 5 * 60_000,
 });

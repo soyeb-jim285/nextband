@@ -13,6 +13,11 @@ it('a guest (401) resolves the me query to null instead of throwing', async () =
   expect(await queryClient.fetchQuery(meQuery)).toBeNull();
 });
 
+it("any other 4xx is a visitor too: Google's renderer cuts /api/me off with a 499, and the page must still render", async () => {
+  (globalThis as { __me?: Promise<Response> }).__me = Promise.resolve(new Response('', { status: 499, statusText: 'Client Closed Request' }));
+  expect(await queryClient.fetchQuery(meQuery)).toBeNull();
+});
+
 it('a server failure still throws', async () => {
   serve(500, { error: 'boom' });
   await expect(queryClient.fetchQuery({ ...meQuery, retry: false })).rejects.toThrow('boom');
