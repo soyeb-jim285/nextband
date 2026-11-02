@@ -478,7 +478,7 @@ private fun AuthField(
     val focus = LocalFocusManager.current
     NbTextField(
         value, onChange, label,
-        modifier = Modifier.semantics { if (autofill != null) contentType = autofill },
+        fieldModifier = Modifier.semantics { if (autofill != null) contentType = autofill },
         error = error,
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboard, imeAction = ime,

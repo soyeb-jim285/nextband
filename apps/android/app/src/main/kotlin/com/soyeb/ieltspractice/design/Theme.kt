@@ -7,6 +7,9 @@ import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
@@ -57,6 +60,7 @@ private val M3Shapes = Shapes(
     large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(28.dp),
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NbTheme(dark: Boolean, content: @Composable () -> Unit) {
     val colors = if (dark) DarkColors else LightColors
@@ -65,7 +69,10 @@ fun NbTheme(dark: Boolean, content: @Composable () -> Unit) {
         runCatching { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
     }
     CompositionLocalProvider(LocalNbColors provides colors, LocalReducedMotion provides reduced) {
-        MaterialTheme(colorScheme = schemeFor(colors), typography = NbTypography, shapes = M3Shapes, content = content)
+        MaterialTheme(colorScheme = schemeFor(colors), typography = NbTypography, shapes = M3Shapes) {
+            // No Material ripple anywhere: every clickable gets the soft PressWash instead.
+            CompositionLocalProvider(LocalIndication provides PressWash, LocalRippleConfiguration provides null, content = content)
+        }
     }
 }
 

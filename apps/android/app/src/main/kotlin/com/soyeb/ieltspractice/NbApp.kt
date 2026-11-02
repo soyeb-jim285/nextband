@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
+import com.soyeb.ieltspractice.design.NbMotion
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -114,17 +115,17 @@ private fun AppShell(graph: AppGraph, start: Any) {
     val d = if (reduced) 0 else 1
     val push: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
         if (isTab(targetState) && isTab(initialState)) fadeIn(tween(180 * d, delayMillis = 60 * d))
-        else slideInHorizontally(tween(300 * d)) { it / 8 } + fadeIn(tween(220 * d))
+        else slideInHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { it / 8 } + fadeIn(tween(220 * d, easing = NbMotion.EaseOut))
     }
     val pushOut: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        if (isTab(targetState) && isTab(initialState)) fadeOut(tween(90 * d))
-        else slideOutHorizontally(tween(300 * d)) { -it / 12 } + fadeOut(tween(200 * d))
+        if (isTab(targetState) && isTab(initialState)) fadeOut(tween(90 * d, easing = NbMotion.EaseOut))
+        else slideOutHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { -it / 12 } + fadeOut(tween(200 * d, easing = NbMotion.EaseOut))
     }
     val pop: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        slideInHorizontally(tween(300 * d)) { -it / 12 } + fadeIn(tween(220 * d))
+        slideInHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { -it / 12 } + fadeIn(tween(220 * d, easing = NbMotion.EaseOut))
     }
     val popOut: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        slideOutHorizontally(tween(300 * d)) { it / 8 } + fadeOut(tween(200 * d))
+        slideOutHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { it / 8 } + fadeOut(tween(200 * d, easing = NbMotion.EaseOut))
     }
 
     CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack) {

@@ -1,5 +1,12 @@
 package com.soyeb.ieltspractice.design.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import com.soyeb.ieltspractice.design.PressWash
+import com.soyeb.ieltspractice.design.pressScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -84,8 +91,10 @@ fun TimerPill(secondsLeft: Long, modifier: Modifier = Modifier, warnAt: Long = 3
 @Composable
 fun MockStrip(onClick: () -> Unit, modifier: Modifier = Modifier, resumeText: String? = null) {
     val c = NB.colors
-    Surface(onClick = onClick, shape = NB.shape.tile, color = c.surface, contentColor = c.ink, modifier = modifier.fillMaxWidth()
-        .let { if (!c.isDark) it.border(1.dp, c.line, NB.shape.tile) else it }) {
+    val src = remember { MutableInteractionSource() }
+    Surface(shape = NB.shape.tile, color = c.surface, contentColor = c.ink, modifier = modifier.fillMaxWidth().pressScale(src, 0.985f)
+        .let { if (!c.isDark) it.border(1.dp, c.line, NB.shape.tile) else it }
+        .clip(NB.shape.tile).clickable(src, PressWash, role = Role.Button, onClick = onClick)) {
         Row(Modifier.heightIn(min = 56.dp).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             IconTile(Icons.Rounded.WorkspacePremium, c.brandText, c.brandSoft, 36.dp)
             Spacer(Modifier.width(12.dp))

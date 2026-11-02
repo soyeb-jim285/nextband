@@ -1,6 +1,28 @@
 package com.soyeb.ieltspractice.design.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.soyeb.ieltspractice.design.NbMotion
+import com.soyeb.ieltspractice.design.PressWash
+import com.soyeb.ieltspractice.design.pressScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,20 +30,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -32,7 +46,10 @@ import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.design.NB
 
 enum class BtnKind { Primary, Secondary, Outline, Text, Destructive }
-enum class BtnSize(val height: Dp, val pad: Dp, val icon: Dp) { Large(56.dp, 24.dp, 22.dp), Medium(48.dp, 20.dp, 20.dp), Small(36.dp, 14.dp, 18.dp) }
+enum class BtnSize(val height: Dp, val pad: Dp, val icon: Dp, val radius: Dp) {
+    Large(56.dp, 24.dp, 22.dp, 18.dp), Medium(48.dp, 20.dp, 20.dp, 14.dp), Small(36.dp, 14.dp, 18.dp, 11.dp);
+    val shape get() = RoundedCornerShape(radius)
+}
 
 /**
  * The one button. Exactly one Primary per view. `loading` keeps the width and shows a spinner; `fill` = full width.
@@ -62,40 +79,42 @@ fun NbButton(
     val pad = PaddingValues(horizontal = size.pad, vertical = 8.dp)
     val content: @Composable () -> Unit = {
         Box(contentAlignment = Alignment.Center) {
-            Row(Modifier.alpha(if (loading) 0f else 1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val la by animateFloatAsState(if (loading) 1f else 0f, tween(NbMotion.FAST), label = "btnLoad")
+            Row(Modifier.graphicsLayer { alpha = 1f - la; scaleX = 1f - 0.04f * la; scaleY = 1f - 0.04f * la }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (icon != null) Icon(icon, null, Modifier.size(size.icon))
                 Text(text, style = if (size == BtnSize.Small) NB.type.label.copy(fontSize = NB.type.caption.fontSize) else NB.type.label, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (trailingIcon != null) Icon(trailingIcon, null, Modifier.size(size.icon))
             }
-            if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = androidx.compose.material3.LocalContentColor.current)
+            if (la > 0f) CircularProgressIndicator(Modifier.size(20.dp).graphicsLayer { alpha = la }, strokeWidth = 2.dp, color = LocalContentColor.current)
         }
     }
     val on = enabled && !loading
-    when (kind) {
-        BtnKind.Primary, BtnKind.Destructive, BtnKind.Secondary -> {
-            val (bg, fg) = when (kind) {
-                BtnKind.Primary -> c.brand to c.onBrand
-                BtnKind.Destructive -> c.bad to (if (c.isDark) Color(0xFF3B0613) else Color.White)
-                else -> c.surface2 to c.ink
-            }
-            Button(
-                click, m, enabled = on, shape = NB.shape.pill, contentPadding = pad,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = bg, contentColor = fg,
-                    disabledContainerColor = if (loading) bg else c.surface2, disabledContentColor = if (loading) fg else c.faint,
-                ),
-                elevation = null,
-            ) { content() }
-        }
-        BtnKind.Outline -> OutlinedButton(
-            click, m, enabled = on, shape = NB.shape.pill, contentPadding = pad,
-            border = BorderStroke(1.dp, if (on) c.faint else c.line),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = c.ink, disabledContentColor = c.faint),
-        ) { content() }
-        BtnKind.Text -> TextButton(
-            click, m, enabled = on, shape = NB.shape.pill, contentPadding = pad,
-            colors = ButtonDefaults.textButtonColors(contentColor = c.brandText, disabledContentColor = c.faint),
-        ) { content() }
+    val (bg, fg) = when {
+        !enabled && !loading -> (if (kind == BtnKind.Text || kind == BtnKind.Outline) Color.Transparent else c.surface2) to c.faint
+        kind == BtnKind.Primary -> c.brand to c.onBrand
+        kind == BtnKind.Destructive -> c.bad to (if (c.isDark) Color(0xFF3B0613) else Color.White)
+        kind == BtnKind.Secondary -> c.surface2 to c.ink
+        kind == BtnKind.Outline -> Color.Transparent to c.ink
+        else -> Color.Transparent to c.brandText
+    }
+    val bgA by animateColorAsState(bg, tween(NbMotion.BASE, easing = NbMotion.EaseOut), label = "btnBg")
+    val fgA by animateColorAsState(fg, tween(NbMotion.BASE, easing = NbMotion.EaseOut), label = "btnFg")
+    val shape = size.shape
+    val src = remember { MutableInteractionSource() }
+    // Primary sits on a soft brand-tinted shadow in light mode; everything else is flat.
+    val lift = kind == BtnKind.Primary && on && !c.isDark
+    Box(
+        m.pressScale(src)
+            .then(if (lift) Modifier.shadow(10.dp, shape, ambientColor = c.brand, spotColor = c.brand) else Modifier)
+            .clip(shape)
+            .background(bgA)
+            .then(if (kind == BtnKind.Outline) Modifier.border(1.dp, if (on) c.faint.copy(alpha = 0.6f) else c.line, shape) else Modifier)
+            .clickable(src, PressWash, enabled = on, role = Role.Button, onClick = click)
+            .semantics { if (loading) stateDescription = "Loading" }
+            .padding(pad),
+        contentAlignment = Alignment.Center,
+    ) {
+        CompositionLocalProvider(LocalContentColor provides fgA) { content() }
     }
 }
 
@@ -111,11 +130,13 @@ fun NbIconButton(
     tint: Color? = null,
 ) {
     val c = NB.colors
-    if (tonal) FilledTonalIconButton(
-        onClick, modifier.size(48.dp), enabled = enabled,
-        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = c.surface2, contentColor = tint ?: c.ink),
-    ) { Icon(icon, contentDescription, Modifier.size(22.dp)) }
-    else IconButton(onClick, modifier.size(48.dp), enabled = enabled) {
-        Icon(icon, contentDescription, Modifier.size(24.dp), tint = if (enabled) tint ?: c.ink else c.faint)
+    val src = remember { MutableInteractionSource() }
+    Box(
+        modifier.size(48.dp).pressScale(src, 0.92f).clip(CircleShape)
+            .then(if (tonal) Modifier.background(c.surface2) else Modifier)
+            .clickable(src, PressWash, enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription, Modifier.size(if (tonal) 22.dp else 24.dp), tint = if (enabled) tint ?: c.ink else c.faint)
     }
 }

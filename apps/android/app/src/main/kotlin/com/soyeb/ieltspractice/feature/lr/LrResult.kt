@@ -1,6 +1,7 @@
 package com.soyeb.ieltspractice.feature.lr
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -385,7 +386,7 @@ private fun AnswerRow(f: FlatQ, m: com.soyeb.ieltspractice.data.model.LrMark?, f
     val given = m?.given.orEmpty()
     val correct = m?.answer.orEmpty().joinToString(" / ") { shown(f, it) }
     val desc = "Question ${f.n}, ${if (ok) "correct" else "wrong"}. Your answer: ${shown(f, given)}." + if (!ok) " Correct answer: $correct." else ""
-    Surface(onClick = onClick, color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.ink, modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = desc }) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent, contentColor = c.ink, modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).semantics(mergeDescendants = true) { contentDescription = desc }) {
         Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = NB.space.lg, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(36.dp).background(if (ok) c.goodSoft else c.badSoft, CircleShape), contentAlignment = Alignment.Center) {
                 Text("${f.n}", style = NB.type.num, color = if (ok) c.goodText else c.badText)

@@ -2,6 +2,13 @@ package com.soyeb.ieltspractice.design.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import com.soyeb.ieltspractice.design.PressWash
+import com.soyeb.ieltspractice.design.pressScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +68,15 @@ fun NbCard(
     }
     val border = if (tone == CardTone.Default && tint == null && !c.isDark) BorderStroke(1.dp, c.line) else null
     val inner: @Composable () -> Unit = { Column(Modifier.padding(padding), content = content) }
-    if (onClick != null) Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = NB.shape.card, color = bg, contentColor = c.ink, border = border, content = inner)
+    if (onClick != null) {
+        // Tappable cards give a little under the finger (scale + wash) instead of a Material ripple.
+        val src = remember { MutableInteractionSource() }
+        Surface(
+            modifier = modifier.fillMaxWidth().pressScale(src, 0.985f).clip(NB.shape.card)
+                .clickable(src, PressWash, role = Role.Button, onClick = onClick),
+            shape = NB.shape.card, color = bg, contentColor = c.ink, border = border, content = inner,
+        )
+    }
     else Surface(modifier = modifier.fillMaxWidth(), shape = NB.shape.card, color = bg, contentColor = c.ink, border = border, content = inner)
 }
 
@@ -134,7 +149,7 @@ fun NbListRow(
             }
         }
     }
-    if (onClick != null) Surface(onClick = onClick, modifier = modifier, color = Color.Transparent, contentColor = NB.colors.ink) { row() }
+    if (onClick != null) Box(modifier.clickable(role = Role.Button, onClick = onClick)) { row() }
     else Box(modifier) { row() }
 }
 

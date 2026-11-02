@@ -353,7 +353,7 @@ private fun FeedbackSheet(onDismiss: () -> Unit, onSend: suspend (String) -> Uni
         onDismiss, title = "Send feedback", subtitle = "Tell us what is broken or what you would like. We read every message.",
         actions = { NbButton("Send", { scope.launch { busy = true; onSend(text.trim()); busy = false } }, fill = true, size = BtnSize.Large, enabled = text.isNotBlank(), loading = busy) },
     ) {
-        NbTextField(text, { text = it.take(2000) }, "Your message", Modifier.heightIn(min = 140.dp), singleLine = false)
+        NbTextField(text, { text = it.take(2000) }, "Your message", singleLine = false)
     }
 }
 

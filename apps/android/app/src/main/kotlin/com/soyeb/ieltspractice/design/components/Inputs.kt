@@ -1,5 +1,31 @@
 package com.soyeb.ieltspractice.design.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.semantics
+import com.soyeb.ieltspractice.design.NbMotion
+import com.soyeb.ieltspractice.design.PressWash
+import com.soyeb.ieltspractice.design.pressScale
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -20,11 +46,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
@@ -57,11 +79,15 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
         modifier.fillMaxWidth().heightIn(min = 44.dp).clip(NB.shape.pill).background(c.surface2).padding(4.dp),
     ) {
         val w = maxWidth / options.size
-        val x by animateDpAsState(w * selected, if (reduced) tween(0) else tween(220), label = "seg")
+        val x by animateDpAsState(w * selected, if (reduced) tween(0) else tween(NbMotion.SLOW, easing = NbMotion.EaseOut), label = "seg")
         // matchParentSize: the pill is as tall as the options row. A bare fillMaxHeight took the parent's max height, so in a tall
         // layout (the full Writing test) the control stretched to the whole screen.
         Box(Modifier.matchParentSize()) {
-            Box(Modifier.offset(x = x).width(w).fillMaxHeight().clip(NB.shape.pill).background(if (c.isDark) c.surface3 else c.surface))
+            Box(
+                Modifier.offset(x = x).width(w).fillMaxHeight()
+                    .then(if (c.isDark) Modifier else Modifier.shadow(3.dp, NB.shape.pill, ambientColor = c.ink.copy(alpha = 0.25f), spotColor = c.ink.copy(alpha = 0.25f)))
+                    .clip(NB.shape.pill).background(if (c.isDark) c.surface3 else c.surface),
+            )
         }
         Row(Modifier.fillMaxWidth().selectableGroup()) {
             options.forEachIndexed { i, label ->
@@ -100,16 +126,21 @@ fun ChipRow(
 @Composable
 fun NbChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     val c = NB.colors
-    FilterChip(
-        selected, onClick, { Text(label, style = NB.type.label) }, modifier.heightIn(min = 36.dp),
-        leadingIcon = icon?.let { { Icon(it, null, Modifier.size(18.dp)) } },
-        shape = NB.shape.pill,
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = c.surface, labelColor = c.ink, iconColor = c.muted,
-            selectedContainerColor = c.brandSoft, selectedLabelColor = c.brandText, selectedLeadingIconColor = c.brandText,
-        ),
-        border = FilterChipDefaults.filterChipBorder(true, selected, borderColor = c.line, selectedBorderColor = c.brandSoft),
-    )
+    val spec = tween<Color>(NbMotion.BASE, easing = NbMotion.EaseOut)
+    val bg by animateColorAsState(if (selected) c.brandSoft else c.surface, spec, label = "chipBg")
+    val fg by animateColorAsState(if (selected) c.brandText else c.ink, spec, label = "chipFg")
+    val edge by animateColorAsState(if (selected) c.brand.copy(alpha = 0.45f) else c.line, spec, label = "chipEdge")
+    val src = remember { MutableInteractionSource() }
+    Row(
+        modifier.heightIn(min = 36.dp).pressScale(src).clip(NB.shape.pill).background(bg).border(1.dp, edge, NB.shape.pill)
+            .selectable(selected, interactionSource = src, indication = PressWash, role = Role.Checkbox, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (icon != null) Icon(icon, null, Modifier.size(18.dp), tint = if (selected) fg else c.muted)
+        Text(label, style = NB.type.label, color = fg, maxLines = 1)
+    }
 }
 
 /** Fixed tabs (2–4) or scrollable tabs (5+), brand indicator. */
@@ -135,7 +166,10 @@ fun NbTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier:
     ) { tabs.forEachIndexed { i, t -> tab(i, t) } }
 }
 
-/** Text field with our colours. */
+/**
+ * Text field: label above, filled well, focus ring that fades in. Not the Material outlined field with its floating label.
+ * Error replaces the hint below and turns the ring red; TalkBack hears the label and the error.
+ */
 @Composable
 fun NbTextField(
     value: String,
@@ -151,18 +185,58 @@ fun NbTextField(
     leadingIcon: ImageVector? = null,
     trailing: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    /** Goes on the editable itself: focusRequester, autofill contentType. [modifier] goes on the whole block. */
+    fieldModifier: Modifier = Modifier,
 ) {
     val c = NB.colors
-    OutlinedTextField(
-        value, onValueChange, modifier.fillMaxWidth(), enabled = enabled, singleLine = singleLine,
-        label = { Text(label) }, placeholder = placeholder?.let { { Text(it) } },
-        isError = error != null, supportingText = error?.let { { Text(it) } },
-        leadingIcon = leadingIcon?.let { { Icon(it, null) } }, trailingIcon = trailing,
-        keyboardOptions = keyboardOptions, keyboardActions = keyboardActions, visualTransformation = visualTransformation,
-        shape = NB.shape.tile, textStyle = NB.type.body,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = c.brand, unfocusedBorderColor = c.faint, focusedLabelColor = c.brandText, cursorColor = c.brand,
-            focusedContainerColor = c.surface, unfocusedContainerColor = c.surface,
-        ),
+    val src = remember { MutableInteractionSource() }
+    val focused by src.collectIsFocusedAsState()
+    val spec = tween<Color>(NbMotion.BASE, easing = NbMotion.EaseOut)
+    val ring by animateColorAsState(
+        when { error != null -> c.bad; focused -> c.brand; else -> if (c.isDark) c.line else Color.Transparent }, spec, label = "fieldRing",
     )
+    val well by animateColorAsState(if (focused) c.surface else c.surface2, spec, label = "fieldWell")
+    val labelColor by animateColorAsState(if (error != null) c.badText else if (focused) c.brandText else c.muted, spec, label = "fieldLabel")
+    val shape = RoundedCornerShape(14.dp)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = NB.type.label, color = labelColor, modifier = Modifier.padding(start = 2.dp).clearAndSetSemantics {})
+        BasicTextField(
+            value, onValueChange,
+            fieldModifier.fillMaxWidth().semantics {
+                contentDescription = label
+                if (error != null) this.error(error)
+            },
+            enabled = enabled, singleLine = singleLine, textStyle = NB.type.body.copy(color = if (enabled) c.ink else c.faint),
+            keyboardOptions = keyboardOptions, keyboardActions = keyboardActions, visualTransformation = visualTransformation,
+            interactionSource = src, cursorBrush = SolidColor(c.brand),
+            decorationBox = { inner ->
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = if (singleLine) 54.dp else 120.dp).clip(shape).background(well)
+                        .border(if (focused || error != null) 1.5.dp else 1.dp, ring, shape)
+                        .padding(start = if (leadingIcon != null) 14.dp else 16.dp, end = if (trailing != null) 4.dp else 16.dp),
+                    verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
+                ) {
+                    if (leadingIcon != null) {
+                        Icon(leadingIcon, null, Modifier.padding(top = if (singleLine) 0.dp else 15.dp).size(20.dp), tint = if (focused) c.brandText else c.muted)
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Box(Modifier.weight(1f).padding(vertical = 15.dp)) {
+                        if (value.isEmpty() && placeholder != null) Text(placeholder, style = NB.type.body, color = c.muted, maxLines = if (singleLine) 1 else Int.MAX_VALUE)
+                        inner()
+                    }
+                    if (trailing != null) trailing()
+                }
+            },
+        )
+        AnimatedVisibility(
+            error != null,
+            enter = fadeIn(tween(NbMotion.BASE)) + expandVertically(tween(NbMotion.BASE, easing = NbMotion.EaseOut)),
+            exit = fadeOut(tween(NbMotion.FAST)) + shrinkVertically(tween(NbMotion.BASE, easing = NbMotion.EaseOut)),
+        ) {
+            // Keep the last message on screen while it animates out.
+            var last by remember { mutableStateOf(error.orEmpty()) }
+            if (error != null) last = error
+            Text(last, style = NB.type.bodySmall, color = c.badText, modifier = Modifier.padding(start = 2.dp).clearAndSetSemantics {})
+        }
+    }
 }

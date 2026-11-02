@@ -162,7 +162,7 @@ private fun SpellingDrill(items: List<LrSpellingItem>, nav: Nav) {
                 }
                 item {
                     NbTextField(
-                        typed, { if (!checked) typed = it }, "Type the word", Modifier.focusRequester(focus),
+                        typed, { if (!checked) typed = it }, "Type the word", fieldModifier = Modifier.focusRequester(focus),
                         enabled = !checked,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { checkWord() }),
