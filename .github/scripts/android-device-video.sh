@@ -136,7 +136,7 @@ clip_splash() { # $1 theme. Cold start: system splash pen-draws the N, then the 
   if [ "$1" = dark ]; then adb shell cmd uimode night yes; else adb shell cmd uimode night no; fi
   adb shell am force-stop "$PKG"; rec_start "00-splash-$1"
   adb shell am start -W -n "$PKG/.MainActivity" --ez demo true --es screen splash --es theme "$1" > /dev/null
-  sleep 5
+  sleep 9  # the emulator's cold start alone takes ~5 s
   rec_stop
 }
 
