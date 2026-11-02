@@ -94,91 +94,50 @@ rec_stop() {
 }
 typewords() { local w; for w in "$@"; do adb shell input text "$w"; sleep 0.1; done; } # each arg is one input call, use %s for spaces
 
-# ---- clips ---------------------------------------------------------------------------------------------------------
-clip_home() { # $1 theme
-  launch home "$1"; rec_start "01-home-scroll-$1"
-  sleep 0.7; swipe_up 900 1.2; swipe_up 900 1.4; swipe_up 900 1.2; swipe_down 700 0.6; swipe_down 700 0.6; swipe_down 700 1
+# ---- clips (android-v2: the motion pass: press scale, sliding tab rule, field focus, staggered entrances) ----------
+key_back() { adb shell input keyevent KEYCODE_BACK; sleep "${1:-1.2}"; }
+clip_welcome() { # $1 theme. Entrance stagger, then sign-in: field focus rings, typing, switch to sign-up and back.
+  launch welcome "$1"; adb shell am force-stop "$PKG"; rec_start "01-welcome-signin-$1"
+  adb shell am start -W -n "$PKG/.MainActivity" --ez demo true --es screen welcome --es theme "$1" > /dev/null
+  sleep 2.5
+  tap_text "I have an account" 0 1.8
+  tap_text "Email" 0 0.8; typewords "maya@example.com"; sleep 0.6
+  tap_text "Password" 0 0.8; typewords "practice2026"; sleep 0.6
+  key_back 0.8   # hide the keyboard
+  tap_text "Create an account" 0 1.8
+  tap_text "Sign in" 0 1.5
   rec_stop
 }
-clip_speaking_hub() { # the hub, scroll to the single parts, tap Part 1, press record (real mic, silence on the emulator)
-  launch speaking light; rec_start "02-speaking-hub-light"
-  sleep 0.7; swipe_up 800 1.0; swipe_up 800 1.0
-  tap_text "Part 1" 0 2.5
-  has_text "Start test" && tap_text "Start test" 0 3 # community-balance fair-use dialog
-  tap_text "Start recording" 0 5
+clip_tabs() { # $1 theme. Today scroll, then every tab: the accent rule slides and takes the skill's colour.
+  launch today "$1"; rec_start "02-tabs-$1"
+  sleep 1; swipe_up 900 1.2; swipe_down 700 1
+  for t in Listening Reading Writing Speaking Today; do tap_text "$t" 0 1.4; done
   rec_stop
 }
-clip_session_prep() { # Part 2 preparation minute: tap the notes box and type notes
-  launch session-prep light; rec_start "03-session-prep-notes-light"
-  sleep 1.5; tap_text "Notes" 1 1.2 # 0 is the label, 1 the field
-  typewords "Book:%s" "Sapiens%s" "-%sread%sit%s" "in%s2019%s" "-%schanged%show%sI%s" "see%shistory"
-  sleep 2
+clip_bank() { # chips animate their fill, the search field shows its focus ring
+  launch bank light; rec_start "03-bank-chips-light"
+  sleep 1; tap_text "Part 1" 0 1; tap_text "Books" 0 1; tap_text "All parts" 0 1; tap_text "All topics" 0 1
+  tap_text "Search prompts" 0 0.8; typewords "home"; sleep 1.2; key_back 1
   rec_stop
 }
-clip_session_live_record() { # a real recording on the emulator mic: Part 1, press the record button, the timer and level run
-  launch session-p1 light; rec_start "03b-session-p1-record-light"
-  sleep 1; tap_text "Start recording" 0 7
+clip_mock() { # the Today hero: press Resume, the mock hub pushes in, back pops out
+  launch today light; rec_start "04-mock-resume-light"
+  sleep 1; tap_text "Resume" 0 2.2; key_back 1.6
+  tap_text "Your bands" 0 0.3; swipe_up 900 1.2; swipe_down 900 1
   rec_stop
 }
-clip_result_tabs() { # $1 theme
-  launch result-speaking "$1" Overview; rec_start "04-result-tabs-$1"
-  sleep 0.7; swipe_up 800 1.0; swipe_up 800 1.0; swipe_down 700 0.4; swipe_down 700 0.4
-  tap_text "Transcript" 0 1.2; swipe_up 800 1.0; swipe_up 800 1.0; swipe_down 700 0.4; swipe_down 700 0.4
-  tap_text "Fluency" 0 1.2; swipe_up 800 1.2; swipe_up 800 1.2
-  rec_stop
-}
-fluency_scroll() { swipe_up 700 1.0; } # brings the pace chart into view (same swipes in the probe pass and the recorded pass)
-clip_fluency_dot() { # $1 theme. Pass 1 (not recorded): probe the chart for dots with taps + dumps. Pass 2 (recorded): replay the scroll and the dot taps.
-  local box x0 y0 x1 y1 w h fx fy last=-99 n=0 hits="" xy
-  launch result-speaking "$1" Fluency; CLIP="05-fluency-dot-$1"
-  fluency_scroll
-  dump chart; box=$(python3 /tmp/find_xy.py "Words per minute over time" 0 box < /tmp/ui.xml)
-  if [ -z "$box" ]; then echo "MISS chart"; return 1; fi
-  read -r x0 y0 x1 y1 <<< "$box"; w=$((x1 - x0)); h=$((y1 - y0)); echo "chart box $box"
-  for fx in 16 24 34 44 52 60 68 76 84 92; do for fy in 40 30 50 60 70; do
-    [ $((fx - last)) -lt 18 ] && continue
-    adb shell input tap $((x0 + w * fx / 100)) $((y0 + h * fy / 100)); sleep 0.4
-    if has_text "Close"; then echo "dot hit at $fx,$fy"; hits="$hits $((x0 + w * fx / 100)),$((y0 + h * fy / 100))"; last=$fx; n=$((n + 1)); tap_text "Close" 0 0.4; break; fi
-  done; [ $n -ge 3 ] && break; done
-  xy=; echo "hits:$hits"
-  launch result-speaking "$1" Fluency; rec_start "05-fluency-dot-$1"
-  sleep 0.7; fluency_scroll; sleep 1
-  for xy2 in $hits; do adb shell input tap ${xy2%,*} ${xy2#*,}; sleep 2.6; done
-  tap_text "Close" 0 1
-  sleep 1.2
-  rec_stop
-}
-clip_writing_type() { # $1 theme
-  launch editor "$1"; rec_start "06-writing-editor-type-$1"
-  sleep 1; tap_text "Your answer" 0 1.0
-  typewords "Some%speople%s" "believe%sthat%s" "children%sshould%s" "start%sschool%s" "later%sin%slife.%s" "However,%sI%s" "think%san%searly%s" "start%sis%sbetter."
-  sleep 1.5
-  rec_stop
-}
-clip_review() {
-  launch review light Question; rec_start "07-review-reveal-light"
-  sleep 1.5; tap_text "Show answer" 0 2.5; tap_text "Good" 0 2; tap_text "Show answer" 0 2.5; tap_text "Easy" 0 2
-  rec_stop
-}
-clip_guest_home() {
-  launch guest-home light; rec_start "09-guest-home-light"
-  sleep 0.7; swipe_up 900 1.3; swipe_up 900 1.5; swipe_down 800 0.8; swipe_down 800 1
+clip_settings() { # segmented control thumb, then the delete sheet with its password field
+  launch settings light; rec_start "05-settings-light"
+  sleep 1; tap_text "Dark" 0 1.4; tap_text "Light" 0 1.4; tap_text "System" 0 1.2
   rec_stop
 }
 
-ONLY=${ONLY:-}  # e.g. ONLY="clip_review clip_home" for a quick re-run
+ONLY=${ONLY:-}  # e.g. ONLY="clip_tabs:dark clip_bank" for a quick re-run
 if [ -n "$ONLY" ]; then for c in $ONLY; do ${c%%:*} ${c#*:}; done; exit 0; fi
-clip_home light
-clip_speaking_hub
-clip_session_prep
-clip_session_live_record
-clip_result_tabs light
-clip_fluency_dot light
-clip_writing_type light
-clip_review
-clip_guest_home
-clip_home dark
-clip_result_tabs dark
-clip_writing_type dark
-clip_fluency_dot dark
-ls -l "$OUT"
+clip_welcome light
+clip_tabs light
+clip_bank
+clip_mock
+clip_settings
+clip_welcome dark
+clip_tabs dark
