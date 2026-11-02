@@ -10,6 +10,7 @@ import { PractiseList } from '@/components/dashboard/PractiseList';
 import { ProgressTabs } from '@/components/dashboard/ProgressTabs';
 import { YourPicture } from '@/components/dashboard/YourPicture';
 import { Alert, buttonStyles, Card, PageContainer, PageHeader } from '@/components/ui';
+import { fmtDate, PlanButton, usePlan } from '@/components/pricing/PlanStatus';
 import { call, client } from '@/lib/api';
 import { formatMinutes, plural } from '@/lib/format';
 import { lrProgressQuery } from '@/lib/lr';
@@ -39,6 +40,7 @@ function Dashboard() {
   const first = me.user.name.split(' ')[0];
   const target = me.settings.targetBand;
   const hasProgress = p.trend.length > 0 || !!lr?.trend.length;
+  const plan = usePlan();
 
   return (
     <PageContainer>
@@ -60,6 +62,16 @@ function Dashboard() {
       />
 
       <div className="space-y-8 md:space-y-12">
+        {plan?.state === 'ending' && (
+          <Alert tone="warn" title={`Your paid plan ends on ${fmtDate(plan.until)}`} action={<PlanButton plan={plan} />}>
+            Renew now and the new days go on after that date, so you lose nothing.
+          </Alert>
+        )}
+        {plan?.state === 'free' && p.attempts > 0 && ( // a new account sees onboarding first
+          <Alert tone="accent" title="Practise without limits" action={<PlanButton plan={plan} />}>
+            The paid plan makes Writing and Speaking unlimited and opens every Listening and Reading test.
+          </Alert>
+        )}
         {p.lastFailed && (
           <Alert
             tone="warn"

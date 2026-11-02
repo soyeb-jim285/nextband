@@ -1,7 +1,5 @@
 import { quotaText, resetLabel, useQuota, windowWord, type Skill, type SkillQuota, type Tier } from '@/lib/community';
-import { Sparkles } from 'lucide-react';
-import { Link } from '@tanstack/react-router';
-import { buttonStyles } from '@/components/ui';
+import { leftText, planOf, PlanButton, planToneClass } from '@/components/pricing/PlanStatus';
 import { cn } from '@/lib/utils';
 
 /** The line that sits with a Start button: "1 test left today". Amber when none is left (the start screen then explains and offers a way out). */
@@ -69,26 +67,17 @@ function QuotaMeter({ label, s }: { label: string; s: SkillQuota }) {
 const LrMeter = ({ label, c }: { label: string; c: { open: number; total: number } }) =>
   c.total > 0 ? <Meter label={label} text={c.open >= c.total ? `All ${c.open} tests` : `${c.open} of ${c.total} tests`} frac={c.open / c.total} /> : null;
 
-function UpgradeButton() {
-  return (
-    <Link to="/pricing" className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'w-full' })}>
-      <Sparkles aria-hidden />
-      Upgrade
-    </Link>
-  );
-}
-
 /** Plan and what is left, for the sidebar footer and the mobile More sheet. */
-export function UsagePanel({ className }: { className?: string }) {
+export function UsagePanel({ className, cta = true }: { className?: string; /** The sidebar has its own plan row in the footer. */ cta?: boolean }) {
   const { data } = useQuota();
   if (!data) return null;
-  const until = data.subscribedUntil && new Date(data.subscribedUntil).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const plan = planOf(data);
   return (
     <section aria-label="Your plan and usage" className={cn('space-y-2 text-caption', className)}>
       {data.tier !== 'guest' && ( // a guest's footer already says "Browsing as a guest"
         <p className="flex items-baseline justify-between gap-2">
           <span className="font-medium text-ink">{PLAN[data.tier]}</span>
-          {until && <span className="text-muted">until {until}</span>}
+          {'daysLeft' in plan && <span className={cn('type-num text-muted', planToneClass(plan))}>{leftText(plan.daysLeft)}</span>}
         </p>
       )}
       <ul className="space-y-2">
@@ -98,7 +87,7 @@ export function UsagePanel({ className }: { className?: string }) {
         <LrMeter label="Listening" c={data.lr.listening} />
         <LrMeter label="Reading" c={data.lr.reading} />
       </ul>
-      {data.tier === 'community' && <UpgradeButton />}
+      {cta && <PlanButton plan={plan} className="w-full" />}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
-import { ArrowLeft, BookOpen, ChevronsUpDown, Compass, Ellipsis, Headphones, History, House, Layers, LibraryBig, LogIn, LogOut, Mic, Palette, PanelLeft, PenLine, Settings, ShieldCheck, TriangleAlert, MessageSquareWarning, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronsUpDown, Compass, Ellipsis, Headphones, History, House, Layers, LibraryBig, LogIn, LogOut, Mic, Palette, PanelLeft, PenLine, Settings, ShieldCheck, TriangleAlert, MessageSquareWarning, Sparkles, type LucideIcon } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import { Button, buttonStyles, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Separator, Sheet } from '@/components/ui';
 import {
@@ -24,6 +24,7 @@ import { ADMIN_ITEMS, Marker, useAdminNav } from '@/components/admin/AdminNav';
 import { useAccount } from '@/lib/query';
 import { cn } from '@/lib/utils';
 import { UsagePanel } from '@/components/community/QuotaNote';
+import { actionLabel, leftText, usePlan } from '@/components/pricing/PlanStatus';
 import { openFeedback } from './FeedbackButton';
 import { Logo, LogoMark } from './Logo';
 import { SiteFooter } from './SiteFooter';
@@ -210,6 +211,30 @@ function AdminSideNav() {
   );
 }
 
+/** Always in the footer, open or collapsed to icons: Upgrade (free), Renew with the days left (ending, amber), Extend plan (paid). */
+function PlanRow() {
+  const plan = usePlan();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const label = plan && actionLabel(plan);
+  if (!plan || !label) return null;
+  const text = plan.state === 'ending' ? `${label} · ${leftText(plan.daysLeft)}` : label;
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={pathname.startsWith('/checkout')}
+        tooltip={text}
+        className={cn(rowClass, plan.state === 'free' && 'font-medium text-accent-text [&>svg]:text-accent-text', plan.state === 'ending' && 'font-medium text-warn-text [&>svg]:text-warn-text')}
+      >
+        <Link to="/checkout">
+          <Sparkles />
+          <span>{text}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 function AppSidebar() {
   const me = useAccount();
   const signedIn = !!me;
@@ -238,10 +263,11 @@ function AppSidebar() {
           ))}
         </nav>}
         {/* In the scrolling area, pinned to its bottom when there is room, so short screens keep the nav reachable. */}
-        {state !== 'collapsed' && !inAdmin && <UsagePanel className="mt-auto px-2 pt-4 pb-3" />}
+        {state !== 'collapsed' && !inAdmin && <UsagePanel cta={false} className="mt-auto px-2 pt-4 pb-3" />}
       </SidebarContent>
       <SidebarFooter className="gap-1 border-t border-sidebar-border px-2 py-2">
         <SidebarMenu>
+          {signedIn && !inAdmin && <PlanRow />}
           {signedIn && <SideLink item={SETTINGS} />}
           {signedIn && owner && !inAdmin && <SideLink item={ADMIN} />}
           <SidebarMenuItem>

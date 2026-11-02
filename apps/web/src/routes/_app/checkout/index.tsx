@@ -6,6 +6,7 @@ import { AccountGate } from '@/components/community/AccountGate';
 import { Alert, Button, Card, Input, PageContainer, PageHeader, Segmented } from '@/components/ui';
 import { call, client } from '@/lib/api';
 import { useAccount } from '@/lib/query';
+import { fmtDate, leftText, usePlan } from '@/components/pricing/PlanStatus';
 
 const isPlan = (v: unknown): v is PaidPlan => typeof v === 'string' && v in PAID_PLANS;
 
@@ -26,6 +27,11 @@ function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const p = PAID_PLANS[plan];
   const phoneOk = PHONE.test(phone.replace(/[\s-]/g, ''));
+  const current = usePlan();
+  const paid = current && 'until' in current ? current : null;
+  const until = paid?.until;
+  // Matches the server (routes/pay.ts): the days go on after the current end, or from now.
+  const newEnd = new Date(Math.max(until?.getTime() ?? 0, Date.now()) + p.days * 86_400_000);
 
   const pay = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,7 +49,17 @@ function Checkout() {
 
   return (
     <PageContainer className="max-w-xl">
-      <PageHeader title="Checkout" description="NextBand paid plan. You pay on PayStation's secure page and come straight back." />
+      <PageHeader title={until ? 'Renew your plan' : 'Checkout'} description="NextBand paid plan. You pay on PayStation's secure page and come straight back." />
+      {current?.state === 'unlimited' && (
+        <Alert tone="good" title="You already have unlimited access" className="mb-6">
+          Every test is open on your account. You don&apos;t need to pay.
+        </Alert>
+      )}
+      {until && (
+        <Alert tone={paid?.state === 'ending' ? 'warn' : 'accent'} title={`Your paid plan runs until ${fmtDate(until)}`} className="mb-6">
+          {leftText(paid!.daysLeft)}. Paying now adds {p.days} days to the end, so nothing you have paid for is lost.
+        </Alert>
+      )}
       <form onSubmit={pay} className="space-y-6">
         <Card className="space-y-5">
           <Segmented
@@ -57,6 +73,8 @@ function Checkout() {
             <dd className="text-right">{me.user.email}</dd>
             <dt className="text-muted">Plan</dt>
             <dd className="text-right">Paid plan, {p.label} ({p.days} days)</dd>
+            <dt className="text-muted">{until ? 'New end date' : 'Runs until'}</dt>
+            <dd className="type-num text-right">{fmtDate(newEnd)}</dd>
             <dt className="border-t border-line pt-2 font-medium text-ink">Total</dt>
             <dd className="type-num border-t border-line pt-2 text-right text-lg font-semibold text-ink">{bdt(p.bdt)} BDT</dd>
           </dl>

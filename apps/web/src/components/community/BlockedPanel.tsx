@@ -25,6 +25,11 @@ function Actions({ blocker, onRetry, size, back }: { blocker: Blocker; onRetry?:
       return (
         <>
           {guest && create('Create an account for more tests', true)}
+          {blocker.tier === 'community' && (
+            <Link to="/checkout" className={buttonStyles({ size })}>
+              {blocker.skill === 'examiner' ? 'Get more sessions with the paid plan' : 'Get unlimited tests'}
+            </Link>
+          )}
           {back}
         </>
       );

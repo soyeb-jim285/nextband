@@ -4,6 +4,7 @@ import { CircleCheck, CircleX, Clock } from 'lucide-react';
 import { useEffect } from 'react';
 import { Mail } from '@/components/legal/Legal';
 import { buttonStyles, EmptyState, PageContainer } from '@/components/ui';
+import { fmtDate, usePlan } from '@/components/pricing/PlanStatus';
 
 type Status = 'paid' | 'failed' | 'cancelled' | 'pending';
 
@@ -20,12 +21,13 @@ function Done() {
     if (status === 'paid') void qc.invalidateQueries(); // plan, quota and unlocked tests all change
   }, [status, qc]);
 
+  const plan = usePlan();
   const home = <Link to="/overview" className={buttonStyles({ size: 'lg' })}>Start practising</Link>;
   return (
     <PageContainer>
       {status === 'paid' ? (
         <EmptyState icon={<CircleCheck />} title="Payment received. Your paid plan is on." action={home}>
-          We have emailed you a confirmation with the date your plan ends.
+          {plan && 'until' in plan ? `It runs until ${fmtDate(plan.until)}. ` : ''}We have emailed you a confirmation with the date your plan ends.
         </EmptyState>
       ) : status === 'failed' || status === 'cancelled' ? (
         <EmptyState icon={<CircleX />} title={status === 'cancelled' ? 'Payment cancelled' : "The payment didn't go through"} action={<Link to="/checkout" className={buttonStyles({ size: 'lg' })}>Try again</Link>}>

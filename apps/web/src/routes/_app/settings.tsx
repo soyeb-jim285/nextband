@@ -10,6 +10,7 @@ import { Button, buttonStyles, Dialog, Input, PageContainer, PageHeader, Switch 
 import { authClient, signOut } from '@/lib/auth';
 import { useAccount, useMe } from '@/lib/query';
 import { cn } from '@/lib/utils';
+import { fmtDate, leftText, PlanButton, planToneClass, usePlan } from '@/components/pricing/PlanStatus';
 
 export const Route = createFileRoute('/_app/settings')({ component: SettingsRoute });
 
@@ -88,9 +89,43 @@ function SettingsPage() {
           </InlineRow>
         </Section>
 
+        <PlanSection />
+
         <Account email={me.user.email} />
       </div>
     </PageContainer>
+  );
+}
+
+const PLAN_NAME = { free: 'Free plan', active: 'Paid plan', ending: 'Paid plan', unlimited: 'Unlimited', guest: 'Guest' } as const;
+
+function PlanSection() {
+  const plan = usePlan();
+  if (!plan) return null;
+  return (
+    <Section id="plan" title="Plan" description="One payment, no auto-renewal. Buying again before it ends adds the time to the end.">
+      <InlineRow
+        title={PLAN_NAME[plan.state]}
+        description={
+          'until' in plan ? (
+            <>
+              Until {fmtDate(plan.until)} · <span className={planToneClass(plan)}>{leftText(plan.daysLeft)}</span>
+            </>
+          ) : plan.state === 'free' ? (
+            'Limited Writing, Speaking and examiner tests. The paid plan makes them unlimited and opens every test.'
+          ) : (
+            'Every test is open on your account.'
+          )
+        }
+      >
+        <PlanButton plan={plan} />
+      </InlineRow>
+      <InlineRow title="Prices and what is included" description="Monthly and three-month plans, in BDT.">
+        <Link to="/pricing" className={buttonStyles({ variant: 'outline', size: 'sm' })}>
+          See pricing
+        </Link>
+      </InlineRow>
+    </Section>
   );
 }
 

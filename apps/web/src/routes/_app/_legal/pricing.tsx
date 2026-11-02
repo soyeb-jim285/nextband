@@ -1,15 +1,22 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { LegalPage, Section } from '@/components/legal/Legal';
 import { FREE, PlanCards } from '@/components/pricing/Plans';
+import { planLine, usePlan } from '@/components/pricing/PlanStatus';
+import { Alert } from '@/components/ui';
+import { useAccount } from '@/lib/query';
 
 export const Route = createFileRoute('/_app/_legal/pricing')({ component: Pricing });
 
 const link = 'font-medium text-accent-text underline decoration-accent/40 underline-offset-[3px] hover:decoration-accent';
 
 function Pricing() {
+  const signedIn = !!useAccount();
+  const plan = usePlan();
+  const line = signedIn && plan && planLine(plan);
   return (
     <LegalPage title="Pricing" updated="29 October 2026">
       <Section title="Plans">
+        {line && <Alert tone={plan.state === 'ending' ? 'warn' : 'accent'}>{line}</Alert>}
         <p>All prices are in Bangladeshi Taka (BDT) and include VAT where it applies. The price you see is the price you pay: no gateway fee is added.</p>
         <PlanCards />
         <p>
