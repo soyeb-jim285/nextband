@@ -3,6 +3,7 @@ package com.soyeb.ieltspractice.design.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -160,5 +161,50 @@ fun Sparkline(bands: List<Double>, target: Double, color: Color, description: St
         }
         drawPath(path, color, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
         drawCircle(color, 3.dp.toPx(), androidx.compose.ui.geometry.Offset(x(bands.lastIndex), y(bands.last())))
+    }
+}
+
+/**
+ * The header's one ornament: a band scale drawn like an instrument dial (an arc, a tick per half band, the whole bands
+ * from 5 to 9 longer). Low contrast and hidden from screen readers; it says what NextBand measures without a word.
+ */
+@Composable
+fun BandScale(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.clearAndSetSemantics { }) {
+        val r = size.minDimension / 2 - 8.dp.toPx()
+        val center = Offset(size.width / 2, size.height / 2)
+        val faint = color.copy(alpha = 0.10f)
+        drawCircle(faint, r, center, style = Stroke(1.5.dp.toPx()))
+        drawCircle(faint, r * 0.72f, center, style = Stroke(1.dp.toPx()))
+        // 5.0 .. 9.0 in half bands across the lower-left quarter (the part that shows on screen).
+        val steps = 8
+        for (i in 0..steps) {
+            val a = Math.toRadians(100.0 + i * (80.0 / steps))
+            val whole = i % 2 == 0
+            val len = (if (whole) 16 else 8).dp.toPx()
+            val outer = Offset(center.x + (r * kotlin.math.cos(a)).toFloat(), center.y + (r * kotlin.math.sin(a)).toFloat())
+            val inner = Offset(center.x + ((r - len) * kotlin.math.cos(a)).toFloat(), center.y + ((r - len) * kotlin.math.sin(a)).toFloat())
+            drawLine(color.copy(alpha = if (whole) 0.28f else 0.16f), inner, outer, strokeWidth = if (whole) 2.dp.toPx() else 1.5.dp.toPx(), cap = StrokeCap.Round)
+        }
+        // The target notch: a small dot at band 7.
+        val t = Math.toRadians(100.0 + 4 * (80.0 / steps))
+        drawCircle(color.copy(alpha = 0.55f), 4.dp.toPx(), Offset(center.x + ((r - 28.dp.toPx()) * kotlin.math.cos(t)).toFloat(), center.y + ((r - 28.dp.toPx()) * kotlin.math.sin(t)).toFloat()))
+    }
+}
+
+/** Ink for content sitting on [BrandHero]. */
+class HeroInk(val fg: Color, val muted: Color)
+
+/**
+ * The one loud surface: deep teal (light) / teal-tinted night (dark) with the [BandScale] ornament in its corner.
+ * White type on brandText is 7:1. One per screen. Pair its action with BtnKind.Inverse.
+ */
+@Composable
+fun BrandHero(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.(HeroInk) -> Unit) {
+    val c = NB.colors
+    val ink = HeroInk(if (c.isDark) c.ink else Color.White, if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f))
+    Box(modifier.fillMaxWidth().clip(NB.shape.card).background(if (c.isDark) c.brandSoft else c.brandText)) {
+        BandScale(ink.fg, Modifier.align(Alignment.TopEnd).offset(x = 90.dp, y = (-70).dp).size(240.dp))
+        Column(Modifier.fillMaxWidth().padding(20.dp)) { content(ink) }
     }
 }

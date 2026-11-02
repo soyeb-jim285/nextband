@@ -9,7 +9,10 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.graphicsLayer
@@ -18,6 +21,7 @@ import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -87,4 +91,18 @@ object PressWash : IndicationNodeFactory {
             }
         }
     }
+}
+
+/**
+ * Entrance for the [index]th item of a short list: fades in and rises 16 dp, 60 ms after the one before.
+ * Content is laid out and readable from the first frame (only alpha/translation move); reduced motion shows it at once.
+ */
+@Composable
+fun Modifier.rise(index: Int): Modifier {
+    val reduced = LocalReducedMotion.current
+    val p = remember { Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(Unit) {
+        if (p.value < 1f) { delay(60L * index); p.animateTo(1f, tween(NbMotion.SLOW, easing = NbMotion.EaseOut)) }
+    }
+    return graphicsLayer { alpha = p.value; translationY = (1f - p.value) * 16.dp.toPx() }
 }

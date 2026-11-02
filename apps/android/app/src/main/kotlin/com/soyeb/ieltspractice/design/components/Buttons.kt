@@ -45,7 +45,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.design.NB
 
-enum class BtnKind { Primary, Secondary, Outline, Text, Destructive }
+/** Inverse = the action on a BrandHero: white on teal (light), bright teal (dark). */
+enum class BtnKind { Primary, Secondary, Outline, Text, Destructive, Inverse }
 enum class BtnSize(val height: Dp, val pad: Dp, val icon: Dp, val radius: Dp) {
     Large(56.dp, 24.dp, 22.dp, 18.dp), Medium(48.dp, 20.dp, 20.dp, 14.dp), Small(36.dp, 14.dp, 18.dp, 11.dp);
     val shape get() = RoundedCornerShape(radius)
@@ -94,6 +95,7 @@ fun NbButton(
         kind == BtnKind.Primary -> c.brand to c.onBrand
         kind == BtnKind.Destructive -> c.bad to (if (c.isDark) Color(0xFF3B0613) else Color.White)
         kind == BtnKind.Secondary -> c.surface2 to c.ink
+        kind == BtnKind.Inverse -> (if (c.isDark) c.brand to c.onBrand else Color.White to c.brandText)
         kind == BtnKind.Outline -> Color.Transparent to c.ink
         else -> Color.Transparent to c.brandText
     }

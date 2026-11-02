@@ -1,5 +1,11 @@
 package com.soyeb.ieltspractice.feature.today
 
+import com.soyeb.ieltspractice.design.components.HeroInk
+import com.soyeb.ieltspractice.design.components.BrandHero
+import com.soyeb.ieltspractice.design.rise
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -204,12 +210,12 @@ private fun LazyListScope.readyItems(nav: Nav, d: TodayData, me: Me?, target: Do
     val bands = skillBands(d.progress, d.lr)
     val next = pickUpNext(d.coach, d.progress, d.lr, target)
 
-    if (days != null) item { ExamChip(days) }
-    if (nudge) item { GoalNudge(nav) }
-    item { MockHero(nav, d.mock, d.lastMock, target) }
-    item { Section("Your bands") { BandsCard(nav, bands, target) } }
-    item { Section("Up next") { UpNextCard(nav, next, testType) } }
-    item { Section("Study tools") { ToolsGrid(nav, d.due) } }
+    if (days != null) item { Box(Modifier.rise(0)) { ExamChip(days) } }
+    if (nudge) item { Box(Modifier.rise(0)) { GoalNudge(nav) } }
+    item { Box(Modifier.rise(1)) { MockHero(nav, d.mock, d.lastMock, target) } }
+    item { Box(Modifier.rise(2)) { Section("Your bands") { BandsCard(nav, bands, target) } } }
+    item { Box(Modifier.rise(3)) { Section("Up next") { UpNextCard(nav, next, testType) } } }
+    item { Box(Modifier.rise(4)) { Section("Study tools") { ToolsGrid(nav, d.due) } } }
     item {
         Section("Recent results", action = if (d.recent.isNotEmpty()) "See all" else null, onAction = { nav.go(History()) }) {
             if (d.recent.isEmpty()) NbCard(tone = CardTone.Inset) {
@@ -251,42 +257,41 @@ private fun GoalNudge(nav: Nav) {
 
 @Composable
 private fun MockHero(nav: Nav, mock: Mock?, last: Mock?, target: Double) {
-    val c = NB.colors
-    NbCard(tone = CardTone.Hero) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(Icons.Rounded.WorkspacePremium, c.brandText, c.surface, 44.dp)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (mock != null) "Resume your full mock" else "Take a full mock test", style = NB.type.title1, color = c.ink)
-                Text(
-                    if (mock != null) MockFlow.continueLine(mock) else "Real timing, all four tests and an overall band.",
-                    style = NB.type.bodySmall, color = c.muted,
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
+    BrandHero { ink ->
+        Text(if (mock != null) "Full mock in progress" else "Full mock test", style = NB.type.label, color = ink.muted)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            if (mock != null) "Pick up where you left off" else "See your real band in one sitting",
+            style = NB.type.headline.copy(fontSize = 26.sp, lineHeight = 32.sp), color = ink.fg, modifier = Modifier.semantics { heading() },
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            if (mock != null) MockFlow.continueLine(mock) else "Real timing, all four tests and an overall band.",
+            style = NB.type.bodySmall, color = ink.muted,
+        )
+        Spacer(Modifier.height(18.dp))
         if (mock != null) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                MockFlow.skills.forEach { key -> MiniStep(mock, key, target) }
+                MockFlow.skills.forEach { key -> MiniStep(mock, key, target, ink) }
             }
-            Spacer(Modifier.height(16.dp))
-            NbButton("Resume", { nav.go(MockHub(mock.id)) }, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
+            Spacer(Modifier.height(18.dp))
+            NbButton("Resume", { nav.go(MockHub(mock.id)) }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SkillDots()
-                Text("2 h 45 m", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = c.ink)
+                Icon(Icons.Rounded.WorkspacePremium, null, Modifier.size(18.dp), tint = ink.fg)
+                Text("4 tests · 2 h 45 m", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = ink.fg)
             }
-            Spacer(Modifier.height(16.dp))
-            NbButton("Start full mock", { nav.go(MockStart) }, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
+            Spacer(Modifier.height(18.dp))
+            NbButton("Start full mock", { nav.go(MockStart) }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
             if (last?.overall != null) Row(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp)
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 6.dp).clip(NB.shape.tile)
                     .clickable(onClickLabel = "Open your last mock result") { nav.go(MockResult(last.id)) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Last mock", style = NB.type.bodySmall, color = c.muted, modifier = Modifier.weight(1f))
+                Text("Last mock", style = NB.type.bodySmall, color = ink.muted, modifier = Modifier.weight(1f))
                 BandPill(last.overall, target)
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = c.faint)
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = ink.muted)
             }
         }
     }
@@ -294,23 +299,23 @@ private fun MockHero(nav: Nav, mock: Mock?, last: Mock?, target: Double) {
 
 /** One section of the open mock: a dot (done / next / later), its name, and its band or status. */
 @Composable
-private fun MiniStep(mock: Mock, key: String, target: Double) {
+private fun MiniStep(mock: Mock, key: String, target: Double, ink: HeroInk) {
     val c = NB.colors
     val sec = mock.section(key)
     val done = sec != null && MockFlow.isFinished(sec.state)
     val current = !done && mock.next == key
     Row(Modifier.fillMaxWidth().heightIn(min = 36.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(22.dp).background(if (done) c.brand else if (current) c.brandSoft else c.surface, CircleShape)
-                .let { if (current) it.border(2.dp, c.brand, CircleShape) else it },
+            Modifier.size(22.dp).background(if (done) ink.fg else Color.Transparent, CircleShape)
+                .border(2.dp, if (done || current) ink.fg else ink.muted.copy(alpha = 0.5f), CircleShape),
             contentAlignment = Alignment.Center,
-        ) { if (done) Icon(Icons.Rounded.Check, null, Modifier.size(14.dp), tint = c.onBrand) }
+        ) { if (done) Icon(Icons.Rounded.Check, null, Modifier.size(14.dp), tint = if (c.isDark) c.brandSoft else c.brandText) }
         Spacer(Modifier.width(12.dp))
-        Text(MockFlow.name(key), style = NB.type.title3, color = if (done || current) c.ink else c.muted, modifier = Modifier.weight(1f))
+        Text(MockFlow.name(key), style = NB.type.title3, color = if (done || current) ink.fg else ink.muted, modifier = Modifier.weight(1f))
         when {
             done && sec?.band != null -> BandPill(sec.band, target)
-            done -> Text(MockFlow.stateLabel(key, sec?.state.orEmpty()).first, style = NB.type.caption, color = c.muted)
-            current -> Tag("Next", fg = c.brandText, bg = c.surface)
+            done -> Text(MockFlow.stateLabel(key, sec?.state.orEmpty()).first, style = NB.type.caption, color = ink.muted)
+            current -> Tag("Next", fg = if (c.isDark) c.brandSoft else c.brandText, bg = ink.fg)
         }
     }
 }
@@ -466,17 +471,19 @@ private fun GuestToday(nav: Nav) {
         refreshing = loader.refreshing, onRefresh = if (session) loader.reload else null,
     ) {
         item {
-            NbCard(tone = CardTone.Hero) {
-                Text("Practise all four IELTS tests free", style = NB.type.title1, color = NB.colors.ink)
-                Spacer(Modifier.height(4.dp))
-                Text("Timed like the real exam, with an honest band score on each test. No account needed.", style = NB.type.bodySmall, color = NB.colors.muted)
-                Spacer(Modifier.height(16.dp))
+            BrandHero { ink ->
+                Text("Free, no account needed", style = NB.type.label, color = ink.muted)
+                Spacer(Modifier.height(6.dp))
+                Text("Practise all four IELTS tests", style = NB.type.headline.copy(fontSize = 26.sp, lineHeight = 32.sp), color = ink.fg, modifier = Modifier.semantics { heading() })
+                Spacer(Modifier.height(6.dp))
+                Text("Timed like the real exam, with an honest band score on each test.", style = NB.type.bodySmall, color = ink.muted)
+                Spacer(Modifier.height(18.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SkillDots()
-                    Text("Full mock · 2 h 45 m", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = NB.colors.ink)
+                    Icon(Icons.Rounded.WorkspacePremium, null, Modifier.size(18.dp), tint = ink.fg)
+                    Text("Full mock · 2 h 45 m", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = ink.fg)
                 }
-                Spacer(Modifier.height(16.dp))
-                NbButton("Start full mock", { nav.go(MockStart) }, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
+                Spacer(Modifier.height(18.dp))
+                NbButton("Start full mock", { nav.go(MockStart) }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
             }
         }
         item {

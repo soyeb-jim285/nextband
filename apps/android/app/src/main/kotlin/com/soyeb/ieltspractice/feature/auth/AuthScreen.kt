@@ -96,6 +96,7 @@ import com.soyeb.ieltspractice.data.model.EmailStatus
 import com.soyeb.ieltspractice.data.net.ApiError
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.design.components.BandScale
 import com.soyeb.ieltspractice.design.Tone
 import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
@@ -341,33 +342,6 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     }
 }
 
-/**
- * The header's one ornament: a band scale drawn like an instrument dial (an arc, a tick per half band, the whole bands
- * from 5 to 9 longer). Low contrast and hidden from screen readers; it says what NextBand measures without a word.
- */
-@Composable
-private fun BandScale(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier.clearAndSetSemantics { }) {
-        val r = size.minDimension / 2 - 8.dp.toPx()
-        val center = Offset(size.width / 2, size.height / 2)
-        val faint = color.copy(alpha = 0.10f)
-        drawCircle(faint, r, center, style = Stroke(1.5.dp.toPx()))
-        drawCircle(faint, r * 0.72f, center, style = Stroke(1.dp.toPx()))
-        // 5.0 .. 9.0 in half bands across the lower-left quarter (the part that shows on screen).
-        val steps = 8
-        for (i in 0..steps) {
-            val a = Math.toRadians(100.0 + i * (80.0 / steps))
-            val whole = i % 2 == 0
-            val len = (if (whole) 16 else 8).dp.toPx()
-            val outer = Offset(center.x + (r * kotlin.math.cos(a)).toFloat(), center.y + (r * kotlin.math.sin(a)).toFloat())
-            val inner = Offset(center.x + ((r - len) * kotlin.math.cos(a)).toFloat(), center.y + ((r - len) * kotlin.math.sin(a)).toFloat())
-            drawLine(color.copy(alpha = if (whole) 0.28f else 0.16f), inner, outer, strokeWidth = if (whole) 2.dp.toPx() else 1.5.dp.toPx(), cap = StrokeCap.Round)
-        }
-        // The target notch: a small dot at band 7.
-        val t = Math.toRadians(100.0 + 4 * (80.0 / steps))
-        drawCircle(color.copy(alpha = 0.55f), 4.dp.toPx(), Offset(center.x + ((r - 28.dp.toPx()) * kotlin.math.cos(t)).toFloat(), center.y + ((r - 28.dp.toPx()) * kotlin.math.sin(t)).toFloat()))
-    }
-}
 
 private fun stepCopy(s: AuthStep, f: AuthForm): Pair<String, String> = when (s) {
     AuthStep.SignIn -> "Welcome back" to "Sign in to continue your practice."
