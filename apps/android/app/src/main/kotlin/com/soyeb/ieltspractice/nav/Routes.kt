@@ -38,11 +38,13 @@ import kotlinx.serialization.Serializable
     val variant: String? = null,
     val promptId: String? = null,
     val mockId: String? = null,
+    /** A retake: the attempt this one improves on (the result then shows what changed). */
+    val parentId: String? = null,
 )
 
 // Speaking (feature/speaking)
-/** [mode]: full | part1 | part2 | part3. [promptId] null = random / full test set. */
-@Serializable data class SpeakingSession(val mode: String, val promptId: String? = null, val mockId: String? = null)
+/** [mode]: full | part1 | part2 | part3. [promptId] null = random / full test set. [parentId]: the attempt being retried ("Practise this again"). */
+@Serializable data class SpeakingSession(val mode: String, val promptId: String? = null, val mockId: String? = null, val parentId: String? = null)
 @Serializable data class LiveExam(val mockId: String? = null)
 
 /** A speaking or writing result. Several ids = one multi-part session (full speaking test). */
