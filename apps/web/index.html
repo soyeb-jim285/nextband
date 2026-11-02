@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#F7F9FB" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0A111C" media="(prefers-color-scheme: dark)" />
-    <!-- Defaults; the server rewrites this block per page (apps/server/src/seo.ts) so link previews and crawlers get the right card. -->
+    <!-- Defaults; the server rewrites this block per page (apps/server/src/seo.ts) with the title, share card and structured data. -->
     <!--seo-->
     <title>NextBand: Free IELTS practice with instant band scores</title>
     <meta name="description" content="Practise IELTS Speaking, Writing, Listening and Reading online. Timed tests in the real exam format, an AI examiner, and band scores for every criterion with each mistake marked." />
@@ -18,37 +18,6 @@
     <link rel="icon" href="/icon.svg?v=nb" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=nb" />
     <link rel="manifest" href="/site.webmanifest" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          { "@type": "WebSite", "name": "NextBand", "url": "https://ielts.soyebjim.me/", "inLanguage": "en" },
-          {
-            "@type": "WebApplication",
-            "name": "NextBand",
-            "url": "https://ielts.soyebjim.me/",
-            "applicationCategory": "EducationalApplication",
-            "operatingSystem": "Web, iOS, Android",
-            "description": "Practise IELTS Speaking, Writing, Listening and Reading with timed real-format tests, an AI examiner and band scores for every criterion.",
-            "offers": [
-              { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "BDT" },
-              { "@type": "Offer", "name": "1 month", "price": "499", "priceCurrency": "BDT" },
-              { "@type": "Offer", "name": "3 months", "price": "1199", "priceCurrency": "BDT" }
-            ],
-            "educationalUse": "Test preparation",
-            "about": { "@type": "Thing", "name": "IELTS" },
-            "publisher": { "@id": "#org" }
-          },
-          {
-            "@type": "Organization",
-            "@id": "#org",
-            "name": "Dolphin Commerce",
-            "email": "support@nextband.app",
-            "address": { "@type": "PostalAddress", "addressLocality": "Mymensingh", "addressCountry": "BD" }
-          }
-        ]
-      }
-    </script>
 
     <script>
       // Apply the theme before first paint (no flash). Mirrors components/layout/ThemeToggle.tsx.
@@ -112,6 +81,8 @@
   </head>
   <body>
     <div id="root">
+      <!-- Pages other than '/' get their own words here from the server (apps/server/src/seo.ts renderShell). -->
+      <!--page-->
       <div id="lp-pre">
         <div class="w">
           <div>
@@ -180,6 +151,7 @@
           <p>NextBand is made by Dolphin Commerce, Mymensingh, Bangladesh.</p>
         </footer>
       </noscript>
+      <!--/page-->
     </div>
     <!-- Boot cover: a plain background until the first page resolves (main.tsx removes it); a load past 700 ms gets the full splash on top. -->
     <style>

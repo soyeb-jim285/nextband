@@ -15,6 +15,7 @@ import { QuotaNote } from '@/components/community/QuotaNote';
 import { useAccount } from '@/lib/query';
 import { bandColor } from '@/lib/result';
 import { cn } from '@/lib/utils';
+import { SeoGuide } from '@/components/SeoGuide';
 import { typeLabel } from '@/lib/writing';
 
 export const Route = createFileRoute('/_app/writing/')({ component: WritingHome });
@@ -113,6 +114,7 @@ function WritingHome() {
         <Recent />
         <Bank />
       </div>
+      <SeoGuide path="/writing" />
     </PageContainer>
   );
 }

@@ -76,7 +76,7 @@ export const LegalLayout = ({ children }: { children: ReactNode }) => (
         <Link
           key={p.to}
           to={p.to}
-          className="rounded-full px-3 py-1 text-sm text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-ink"
+          className="relative rounded-full px-3 py-1.5 text-sm text-muted transition-colors duration-200 after:absolute after:inset-x-0 after:-inset-y-1.5 hover:bg-surface-2 hover:text-ink"
           activeProps={{ className: 'bg-accent-soft font-medium !text-accent-text hover:!bg-accent-soft', 'aria-current': 'page' }}
         >
           {p.label}

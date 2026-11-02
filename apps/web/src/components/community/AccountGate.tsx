@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { ClipboardCheck, Compass, CreditCard, History, Layers, Settings, TriangleAlert, type LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { buttonStyles, EmptyState, PageContainer, PageHeader } from '@/components/ui';
 
 const WHAT: Record<'history' | 'mistakes' | 'review' | 'settings' | 'mock' | 'coach' | 'checkout', { title: string; page: string; icon: LucideIcon; heading: string; body: string }> = {
@@ -13,7 +14,7 @@ const WHAT: Record<'history' | 'mistakes' | 'review' | 'settings' | 'mock' | 'co
 };
 
 /** What a guest sees instead of a personal page: what it is for and the way to get it. Never an error, never a redirect. */
-export function AccountGate({ what }: { what: keyof typeof WHAT }) {
+export function AccountGate({ what, children }: { what: keyof typeof WHAT; /** Shown under the sign-in prompt, e.g. a public page's guide. */ children?: ReactNode }) {
   const redirect = useRouterState({ select: (s) => s.location.href });
   const w = WHAT[what];
   const Icon = w.icon;
@@ -36,6 +37,7 @@ export function AccountGate({ what }: { what: keyof typeof WHAT }) {
       >
         {w.body}
       </EmptyState>
+      {children}
     </PageContainer>
   );
 }

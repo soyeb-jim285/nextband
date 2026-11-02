@@ -33,7 +33,7 @@ function PlanCard({ plan, as: H }: { plan: PaidPlan; as: 'h2' | 'h3' }) {
       </p>
       <p className="type-caption mt-1">{best ? `${bdt(Math.round(p.bdt / 3))} a month, save ${bdt(PAID_PLANS.month.bdt * 3 - p.bdt)}` : 'No auto-renewal'}</p>
       <Features items={PAID} />
-      <Link to="/checkout" search={{ plan }} className={buttonStyles({ variant: best ? 'primary' : 'secondary', className: 'mt-6 w-full' })}>
+      <Link to="/checkout" search={{ plan }} className={buttonStyles({ variant: best ? 'primary' : 'secondary', size: 'lg', className: 'mt-6 w-full' })}>
         Buy {p.label}
       </Link>
     </Card>

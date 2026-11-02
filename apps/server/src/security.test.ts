@@ -136,6 +136,16 @@ describe('transport hardening', () => {
     expect(r.headers.get('x-frame-options')).toBe('DENY');
     expect(r.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
     expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(r.headers.get('permissions-policy')).toContain('microphone=(self)');
+  });
+  it('sends www and trailing-slash page URLs to the one canonical URL (301), never /api', async () => {
+    const www = await req('/pricing?x=1', { headers: new Headers({ host: 'www.nextband.app', 'cf-visitor': '{"scheme":"https"}' }) });
+    expect(www.status).toBe(301);
+    expect(www.headers.get('location')).toBe('https://nextband.app/pricing?x=1');
+    const slash = await req('/pricing/', { headers: new Headers({ host: 'nextband.app' }) });
+    expect(slash.status).toBe(301);
+    expect(slash.headers.get('location')).toMatch(/\/\/nextband\.app\/pricing$/);
+    expect((await req('/api/health/')).status).not.toBe(301);
   });
   it('limits Listening/Reading submits per account (each may call the model)', async () => {
     const { headers } = await testUser();

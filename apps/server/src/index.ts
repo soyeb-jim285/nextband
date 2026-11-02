@@ -14,6 +14,7 @@ import { weeklySweep } from './coach/weekly';
 import { planReminderSweep } from './plan-reminders';
 import { settlePending } from './routes/pay';
 import { purgeReplays } from './replay';
+import { isKnownPath } from '@ielts/core';
 import { renderShell } from './seo';
 
 const app = createApp();
@@ -31,7 +32,8 @@ if (existsSync(env.WEB_DIST)) {
   // precompressed: serves .br/.gz siblings when the build emitted them; otherwise compress() (app.ts) gzips on the fly.
   app.use('/*', serveStatic({ root: env.WEB_DIST, precompressed: true }));
   // A missing /assets/* file is a 404, never the HTML shell (which the middleware above would otherwise mark immutable, poisoning the cache after a deploy).
-  app.get('*', (c) => (c.req.path.startsWith('/api') || c.req.path.startsWith('/assets/') ? c.notFound() : c.html(renderShell(indexHtml, c.req.path))));
+  // Unknown paths still get the shell (the app's not-found screen) but HTTP 404, so crawlers see no soft 404s.
+  app.get('*', (c) => (c.req.path.startsWith('/api') || c.req.path.startsWith('/assets/') ? c.notFound() : c.html(renderShell(indexHtml, c.req.path), isKnownPath(c.req.path) ? 200 : 404)));
 }
 
 const sweep = () => Promise.all([settlePending().catch((e) => console.error('settlePending failed', e)), recoverStale().catch((e) => console.error('recoverStale failed', e)), reconcileCosts().catch((e) => console.error('reconcileCosts failed', e))]);

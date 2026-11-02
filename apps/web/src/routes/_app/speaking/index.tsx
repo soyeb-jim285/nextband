@@ -14,6 +14,7 @@ import { QuotaNote } from '@/components/community/QuotaNote';
 import { useAccount } from '@/lib/query';
 import { GuestRecent } from '@/components/dashboard/GuestRecent';
 import { useQuota } from '@/lib/community';
+import { SeoGuide } from '@/components/SeoGuide';
 import { cn } from '@/lib/utils';
 
 export const Route = createFileRoute('/_app/speaking/')({ component: SpeakingHome });
@@ -93,6 +94,7 @@ function SpeakingHome() {
 
         <Recent />
       </div>
+      <SeoGuide path="/speaking" />
     </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { PAGE_COPY } from './seo-copy';
 /** Page titles, descriptions and share images. The server writes them into the HTML for crawlers and link previews
  *  (which do not run the SPA); the web app sets the same title as you navigate. */
 export const SITE_NAME = 'NextBand';
@@ -16,9 +17,9 @@ const DEFAULT: PageMeta = {
 /** Public pages worth indexing; everything else (results, history, settings, exam screens) gets a title but noindex. */
 const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
   '/': {
-    title: `${SITE_NAME}: Know your IELTS band and what to fix`,
+    title: `Free IELTS practice tests with band scores | ${SITE_NAME}`,
     description:
-      'Practise IELTS Listening, Reading, Writing and Speaking free, no account or card. See every mistake marked, then a plan for what to fix this week.',
+      'Free IELTS practice tests for Listening, Reading, Writing and Speaking, with an AI examiner and a band for every criterion. Every mistake marked, then a plan for what to fix this week. Made in Bangladesh.',
     image: '/og/landing.png',
   },
   '/speaking': {
@@ -51,24 +52,24 @@ const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
     image: '/og/home.png',
   },
   '/mock': {
-    title: `Full IELTS mock test online | ${SITE_NAME}`,
-    description: 'Sit Listening, Reading, Writing and Speaking in one go, with a band for each skill and one overall.',
+    title: `Free full IELTS mock test online | ${SITE_NAME}`,
+    description: 'Sit a full IELTS mock test online: Listening, Reading, Writing and Speaking with an AI examiner, in test-day order. A band for each skill and one overall. Free with an account, made in Bangladesh.',
     image: DEFAULT.image,
   },
-  '/signup': { title: `Create your free account | ${SITE_NAME}`, description: DEFAULT.description, image: DEFAULT.image },
+  '/signup': { title: `Create your free account | ${SITE_NAME}`, description: DEFAULT.description, image: DEFAULT.image }, // noindex, like /login
   '/privacy': {
     title: `Privacy policy | ${SITE_NAME}`,
     description: 'What NextBand collects, how session recording works, who sees it, and how long it is kept.',
     image: DEFAULT.image,
   },
   '/about': {
-    title: `About us | ${SITE_NAME}`,
-    description: 'NextBand is made by Dolphin Commerce, a software company in Mymensingh, Bangladesh: why we built it and how it works.',
+    title: `About NextBand: IELTS practice made in Bangladesh`,
+    description: 'NextBand is made by Dolphin Commerce, a software company in Mymensingh, Bangladesh: why we built it, how scores are worked out, and the company details.',
     image: DEFAULT.image,
   },
   '/pricing': {
-    title: `Pricing in BDT | ${SITE_NAME}`,
-    description: 'Practise free, or get unlimited Speaking and Writing tests, the live examiner and every Listening and Reading test from ৳499 a month.',
+    title: `Pricing: IELTS practice from ৳499 a month | ${SITE_NAME}`,
+    description: 'Practise IELTS free, or pay once from ৳499 a month by bKash, Nagad or card: unlimited Writing and recorded Speaking tests, the live AI examiner up to 5 times a day, and every Listening and Reading test.',
     image: DEFAULT.image,
   },
   '/terms': {
@@ -87,7 +88,7 @@ const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
     image: DEFAULT.image,
   },
   '/contact': {
-    title: `Contact | ${SITE_NAME}`,
+    title: `Contact NextBand support`,
     description: 'How to reach NextBand and Dolphin Commerce for support, billing or anything else.',
     image: DEFAULT.image,
   },
@@ -112,13 +113,41 @@ const NOINDEX_TITLES: [RegExp, string][] = [
   [/^\/(forgot|reset)-password/, 'Reset password'],
 ];
 
-/** Paths listed in sitemap.xml. */
-export const SITEMAP_PATHS = ['/', '/speaking', '/writing', '/listening', '/reading', '/bank', '/mock', '/pricing', '/about', '/privacy', '/terms', '/refunds', '/delivery', '/contact'];
+/** Paths listed in sitemap.xml, with the date their content last changed (bump it when you edit the page). */
+export const SITEMAP: Record<string, string> = {
+  '/': '2026-11-02',
+  '/speaking': '2026-11-02',
+  '/writing': '2026-11-02',
+  '/listening': '2026-11-02',
+  '/reading': '2026-11-02',
+  '/bank': '2026-11-02',
+  '/mock': '2026-11-02',
+  '/pricing': '2026-11-02',
+  '/about': '2026-11-02',
+  '/privacy': '2026-10-29',
+  '/terms': '2026-10-29',
+  '/refunds': '2026-10-29',
+  '/delivery': '2026-10-29',
+  '/contact': '2026-11-02',
+};
+export const SITEMAP_PATHS = Object.keys(SITEMAP);
+
+/** Every path the web app can render (apps/web routes; the web test routes.test checks the two stay in step). Anything else
+ *  is answered with the SPA shell (its not-found screen) but HTTP 404, so crawlers see no soft 404s. */
+const ROUTES = [
+  /^\/(overview|speaking|speaking\/live|speaking\/session|writing|writing\/full|listening|reading|mock|bank|coach|history|mistakes|review|settings|checkout|checkout\/done|about|contact|delivery|pricing|privacy|refunds|terms|login|signup|forgot-password|reset-password|live-demo|styleguide)?$/,
+  /^\/(speaking\/result|writing\/result|writing\/task|lr\/run|lr\/result|mock|admin\/replays|admin\/users)\/[^/]+$/,
+  /^\/admin(\/(activity|content|costs|emails|feedback|funnel|growth|health|logs|playground|replays|tests|users))?$/,
+];
+export const isKnownPath = (path: string) => ROUTES.some((re) => re.test(path.length > 1 ? path.replace(/\/+$/, '') : path));
+
+/** Breadcrumb name for a public page (structured data). */
+export const crumbName = (path: string) => PAGE_COPY[path]?.h1 ?? PAGES[path]?.title.split(' | ')[0] ?? SITE_NAME;
 
 export function pageMeta(path: string): PageMeta {
   const p = path.length > 1 ? path.replace(/\/+$/, '') : path;
   const page = PAGES[p];
-  if (page) return { ...page, index: p !== '/login' };
+  if (page) return { ...page, index: p !== '/login' && p !== '/signup' };
   const named = NOINDEX_TITLES.find(([re]) => re.test(p));
   return { ...DEFAULT, title: named ? `${named[1]} | ${SITE_NAME}` : DEFAULT.title, index: false };
 }

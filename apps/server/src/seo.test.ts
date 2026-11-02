@@ -30,3 +30,26 @@ it('titles the privacy page and keeps /admin noindex', () => {
   expect(admin).toContain('<title>Admin | NextBand</title>');
   expect(admin).toContain('content="noindex, follow"');
 });
+
+const page = '<head>\n<!--seo-->\n<title>x</title>\n<!--/seo-->\n</head><body><div id="root"><!--page--><h1>Know your band.</h1><!--/page--></div></body>';
+
+it('gives each public page its own body and structured data on the canonical origin', () => {
+  const sp = renderShell(page, '/speaking', 'https://ielts.example');
+  expect(sp).toContain('<h1>IELTS Speaking practice with a band score</h1>');
+  expect(sp).not.toContain('Know your band.');
+  expect(sp).toContain('"@type":"BreadcrumbList"');
+  expect(sp).toContain('"url":"https://ielts.example/"');
+  expect(sp).not.toContain('soyebjim');
+  expect(renderShell(page, '/about', 'https://ielts.example')).toContain('"@type":"AboutPage"');
+  // the landing page keeps its own shell
+  expect(renderShell(page, '/', 'https://ielts.example')).toContain('<h1>Know your band.</h1>');
+});
+
+it('treats unknown paths and auth pages as noindex with no page copy', () => {
+  for (const p of ['/nonexistent-zz', '/signup', '/.well-known/ai-catalog.json']) {
+    const html = renderShell(page, p, 'https://ielts.example');
+    expect(html).toContain('content="noindex, follow"');
+    expect(html).not.toContain('<main id="ssr">');
+    expect(html).not.toContain('"@type":"WebPage"');
+  }
+});

@@ -1,3 +1,4 @@
+import { PAGE_COPY } from '@ielts/core';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { COMPANY, LegalPage, List, Section } from '@/components/legal/Legal';
 
@@ -33,6 +34,10 @@ function About() {
         <p>
           You can start free. The paid plan is on the <Link to="/pricing" className={link}>pricing page</Link>.
         </p>
+      </Section>
+
+      <Section title={PAGE_COPY['/about']!.sections[0]!.h}>
+        <p>{PAGE_COPY['/about']!.sections[0]!.p}</p>
       </Section>
 
       <Section title="Company details">

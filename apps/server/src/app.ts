@@ -53,6 +53,13 @@ export function createApp() {
       const u = new URL(c.req.url);
       return c.redirect(`https://${c.req.header('host') ?? u.host}${u.pathname}${u.search}`, 308);
     }
+    // One host and one URL per page for search engines: www → apex, and a page path's trailing slash dropped (never /api).
+    const host = c.req.header('host') ?? '';
+    const path = c.req.path;
+    if (host.startsWith('www.') || (path.length > 1 && path.endsWith('/') && !path.startsWith('/api/') && (c.req.method === 'GET' || c.req.method === 'HEAD'))) {
+      const u = new URL(c.req.url);
+      return c.redirect(`${cf ? 'https:' : u.protocol}//${host.replace(/^www\./, '') || u.host}${path.length > 1 ? path.replace(/\/+$/, '') : path}${u.search}`, 301);
+    }
     await next();
     if (cf) c.header('Strict-Transport-Security', 'max-age=31536000');
   });
@@ -64,6 +71,7 @@ export function createApp() {
     c.header('Content-Security-Policy', "frame-ancestors 'none'");
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    c.header('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self), payment=(), usb=()'); // the mic is for Speaking
   });
 
   // No JSON body anywhere comes near this (an essay is 12k chars; replay chunks have their own, tighter 1 MB cap with its own error); without a cap a few 100 MB bodies exhaust memory.

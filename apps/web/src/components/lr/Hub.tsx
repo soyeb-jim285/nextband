@@ -12,6 +12,7 @@ import { formatBand } from '@/lib/format';
 import { LR_PARTS, lrTestsQuery, parseRef, partsLabel, readingSeconds, type LrSkill } from '@/lib/lr';
 import { useMe } from '@/lib/query';
 import { bandColor } from '@/lib/result';
+import { SeoGuide } from '@/components/SeoGuide';
 import { cn } from '@/lib/utils';
 
 type Item = Schemas['LrTestListItem'];
@@ -225,6 +226,7 @@ export function LrHub({ skill }: { skill: LrSkill }) {
         ))
       )}
       <StartDialog key={pick?.id} test={pick} onClose={() => { setPick(null); setErr(false); }} onStart={(m, p) => pick && void start(pick, m, p)} onContinue={(id) => void open(id)} busy={busy} error={err} />
+      <SeoGuide path={`/${skill}`} />
     </PageContainer>
   );
 }
