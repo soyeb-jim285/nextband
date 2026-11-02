@@ -503,6 +503,32 @@
   }
 }
 
+/* Phones and tablets: the stage is unpinned, so the wide-screen sort (step 0 scatters every chip across the box) has no
+   box to scatter in. Each pile sorts itself as it scrolls through instead: its chips start thrown about (their own
+   scatter seat and spin, sx/sy/sr) and settle into the pile one after another, scrubbed by the pile's scroll. */
+@keyframes lp-habits-settle {
+  from {
+    transform: translate(calc((var(--sx) - 32) * 3px), calc((var(--sy) - 37) * 3px)) rotate(calc(var(--sr) * 1.6deg));
+  }
+}
+@media (max-width: 1023.98px) {
+  .lp-habits-visual {
+    overflow-x: clip; /* a thrown chip never widens the page */
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (max-width: 1023.98px) and (prefers-reduced-motion: no-preference) {
+    .lp-habits-stack {
+      view-timeline: --lp-pile block;
+    }
+    .lp-habits-chip {
+      animation: lp-habits-settle ease-in-out backwards;
+      animation-timeline: --lp-pile;
+      animation-range: entry calc(var(--k) * 60px) entry calc(440px + var(--k) * 60px);
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lp-habits-chip,
   .lp-habits-card,

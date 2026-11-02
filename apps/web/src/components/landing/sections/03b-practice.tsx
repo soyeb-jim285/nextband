@@ -249,7 +249,7 @@ export function Practice() {
             NOT GIVEN because the passage never says who moved the boat lanes, and question 5 was "dawn", not the distractor "daylight", because the
             question asks when the otters were first seen.
           </p>
-          <div className="lp-lx-desk" aria-hidden="true">
+          <div className="lp-lx-desk" aria-hidden="true" data-lp-play>
             <ExamSheet />
             <ResultCard />
             <Review />

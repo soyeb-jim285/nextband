@@ -56,7 +56,9 @@ function Paper({ step, paras }: { step: number; paras: Seg[][] }) {
     const w = win.current;
     const t = text.current;
     if (!w || !t) return;
-    const el = focus ? t.querySelector<HTMLElement>(`.lp-wx-mk--${focus}`) : null;
+    // No focus, nothing to scroll: no layout read, so mount does not force a layout of the whole page.
+    if (!focus) return void (t.style.transform = '');
+    const el = t.querySelector<HTMLElement>(`.lp-wx-mk--${focus}`);
     const max = t.scrollHeight - w.clientHeight;
     const y = el && max > 0 ? Math.min(max, Math.max(0, el.offsetTop - w.clientHeight * 0.35)) : 0;
     t.style.transform = y ? `translateY(${-y}px)` : '';
@@ -146,7 +148,7 @@ export function WritingDesk(p: DeskProps) {
           <div className="lp-container lp-wx-frame">
             <SectionHead id={`${p.id}-title`} title={p.title} sub={p.sub} />
             <p className="sr-only">{p.srText}</p>
-            <div className="lp-wx-desk" aria-hidden="true">
+            <div className="lp-wx-desk" aria-hidden="true" data-lp-play>
               <div className="lp-card lp-wx-exam" style={vars({ '--split': p.split })}>
                 <div className="lp-wx-bar">
                   <b>Writing</b>

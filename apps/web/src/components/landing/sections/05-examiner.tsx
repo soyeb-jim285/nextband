@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowDown, Check, Lightbulb, Mic } from 'lucide-react';
+import { ArrowDown, Lightbulb, Mic } from 'lucide-react';
 import { useRef } from 'react';
 import { SectionHead } from '../SectionHead';
 import { Stage } from '../Stage';
-import { clock, Pen, useCountdown, vars } from '../wire';
+import { clock, Pen, Tick, useCountdown, vars } from '../wire';
 import './05-examiner.css';
 
 /*
@@ -65,7 +65,7 @@ function Side({ step }: { step: number }) {
             ))}
           </span>
           <p className="lp-sxe-ok">
-            <Check size={14} aria-hidden /> We can hear you clearly
+            <Tick size={14} strokeWidth={2} /> We can hear you clearly
           </p>
         </div>
       )}
@@ -163,7 +163,7 @@ export function Examiner() {
                 Illustration: a live Speaking test. The examiner checks your microphone, asks a Part 1 question about where you live, gives a Part 2 cue card with one minute to prepare and make notes, listens for up
                 to two minutes while your answer is transcribed and nudges you to add a reason, then asks a Part 3 discussion question. When the test is complete, your result is ready.
               </p>
-              <div className="lp-card lp-sxe-room" aria-hidden="true">
+              <div className="lp-card lp-sxe-room" aria-hidden="true" data-lp-play>
                 <div className="lp-sxe-bar">
                   <b>Speaking</b>
                   <span className="lp-sxe-live">
@@ -172,7 +172,7 @@ export function Examiner() {
                   <ol className="lp-sxe-parts">
                     {PARTS.map((p, i) => (
                       <li key={p} data-on={PART_OF[step] === i || undefined} data-done={PART_OF[step]! > i || undefined}>
-                        {PART_OF[step]! > i && <Check size={12} aria-hidden />}
+                        {PART_OF[step]! > i && <Tick size={12} strokeWidth={2} />}
                         {p}
                       </li>
                     ))}

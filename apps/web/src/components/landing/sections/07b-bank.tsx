@@ -112,7 +112,7 @@ export function Bank() {
                 </span>
               </span>
             </div>
-            <div className="lp-bank-list" aria-hidden="true">
+            <div className="lp-bank-list" aria-hidden="true" data-lp-play>
               <ul className="lp-bank-layer lp-bank-layer--s">
                 <Rows rows={SPEAKING} />
               </ul>

@@ -42,7 +42,7 @@ export function Mock() {
             <p className="sr-only">
               Illustration: a Listening card ends and the next card offers Start Reading. A sample result fills in as each section ends: Listening 7.0, Reading 6.5, Writing 6.0, Speaking 6.5, overall 6.5. In the mock, Speaking can be live or recorded.
             </p>
-            <div className="lp-mock-grid" aria-hidden="true">
+            <div className="lp-mock-grid" aria-hidden="true" data-lp-play>
               <ol className="lp-mock-track">
                 {NODES.map(([l, name, time], k) => (
                   <li key={l} className="lp-mock-col" style={vars({ '--order': k })}>

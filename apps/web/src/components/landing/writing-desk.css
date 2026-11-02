@@ -519,11 +519,7 @@
   .lp-wx-score,
   .lp-wx-detail,
   .lp-wx-better {
-    margin-top: -16px;
-  }
-  .lp-wx-detail {
-    width: calc(100% - 24px);
-    justify-self: end;
+    margin-top: 0; /* the overlap and stagger live in landing.css (phone desk) */
   }
   .lp-wx-split {
     grid-template-columns: minmax(0, 1fr);

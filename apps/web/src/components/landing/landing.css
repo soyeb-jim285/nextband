@@ -551,6 +551,11 @@ html:has(.landing) {
     height: auto;
     overflow: visible;
   }
+  /* Unpinned acts change height as they step (Stage scrubStep); the browser's scroll anchoring would then shift the
+     page under the thumb and flip the step back and forth. */
+  html:has(.landing) {
+    overflow-anchor: none;
+  }
 }
 
 /* ---------- The unknown band, "?.?" (wire.tsx BandQ): two pen-drawn hooks and one baseline point, in ink ---------- */
@@ -899,6 +904,66 @@ html:has(.landing) {
     .landing .lp-sharpen {
       animation-name: lp-sharpen-sm;
       animation-range: entry 0% entry 120px;
+    }
+  }
+}
+
+/* Phones: the acts are unpinned, so the wide-screen step choreography has nothing to move. Two phone motions instead,
+   both scrubbed by each piece's own entry so the movement happens where it is seen:
+   - A desk of whole cards (Listening, Practice, Writing) lays out like the wide-screen desk, scaled down: narrower cards
+     staggered left and right, each overlapping the foot of the one before, every card still mostly in view. Each slides
+     in from its own side into its place on the stack.
+   - The pieces of other pictures ([data-lp-play], Stage.tsx) slide in from alternating sides. Zero specificity: Mock's
+     own slot animation wins; Bank's stacked layers do not fade, since only one of them is meant to show. */
+@keyframes lp-in-l {
+  from {
+    translate: -96px 0;
+    opacity: 0;
+  }
+}
+@keyframes lp-in-r {
+  from {
+    translate: 96px 0;
+    opacity: 0;
+  }
+}
+@keyframes lp-in-x {
+  from {
+    translate: 96px 0;
+  }
+}
+@media (max-width: 47.999rem) {
+  .landing :is(.lp-lx-desk, .lp-wx-desk) {
+    overflow-x: clip; /* a card's off-side start never widens the page */
+    padding-bottom: 8px; /* room for the last card's shadow */
+  }
+  .landing :is(.lp-lx-desk, .lp-wx-desk) > .lp-card {
+    width: calc(100% - 20px);
+    justify-self: start;
+    box-shadow: var(--lp-shadow-sheet);
+  }
+  .landing :is(.lp-lx-desk, .lp-wx-desk) > .lp-card:nth-child(even) {
+    justify-self: end;
+  }
+  .landing :is(.lp-lx-desk, .lp-wx-desk) > .lp-card + .lp-card {
+    margin-top: -56px; /* overlaps the foot of the card before, like the wide-screen desk */
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) and (max-width: 47.999rem) {
+    :where(.landing [data-lp-play] > *) {
+      animation: lp-in-l ease-in-out backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 560px; /* spread over about two thirds of a phone screen of scrolling */
+    }
+    :where(.landing [data-lp-play] > :nth-child(even)) {
+      animation-name: lp-in-r;
+    }
+    :where(.landing [data-lp-play] > .lp-bank-layer) {
+      animation-name: lp-in-x;
+    }
+    :where(.landing [data-lp-play]:not(.lp-lx-desk, .lp-wx-desk)) {
+      overflow-x: clip; /* the off-side start never widens the page */
     }
   }
 }

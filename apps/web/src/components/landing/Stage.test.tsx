@@ -1,6 +1,6 @@
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { past, Stage } from './Stage';
+import { past, scrubStep, Stage } from './Stage';
 
 // A stub IntersectionObserver the test drives by hand: fire(targets, isIntersecting).
 let observers: { cb: IntersectionObserverCallback; targets: Element[] }[] = [];
@@ -58,23 +58,19 @@ describe('Stage', () => {
     expect(stageOf(container).getAttribute('data-step')).toBe('4');
   });
 
-  it('a flat phone track paints its last step first, or plays the steps on a timer when asked', () => {
-    vi.useFakeTimers();
+  it('a flat phone track without play paints its last step', () => {
     vi.stubGlobal('matchMedia', media(false, true));
     const flat = render(<Stage steps={4} className="lp-track--mobile-flat">x</Stage>);
     expect(stageOf(flat.container).getAttribute('data-step')).toBe('3');
-    flat.unmount();
+  });
 
-    const play = render(
-      <Stage steps={3} className="lp-track--mobile-flat" play>
-        x
-      </Stage>,
-    );
-    expect(stageOf(play.container).getAttribute('data-step')).toBe('0');
-    fire([play.container.querySelector('.lp-track')!], true);
-    act(() => vi.advanceTimersByTime(2000));
-    expect(stageOf(play.container).getAttribute('data-step')).toBe('2');
-    vi.useRealTimers();
+  it('a phone act steps with its picture passing 70% down the screen, and reverses', () => {
+    // 800px screen (line at 560), a 400px picture in 4 steps: one step per 100px past the line.
+    expect(scrubStep(700, 400, 800, 4)).toBe(0); // still below the line
+    expect(scrubStep(560, 400, 800, 4)).toBe(1);
+    expect(scrubStep(400, 400, 800, 4)).toBe(2);
+    expect(scrubStep(300, 400, 800, 4)).toBe(3);
+    expect(scrubStep(-500, 400, 800, 4)).toBe(3); // clamped
   });
 
   it('past lists every step reached', () => {

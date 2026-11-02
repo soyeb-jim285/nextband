@@ -60,12 +60,14 @@
          Colours are the landing ramp and brand in components/landing/landing.css :root (--lp-g-*, --lp-brand-*); this
          file cannot load that CSS before the script runs, so lp-pre.test.ts fails if these literals drift from it. -->
     <style>
+      body { margin: 0; } /* as styles.css will have it: the shell must not shift 8px when the stylesheet lands */
       #lp-pre { display: none; }
       html[data-lp-pre] #lp-pre { display: block; min-height: 100svh; background: #f7f9fb; color: #0f172a; font-family: var(--font-sans, system-ui, sans-serif); }
-      .dark #lp-pre { background: #0a111c; color: #e8edf3; }
+      html.dark[data-lp-pre] #lp-pre { background: #0a111c; color: #e8edf3; } /* outranks the html[data-lp-pre] rule above */
       #lp-pre .w { max-width: 80rem; margin: 0 auto; padding: calc(4rem + 20px) 1rem 0; }
       #lp-pre h1 { margin: 0; font-family: var(--font-serif, Georgia, serif); font-weight: 500; font-size: clamp(2.75rem, 1.25rem + 3.6vw, 4.5rem); line-height: 1.06; letter-spacing: -0.03em; }
-      #lp-pre h1 span { display: block; }
+      /* One text block, not a block per line: Chrome scores the largest text block as LCP, so the shell headline stays
+         the LCP and the React hero that replaces it (smaller blocks per line) does not push LCP out to the JS. */
       #lp-pre p { margin: 20px 0 0; max-width: 27em; font-size: 1.0625rem; line-height: 1.5; color: #5b6b80; }
       .dark #lp-pre p { color: #94a3b8; }
       #lp-pre a { display: inline-flex; align-items: center; min-height: 52px; margin-top: 24px; padding: 0 26px; border-radius: 999px; background: #0f766e; color: #ffffff; font-size: 1rem; font-weight: 600; text-decoration: none; }
@@ -86,7 +88,7 @@
       <div id="lp-pre">
         <div class="w">
           <div>
-            <h1><span>Know your band.</span> <span>Know what to fix.</span></h1>
+            <h1>Know your band. <br>Know what to fix.</h1>
             <p>Practise all four IELTS skills and see every mistake marked.</p>
             <a href="/mock">Take a full mock free</a>
           </div>

@@ -218,7 +218,7 @@ export function Address() {
             of 8.5, 38 of 40 correct, with two mistakes. The transcript review then marks the words that held each one: question 11, a distractor, and
             question 12, a spelling slip.
           </p>
-          <div className="lp-lx-desk" aria-hidden="true">
+          <div className="lp-lx-desk" aria-hidden="true" data-lp-play>
             <ExamSheet />
             <ResultCard />
             <Review />

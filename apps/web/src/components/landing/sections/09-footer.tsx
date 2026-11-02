@@ -34,7 +34,10 @@ export function Footer() {
               Sign in
             </Link>
           </div>
-          <nav aria-label="Practise" className="lp-footer-nav" style={o(1)}>
+          <nav aria-labelledby="ft-practise" className="lp-footer-nav" style={o(1)}>
+            <p id="ft-practise" className="lp-footer-h">
+              Practise
+            </p>
             <ul>
               {PRACTISE.map((l) => (
                 <li key={l.to}>
@@ -43,7 +46,10 @@ export function Footer() {
               ))}
             </ul>
           </nav>
-          <nav aria-label="Legal" className="lp-footer-nav" style={o(2)}>
+          <nav aria-labelledby="ft-company" className="lp-footer-nav" style={o(2)}>
+            <p id="ft-company" className="lp-footer-h">
+              Company
+            </p>
             <ul>
               {PAGES.map((l) => (
                 <li key={l.to}>

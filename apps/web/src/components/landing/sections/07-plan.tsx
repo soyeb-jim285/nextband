@@ -88,7 +88,7 @@ export function Plan() {
               review cards, 10 minutes.
             </figcaption>
             {/* ponytail: lp-card directly, since WireCard does not forward aria-hidden */}
-            <div className="lp-card lp-plan-sheet" aria-hidden="true">
+            <div className="lp-card lp-plan-sheet" aria-hidden="true" data-lp-play>
               <div>
                 <div className="lp-plan-head">
                   <p className="type-title-sm">Your coach</p>

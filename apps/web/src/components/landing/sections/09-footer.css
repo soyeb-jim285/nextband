@@ -88,6 +88,14 @@
   text-decoration-color: var(--ink);
 }
 
+.lp-footer-h {
+  margin: 0 0 4px;
+  font-size: var(--lp-fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 .lp-footer-nav ul {
   display: grid;
   row-gap: 0;
@@ -129,3 +137,42 @@
   border-radius: var(--lp-radius-chip);
 }
 
+
+/* Phones: one quiet block, not a second masthead. A small wordmark, the mail and Sign in on one line in the body face,
+   the two lists under their labels, the company lines last. */
+@media (max-width: 47.999rem) {
+  .lp-footer {
+    padding-block: 40px 32px;
+  }
+  .lp-footer-inner {
+    gap: 28px;
+  }
+  .lp-footer-grid {
+    column-gap: 16px;
+    row-gap: 28px;
+  }
+  .lp-footer-ask {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    column-gap: 20px;
+  }
+  .lp-footer-logo {
+    grid-column: 1 / -1;
+    justify-self: start;
+    height: 1.375rem;
+    margin-bottom: 8px;
+  }
+  .lp-footer-mail {
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  .lp-footer-signin {
+    margin-top: 0;
+  }
+  .lp-footer-meta {
+    gap: 4px;
+  }
+}

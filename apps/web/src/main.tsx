@@ -2,6 +2,7 @@ import { pageMeta } from '@ielts/core';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { RouteError } from '@/components/layout/RouteError';
 import { PageSkeleton } from '@/components/ui';
@@ -39,9 +40,8 @@ const router = createRouter({
 // router doesn't discover them only after the entry has rendered. _app's loader awaits me in parallel with the page loaders.
 for (const r of router.getMatchedRoutes(location.pathname)[0]) router.loadRouteChunk(r)?.catch(() => {}); // the router retries and reports on navigation
 
-// The boot cover (index.html) stays until the first page has resolved, so a hard load never flashes an unstyled page.
-const unboot = router.subscribe('onResolved', () => {
-  unboot();
+// The boot cover (index.html) stays until the first page is on screen, so a hard load never flashes an unstyled page.
+function unboot() {
   const w = window as { __nbReady?: boolean; __nbSplashClose?: () => void };
   w.__nbReady = true; // a slow-load splash (index.html) that has not started yet stays away
   w.__nbSplashClose?.();
@@ -49,7 +49,7 @@ const unboot = router.subscribe('onResolved', () => {
   if (!boot) return;
   boot.style.opacity = '0';
   setTimeout(() => boot.remove(), 200);
-});
+}
 
 // The tab title follows the page (the server writes the same one into the HTML for crawlers and link previews).
 router.subscribe('onResolved', ({ toLocation }) => {
@@ -82,10 +82,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+// React mounts only once the first page has loaded (route chunks, loaders), and commits it in one go: the static shell
+// in #root (index.html: the landing headline, or a page's own text under the boot cover) stays up until the real page
+// replaces it, instead of an empty first commit while the router is still loading.
+const root = createRoot(document.getElementById('root')!);
+void router
+  .load()
+  .catch(() => {}) // a failed load renders its error component
+  .then(() => {
+    flushSync(() =>
+      root.render(
+        <StrictMode>
+          <QueryClientProvider client={queryClient}>
+            <RouterProvider router={router} />
+          </QueryClientProvider>
+        </StrictMode>,
+      ),
+    );
+    unboot();
+  });
