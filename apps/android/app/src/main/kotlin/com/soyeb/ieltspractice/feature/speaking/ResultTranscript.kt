@@ -188,7 +188,8 @@ fun TranscriptPanel(
                     if (s.rest.isNotEmpty()) Text(s.rest, style = NB.type.bodySmall, color = c.muted)
                     Spacer(Modifier.height(10.dp))
                 }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                // Words flow left-aligned like prose; the spare space at the end of a line stays there (no justified gaps).
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp, androidx.compose.ui.Alignment.Start), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     for (i in s.range) WordView(
                         model.tokens[i], filter, now, nowPause, focusWord, colors, player, leaned, onSelect,
                     ) { d -> markDetail = if (markDetail == d) null else d }

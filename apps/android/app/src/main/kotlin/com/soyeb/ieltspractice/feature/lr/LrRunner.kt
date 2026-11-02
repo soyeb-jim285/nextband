@@ -661,7 +661,9 @@ private fun PartTabs(labels: List<String>, counts: List<Pair<Int, Int>>, selecte
                 ) {
                     Text(label, style = NB.type.label, color = if (on) c.brandText else c.muted, maxLines = 1)
                     Text("${counts[i].first}/${counts[i].second}", style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
-                    Spacer(Modifier.weight(1f))
+                    // A fixed gap, not weight(1f): with no height cap the weighted spacer made the tabs fill the screen,
+                    // leaving the passage, questions and audio bar zero height.
+                    Spacer(Modifier.height(6.dp))
                     Box(Modifier.height(3.dp).widthIn(min = 32.dp).fillMaxWidth(0.5f).background(if (on) c.brand else Color.Transparent, NB.shape.pill))
                 }
             }

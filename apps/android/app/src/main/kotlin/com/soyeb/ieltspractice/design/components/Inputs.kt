@@ -58,7 +58,11 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
     ) {
         val w = maxWidth / options.size
         val x by animateDpAsState(w * selected, if (reduced) tween(0) else tween(220), label = "seg")
-        Box(Modifier.offset(x = x).width(w).fillMaxHeight().heightIn(min = 36.dp).clip(NB.shape.pill).background(if (c.isDark) c.surface3 else c.surface))
+        // matchParentSize: the pill is as tall as the options row. A bare fillMaxHeight took the parent's max height, so in a tall
+        // layout (the full Writing test) the control stretched to the whole screen.
+        Box(Modifier.matchParentSize()) {
+            Box(Modifier.offset(x = x).width(w).fillMaxHeight().clip(NB.shape.pill).background(if (c.isDark) c.surface3 else c.surface))
+        }
         Row(Modifier.fillMaxWidth().selectableGroup()) {
             options.forEachIndexed { i, label ->
                 Box(
