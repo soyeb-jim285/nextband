@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -45,6 +44,7 @@ import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.LocalSnack
+import com.soyeb.ieltspractice.design.components.NbSheet
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbIconButton
@@ -141,7 +141,7 @@ fun SettingsScreen(nav: Nav) {
         }
     }
 
-    if (deleting) DeleteDialog(
+    if (deleting) DeleteSheet(
         onDismiss = { deleting = false },
         onDelete = { password ->
             try {
@@ -219,7 +219,7 @@ private fun ReadingSize(saved: Float, onSave: (Float) -> Unit) {
 
 /** Confirms with the account password (Better Auth delete-user). [onDelete] returns an error message, or null when it worked. */
 @Composable
-private fun DeleteDialog(onDismiss: () -> Unit, onDelete: suspend (String) -> String?) {
+private fun DeleteSheet(onDismiss: () -> Unit, onDelete: suspend (String) -> String?) {
     var password by remember { mutableStateOf("") }
     var show by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -233,26 +233,24 @@ private fun DeleteDialog(onDismiss: () -> Unit, onDelete: suspend (String) -> St
             busy = false
         }
     }
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Delete your account?", style = NB.type.title1) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Everything you've recorded and written will be permanently deleted. Confirm with your password.", style = NB.type.body, color = NB.colors.muted)
-                NbTextField(
-                    password, { password = it; error = null }, "Password", error = error,
-                    visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { go() }),
-                    trailing = {
-                        NbIconButton(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Hide password" else "Show password", { show = !show })
-                    },
-                )
-            }
+    // A sheet, not an AlertDialog: thumb-reach on a phone, and the actions sit where the keyboard leaves room.
+    NbSheet(
+        onDismiss = { if (!busy) onDismiss() },
+        title = "Delete your account?",
+        subtitle = "Everything you've recorded and written will be permanently deleted. Confirm with your password.",
+        actions = {
+            NbButton("Delete forever", ::go, kind = BtnKind.Destructive, size = BtnSize.Large, fill = true, enabled = password.isNotEmpty(), loading = busy)
+            NbButton("Keep account", onDismiss, kind = BtnKind.Text, fill = true, enabled = !busy)
         },
-        confirmButton = { NbButton("Delete forever", ::go, kind = BtnKind.Destructive, size = BtnSize.Small, enabled = password.isNotEmpty(), loading = busy) },
-        dismissButton = { NbButton("Keep account", onDismiss, kind = BtnKind.Text, size = BtnSize.Small, enabled = !busy) },
-        containerColor = NB.colors.surface, titleContentColor = NB.colors.ink, textContentColor = NB.colors.muted,
-        shape = NB.shape.card,
-    )
+    ) {
+        NbTextField(
+            password, { password = it; error = null }, "Password", error = error,
+            visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { go() }),
+            trailing = {
+                NbIconButton(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Hide password" else "Show password", { show = !show })
+            },
+        )
+    }
 }
