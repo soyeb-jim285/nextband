@@ -10,6 +10,11 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import com.soyeb.ieltspractice.design.NbMotion
 import androidx.compose.animation.fadeIn
+import com.soyeb.ieltspractice.design.LocalSharedScope
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -95,6 +100,7 @@ fun NbApp(graph: AppGraph, demo: DemoConfig? = null) {
 
 private fun isTab(e: NavBackStackEntry) = Tab.entries.any { e.destination.hasRoute(it.route::class) }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun AppShell(graph: AppGraph, start: Any) {
     val controller = rememberNavController()
@@ -113,19 +119,24 @@ private fun AppShell(graph: AppGraph, start: Any) {
     }
 
     val d = if (reduced) 0 else 1
+    // Push: the new screen slides in from the right edge (a third of the way) over the old one, which drifts left and
+    // fades a little (parallax). Pop mirrors it; predictive back scrubs the same transition with the gesture.
+    // Tab to tab: fade through with a slight 0.98 -> 1 scale, no sideways motion (tabs are peers, not a stack).
+    val spec = { ms: Int -> tween<IntOffset>(ms * d, easing = NbMotion.EaseOut) }
+    val fspec = { ms: Int, delay: Int -> tween<Float>(ms * d, delayMillis = delay * d, easing = NbMotion.EaseOut) }
     val push: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        if (isTab(targetState) && isTab(initialState)) fadeIn(tween(180 * d, delayMillis = 60 * d))
-        else slideInHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { it / 8 } + fadeIn(tween(220 * d, easing = NbMotion.EaseOut))
+        if (isTab(targetState) && isTab(initialState)) fadeIn(fspec(200, 70)) + scaleIn(fspec(260, 70), initialScale = 0.98f)
+        else slideInHorizontally(spec(320)) { it / 3 } + fadeIn(fspec(220, 0))
     }
     val pushOut: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        if (isTab(targetState) && isTab(initialState)) fadeOut(tween(90 * d, easing = NbMotion.EaseOut))
-        else slideOutHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { -it / 12 } + fadeOut(tween(200 * d, easing = NbMotion.EaseOut))
+        if (isTab(targetState) && isTab(initialState)) fadeOut(fspec(90, 0))
+        else slideOutHorizontally(spec(320)) { -it / 10 } + fadeOut(tween(320 * d, easing = NbMotion.EaseOut), targetAlpha = 0.4f)
     }
     val pop: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        slideInHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { -it / 12 } + fadeIn(tween(220 * d, easing = NbMotion.EaseOut))
+        slideInHorizontally(spec(320)) { -it / 10 } + fadeIn(tween(320 * d, easing = NbMotion.EaseOut), initialAlpha = 0.4f)
     }
     val popOut: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        slideOutHorizontally(tween(300 * d, easing = NbMotion.EaseOut)) { it / 8 } + fadeOut(tween(200 * d, easing = NbMotion.EaseOut))
+        slideOutHorizontally(spec(320)) { it / 3 } + fadeOut(fspec(220, 60))
     }
 
     CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack) {
@@ -135,6 +146,7 @@ private fun AppShell(graph: AppGraph, start: Any) {
             bottomBar = { if (current != null) BottomBar(current, nav::openTab, todayBadge = due) },
             snackbarHost = { NbSnackbarHost(snack) },
         ) { pad ->
+            SharedTransitionLayout { CompositionLocalProvider(LocalSharedScope provides this) {
             NavHost(
                 controller, startDestination = start,
                 modifier = Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding()),
@@ -151,6 +163,7 @@ private fun AppShell(graph: AppGraph, start: Any) {
                 historyGraph(nav)
                 youGraph(nav)
             }
+            } }
         }
         GateHost(nav)
     }

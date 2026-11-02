@@ -3,6 +3,7 @@ package com.soyeb.ieltspractice.feature.today
 import com.soyeb.ieltspractice.design.components.HeroInk
 import com.soyeb.ieltspractice.design.components.BrandHero
 import com.soyeb.ieltspractice.design.rise
+import com.soyeb.ieltspractice.design.sharedBox
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
@@ -257,7 +258,7 @@ private fun GoalNudge(nav: Nav) {
 
 @Composable
 private fun MockHero(nav: Nav, mock: Mock?, last: Mock?, target: Double) {
-    BrandHero { ink ->
+    BrandHero(Modifier.sharedBox(com.soyeb.ieltspractice.feature.mock.MOCK_HERO, NB.shape.card)) { ink ->
         Text(if (mock != null) "Full mock in progress" else "Full mock test", style = NB.type.label, color = ink.muted)
         Spacer(Modifier.height(6.dp))
         Text(

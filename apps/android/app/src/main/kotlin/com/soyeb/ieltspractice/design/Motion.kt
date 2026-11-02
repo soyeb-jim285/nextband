@@ -1,6 +1,13 @@
 package com.soyeb.ieltspractice.design
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -105,4 +112,35 @@ fun Modifier.rise(index: Int): Modifier {
         if (p.value < 1f) { delay(60L * index); p.animateTo(1f, tween(NbMotion.SLOW, easing = NbMotion.EaseOut)) }
     }
     return graphicsLayer { alpha = p.value; translationY = (1f - p.value) * 16.dp.toPx() }
+}
+
+/** Set by NbApp around the NavHost; null in previews and screenshot tests (shared elements then do nothing). */
+@OptIn(ExperimentalSharedTransitionApi::class)
+val LocalSharedScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
+/** The destination's enter/exit scope, set by [Shared] at the composable<> registration. */
+val LocalNavVisibility = staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
+
+/** Wrap a destination's content so [sharedBox] inside it can find the navigation transition. */
+@Composable
+fun AnimatedVisibilityScope.Shared(content: @Composable () -> Unit) =
+    CompositionLocalProvider(LocalNavVisibility provides this, content = content)
+
+/**
+ * Container transform between screens: the element with [key] on the old screen grows into the element with the same
+ * key on the new one (e.g. the Today mock card into the mock screen). No-op without a nav transition or with reduced motion.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedBox(key: String, shape: Shape): Modifier {
+    val shared = LocalSharedScope.current ?: return this
+    val vis = LocalNavVisibility.current ?: return this
+    if (LocalReducedMotion.current) return this
+    val state = with(shared) { rememberSharedContentState(key) }
+    return with(shared) {
+        this@sharedBox.sharedBounds(
+            state, vis,
+            boundsTransform = BoundsTransform { _, _ -> tween(NbMotion.SLOW + 60, easing = NbMotion.Drawer) },
+            clipInOverlayDuringTransition = OverlayClip(shape),
+        )
+    }
 }
