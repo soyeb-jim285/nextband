@@ -176,7 +176,11 @@ export function createApp() {
       const method = c.req.method as 'GET' | 'PUT';
       if (!verifyLocal(method, key, Number(c.req.query('exp')), c.req.query('sig') ?? '')) return c.text('Forbidden', 403, cors);
       if (method === 'PUT') {
-        if (Number(c.req.header('content-length') ?? 0) > MAX_AUDIO_BYTES) return c.text('Too large', 413, cors);
+        // bodyLimit skips this route, so the cap lives here: a body without Content-Length (chunked) could otherwise be any size.
+        // Browsers (Blob) and OkHttp (File) always send it; the HTTP parser stops reading at the declared length.
+        const len = c.req.header('content-length');
+        if (!len) return c.text('Length required', 411, cors);
+        if (Number(len) > MAX_AUDIO_BYTES) return c.text('Too large', 413, cors);
         const body = new Uint8Array(await c.req.arrayBuffer());
         if (body.length > MAX_AUDIO_BYTES) return c.text('Too large', 413, cors);
         await storage.put(key, body, c.req.header('content-type') ?? 'application/octet-stream');

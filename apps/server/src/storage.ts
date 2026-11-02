@@ -37,8 +37,10 @@ const Bucket = env.R2_BUCKET;
 // Clients get URLs on our own origin (relayed by app.ts /api/local-storage/*), not R2's: some networks (seen on campus/ISP
 // networks in Dhaka, 2026-11-02) block *.r2.cloudflarestorage.com, which broke Listening audio, examiner lines and uploads.
 // ponytail: every byte now passes through the app server; R2_DIRECT=true restores direct links if that bandwidth ever matters.
-// Same for every user (Listening/Reading assets, examiner lines): served by Cloudflare's cache on MEDIA_URL. Must match the WAF allow-list there.
-const PUBLIC_PREFIXES = ['lr/', 'speaking/'];
+// Same for every user and not access-controlled: our own generated Listening/Reading assets and examiner lines, served by Cloudflare's
+// cache on MEDIA_URL. Cambridge assets (lr/lr/cambridge/, restricted tests) stay on signed relay URLs. Must match the WAF allow-list there.
+// ponytail: plan-limited generated tests are guessable here too; they're our own content, move them to the relay if that matters.
+const PUBLIC_PREFIXES = ['lr/lr/gen/', 'speaking/'];
 const r2: Storage = {
   presignPut: async (key, contentType, expiresS = 300) =>
     env.R2_DIRECT ? getSignedUrl(s3, new PutObjectCommand({ Bucket, Key: key, ContentType: contentType }), { expiresIn: expiresS }) : localUrl('PUT', key, expiresS),
