@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,8 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,6 +42,7 @@ import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.bandTone
 import com.soyeb.ieltspractice.design.components.BandRing
+import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.CardTone
 import com.soyeb.ieltspractice.design.components.CriterionBar
@@ -48,6 +53,8 @@ import com.soyeb.ieltspractice.design.components.Overline
 import com.soyeb.ieltspractice.design.components.SkillTile
 import com.soyeb.ieltspractice.design.fg
 import com.soyeb.ieltspractice.design.fmtBand
+import com.soyeb.ieltspractice.nav.Auth
+import com.soyeb.ieltspractice.nav.Nav
 
 // Shared pieces of every result screen (speaking, writing, listening/reading, mock). One look for "here is your band".
 
@@ -186,3 +193,17 @@ fun NoSpeechState(onRetake: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+/** Under a guest's result: it is kept for a while, but only an account keeps it for good. */
+@Composable
+fun GuestResultBar(nav: Nav, modifier: Modifier = Modifier) {
+    Surface(modifier.fillMaxWidth(), color = NB.colors.surface, contentColor = NB.colors.ink) {
+        Column {
+            HorizontalDivider(color = NB.colors.line)
+            Banner(
+                "Create an account to keep this result.", Icons.Rounded.Person,
+                Modifier.navigationBarsPadding().padding(horizontal = NB.space.gutter, vertical = 10.dp),
+                action = "Create account", onAction = { nav.go(Auth("signup", "Create an account to keep this result")) },
+            )
+        }
+    }
+}
