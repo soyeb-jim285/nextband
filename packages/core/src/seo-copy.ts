@@ -10,7 +10,7 @@ const BANDS_NOTE = 'NextBand is practice, not the official test, so every band i
 
 export const PAGE_COPY: Record<string, PageCopy> = {
   '/speaking': {
-    h1: 'IELTS Speaking practice with a band score',
+    h1: 'Free IELTS Speaking practice with a band score',
     intro:
       'Answer real-format IELTS Speaking questions out loud and get a band for each of the four criteria, with every pause, slip and mispronounced word marked in your transcript.',
     sections: [
@@ -33,7 +33,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
     ],
   },
   '/writing': {
-    h1: 'IELTS Writing Task 1 and Task 2 practice with feedback',
+    h1: 'Free IELTS Writing Task 1 and Task 2 practice with feedback',
     intro:
       'Write IELTS Academic or General Training answers under exam timing and get a band for each criterion, every mistake underlined with the fix and the reason, and a rewrite one band higher.',
     sections: [
@@ -56,7 +56,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
     ],
   },
   '/listening': {
-    h1: 'IELTS Listening practice tests online',
+    h1: 'Free IELTS Listening practice tests online',
     intro:
       'Full IELTS Listening tests with exam-style audio and timing, or one part at a time. You get your score and band straight away, with the line in the transcript where each answer was.',
     sections: [
@@ -79,7 +79,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
     ],
   },
   '/reading': {
-    h1: 'IELTS Reading practice tests, Academic and General Training',
+    h1: 'Free IELTS Reading practice tests, Academic and General Training',
     intro:
       'Full IELTS Academic and General Training Reading tests, or one passage at a time. Get your band straight away and see where each answer sits in the passage.',
     sections: [
@@ -102,7 +102,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
     ],
   },
   '/mock': {
-    h1: 'Full IELTS mock test online',
+    h1: 'Free full IELTS mock test online',
     intro:
       'Sit Listening, Reading, Writing and Speaking in one guided run, the way test day works, and get a band for each skill and one overall band. Free with an account, and made for candidates in Bangladesh.',
     sections: [

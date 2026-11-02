@@ -28,7 +28,7 @@ function jsonLd(path: string, url: string, origin: string, title: string, descri
       url: `${origin}/`,
       applicationCategory: 'EducationalApplication',
       operatingSystem: 'Web, iOS, Android',
-      description: 'Practise IELTS Speaking, Writing, Listening and Reading with timed real-format tests, an AI examiner and band scores for every criterion.',
+      description: 'Free IELTS practice for Speaking, Writing, Listening and Reading: timed real-format tests, an AI examiner and band scores for every criterion.',
       educationalUse: 'Test preparation',
       about: { '@type': 'Thing', name: 'IELTS' },
       publisher: { '@id': id('org') },
