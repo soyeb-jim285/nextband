@@ -2,8 +2,9 @@ package com.soyeb.ieltspractice
 
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
-import com.github.takahirom.roborazzi.captureRoboImage
+import androidx.test.platform.app.InstrumentationRegistry
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.nav.screenCatalog
 import org.junit.Rule
@@ -30,7 +31,11 @@ data class ScreenCase(val screen: String, val variant: String?, val dark: Boolea
 class ScreenshotTest(private val case: ScreenCase) {
     @get:Rule val rule = createComposeRule()
 
+    @OptIn(ExperimentalRoborazziApi::class)
     @Test fun capture() {
+        // Robolectric starts in keyboard (non-touch) mode, where a new window focuses its first focusable: a dialog's text field then
+        // blinks its cursor forever and Compose never idles (AppNotIdleException). Phones are in touch mode anyway.
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
         val demo = DemoConfig(screen = case.screen, tab = case.variant, theme = if (case.dark) "dark" else "light")
         val graph = AppGraph(RuntimeEnvironment.getApplication(), demo)
         rule.setContent { NbApp(graph, demo) }
@@ -42,7 +47,8 @@ class ScreenshotTest(private val case: ScreenCase) {
             try { rule.waitUntil(30_000) { graph.api.inflight.get() == 0 } } catch (e: ComposeTimeoutException) { println("capture ${case.fileName}: inflight=${graph.api.inflight.get()} after 30s") }
         }
         rule.waitForIdle()
-        rule.onRoot().captureRoboImage("../screenshots/${case.fileName}.png")
+        // The whole screen, not onRoot(): dialogs and bottom sheets are separate windows and onRoot() would leave them out.
+        captureScreenRoboImage("../screenshots/${case.fileName}.png")
     }
 
     companion object {
