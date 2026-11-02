@@ -94,13 +94,14 @@ fun NbApp(graph: AppGraph, demo: DemoConfig? = null) {
             val done = onboarded
             // Once per process (saveable: not again on rotation); never in demo/screenshot runs (demo screen "splash" forces it, for the video). It also covers session restore.
             var splash by rememberSaveable { mutableStateOf(demo == null || demo.screen == "splash") }
+            var reveal by rememberSaveable { mutableStateOf(!splash) }
             Box(Modifier.fillMaxSize()) {
-                if (!ready || done == null) Box(Modifier.fillMaxSize().background(NB.colors.bg))
+                if (!ready || done == null || !reveal) Box(Modifier.fillMaxSize().background(NB.colors.bg))
                 else {
                     val start = remember { demo?.screen?.let { startFor(it) } ?: if (done || signedIn) TodayTab else Welcome }
                     AppShell(graph, start)
                 }
-                if (splash) NbSplash { splash = false }
+                if (splash) NbSplash(onReveal = { reveal = true }, onDone = { splash = false })
             }
         }
     }
