@@ -112,7 +112,7 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
             val first = list.firstOrNull()
             when {
                 ids.isEmpty() -> Shell(nav) { EmptyState(Icons.Rounded.Warning, "Nothing to show", "There's no answer to mark here.") }
-                error != null && list.isEmpty() -> Shell(nav) { ErrorState(error.orEmpty()) { round++ } }
+                error != null && list.isEmpty() -> Shell(nav) { ErrorState(error.orEmpty(), onRetry = { round++ }) }
                 list.size < ids.size || first == null -> Shell(nav) { SkeletonList() }
                 unsent != null -> Shell(nav) {
                     FailedState("This recording never finished uploading. Record it again from the Speaking tab.", retryable = false, onRetry = {})

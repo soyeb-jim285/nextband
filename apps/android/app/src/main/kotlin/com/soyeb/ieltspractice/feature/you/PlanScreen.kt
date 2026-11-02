@@ -72,7 +72,8 @@ fun PlanScreen(nav: Nav) {
     val quota by api.quota.collectAsState()
     val hasAccount by api.hasAccount.collectAsState()
     var plan by remember { mutableStateOf(paidPlans.last()) }
-    var checkout by remember { mutableStateOf(LocalDemo.current?.tab == "Checkout") }
+    val demoTab = LocalDemo.current?.tab
+    var checkout by remember { mutableStateOf(demoTab == "Checkout") }
 
     // Back from the payment page: the plan may have changed.
     LifecycleResumeEffect(hasAccount) {

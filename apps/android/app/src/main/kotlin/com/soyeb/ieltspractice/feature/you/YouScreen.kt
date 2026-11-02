@@ -107,9 +107,10 @@ fun YouScreen(nav: Nav) {
     val quota by api.quota.collectAsState()
     val hasAccount by api.hasAccount.collectAsState()
     val testType by prefs.testType.collectAsState(initial = "academic")
+    val demoTab = LocalDemo.current?.tab
     var sheet by remember {
         mutableStateOf(
-            when (LocalDemo.current?.tab) { "Band" -> YouSheet.Band; "Type" -> YouSheet.Type; "Feedback" -> YouSheet.Feedback; "Legal" -> YouSheet.Legal; else -> null },
+            when (demoTab) { "Band" -> YouSheet.Band; "Type" -> YouSheet.Type; "Feedback" -> YouSheet.Feedback; "Legal" -> YouSheet.Legal; else -> null },
         )
     }
     var datePicker by remember { mutableStateOf(false) }

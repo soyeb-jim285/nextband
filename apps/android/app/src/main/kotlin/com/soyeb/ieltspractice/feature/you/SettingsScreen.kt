@@ -77,7 +77,8 @@ fun SettingsScreen(nav: Nav) {
     val source by prefs.speakingSource.collectAsState(initial = "any")
     val scale by prefs.readingTextScale.collectAsState(initial = 1f)
     val s = me?.settings
-    var deleting by remember { mutableStateOf(LocalDemo.current?.tab == "Delete") }
+    val demoTab = LocalDemo.current?.tab
+    var deleting by remember { mutableStateOf(demoTab == "Delete") }
 
     /** Save one setting; false (and a snackbar) when the server refused. */
     suspend fun save(block: suspend () -> Unit): Boolean = try {
