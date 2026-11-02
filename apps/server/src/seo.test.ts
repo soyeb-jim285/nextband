@@ -13,7 +13,7 @@ it('writes each page its own title, share card and canonical URL; private pages 
   const result = renderShell(shell, '/speaking/result/abc', 'https://ielts.example');
   expect(result).toContain('<title>Speaking result | NextBand</title>');
   expect(result).toContain('content="noindex, follow"');
-  expect(renderShell(shell, '/', 'https://ielts.example')).toContain('og/home.png');
+  expect(renderShell(shell, '/', 'https://ielts.example')).toContain('og/landing.png');
 });
 
 it('inserts a hostile path literally: no $-pattern expansion, no markup', () => {
