@@ -125,7 +125,7 @@ fun WritingHub(nav: Nav) {
 
     TabScreen(
         "Writing",
-        actions = { Avatar(me?.user?.name?.takeIf { !guest && it.isNotBlank() }, Modifier.padding(end = 8.dp), onClick = { nav.go(You) }) },
+        actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(me?.user?.name?.takeIf { !guest && it.isNotBlank() }, Modifier.padding(end = 8.dp), onClick = { nav.go(You) }) },
         refreshing = load.refreshing, onRefresh = load.reload,
     ) {
         item {

@@ -185,7 +185,7 @@ private fun TodayScreen(nav: Nav) {
     TabScreen(
         title = greeting(hourNow(), me?.user?.name),
         subtitle = data?.let { subtitle(it.progress.streak, it.progress.minutesThisWeek) },
-        actions = { Avatar(me?.user?.name, onClick = { nav.go(You) }) },
+        actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(me?.user?.name, onClick = { nav.go(You) }) },
         refreshing = loader.refreshing, onRefresh = loader.reload, listState = listState,
     ) {
         when (val s = loader.state) {
@@ -468,7 +468,7 @@ private fun GuestToday(nav: Nav) {
     TabScreen(
         title = greeting(hourNow(), null),
         subtitle = "Free practice, no account needed",
-        actions = { Avatar(null, onClick = { nav.go(You) }) },
+        actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(null, onClick = { nav.go(You) }) },
         refreshing = loader.refreshing, onRefresh = if (session) loader.reload else null,
     ) {
         item {

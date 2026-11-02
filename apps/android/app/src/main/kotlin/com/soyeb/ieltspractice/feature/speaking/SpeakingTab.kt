@@ -124,7 +124,7 @@ fun SpeakingTabScreen(nav: Nav) {
 
     TabScreen(
         "Speaking",
-        actions = { Avatar(me?.user?.takeIf { !it.isAnonymous }?.name, onClick = { nav.go(You) }) },
+        actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(me?.user?.takeIf { !it.isAnonymous }?.name, onClick = { nav.go(You) }) },
         refreshing = recent.refreshing,
         onRefresh = {
             recent.reload(); mock.reload()

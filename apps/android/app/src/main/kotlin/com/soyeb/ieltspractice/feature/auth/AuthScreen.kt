@@ -1,5 +1,6 @@
 package com.soyeb.ieltspractice.feature.auth
 
+import com.soyeb.ieltspractice.design.components.Logo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition

@@ -1,6 +1,7 @@
 package com.soyeb.ieltspractice.design.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.design.pressScale
 
 /** One snackbar host for the whole app (root scaffold). `LocalSnack.current.showSnackbar("Saved")`. */
 val LocalSnack = staticCompositionLocalOf { SnackbarHostState() }
@@ -95,6 +97,8 @@ fun TabScreen(
                         if (subtitle != null && scroll.state.collapsedFraction < 0.5f) Text(subtitle, style = NB.type.bodySmall, color = NB.colors.muted, maxLines = 1)
                     }
                 },
+                // The brand rides in the bar on every tab (left); actions (bell, avatar) sit right.
+                navigationIcon = { Logo(Modifier.padding(start = NB.space.gutter, end = 8.dp), height = 20.dp) },
                 actions = actions, colors = topBarColors, scrollBehavior = scroll,
             )
         },
@@ -185,10 +189,15 @@ fun Avatar(name: String?, modifier: Modifier = Modifier, size: Dp = 36.dp, onCli
             else Text(initials, style = if (size >= 56.dp) NB.type.title1 else NB.type.label, color = NB.colors.brandText)
         }
     }
-    if (onClick != null) Surface(
-        onClick = onClick, shape = CircleShape, color = androidx.compose.ui.graphics.Color.Transparent,
-        modifier = modifier.size(48.dp).semantics { contentDescription = "You: profile and settings" },
-    ) { Box(contentAlignment = Alignment.Center) { face() } }
+    if (onClick != null) {
+        val src = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        Box(
+            modifier.size(48.dp).pressScale(src, 0.92f).clip(CircleShape)
+                .clickable(src, com.soyeb.ieltspractice.design.PressWash, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+                .semantics { contentDescription = "You: profile and settings" },
+            contentAlignment = Alignment.Center,
+        ) { face() }
+    }
     else Box(modifier) { face() }
 }
 

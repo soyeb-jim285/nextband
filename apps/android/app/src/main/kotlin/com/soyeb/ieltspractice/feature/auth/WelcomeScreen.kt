@@ -41,6 +41,7 @@ import com.soyeb.ieltspractice.R
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.components.BandRing
+import com.soyeb.ieltspractice.design.components.Logo
 import com.soyeb.ieltspractice.design.components.BandScale
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
@@ -50,17 +51,6 @@ import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Onboarding
 
-/** The NextBand wordmark. Its colours come from values(-night)/colors.xml, resolved for the app's theme (Settings can differ from the device). */
-@Composable
-fun Logo(modifier: Modifier = Modifier, height: Dp = 26.dp, dark: Boolean = NB.colors.isDark) {
-    val context = LocalContext.current
-    val vector = remember(context, dark) {
-        val c = Configuration(context.resources.configuration)
-        c.uiMode = (c.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or (if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
-        ImageVector.vectorResource(null, context.createConfigurationContext(c).resources, R.drawable.logo_wordmark)
-    }
-    Image(vector, "NextBand", modifier.height(height))
-}
 
 /**
  * First launch. Deep teal header (the same one sign-in uses) with the promise and a sample band; a sheet rises over it

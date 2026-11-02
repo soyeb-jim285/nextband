@@ -154,7 +154,7 @@ fun LrHubScreen(skill: Skill, nav: Nav) {
 
     TabScreen(
         title = skill.label,
-        actions = { Avatar(me?.user?.takeIf { !it.isAnonymous }?.name, onClick = { nav.go(You) }) },
+        actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(me?.user?.takeIf { !it.isAnonymous }?.name, onClick = { nav.go(You) }) },
         refreshing = load.refreshing, onRefresh = load.reload,
     ) {
         item {
