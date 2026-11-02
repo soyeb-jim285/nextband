@@ -52,13 +52,17 @@ export function PostHog() {
   const userId = me?.user.id;
   const email = me && !me.user.isAnonymous ? me.user.email : undefined;
   const tier = me?.tier;
+  const owner = !!me?.isOwner;
   useEffect(() => {
     if (dev) return;
     void load().then((p) => {
+      // The owner's own browsing (admin, testing) stays out of analytics and replays. The opt-out persists on this device,
+      // so later visits are skipped from the first event, even signed out.
+      if (owner) return p.opt_out_capturing();
       if (userId) p.identify(userId, { email, tier, guest: !email });
       else if (p._isIdentified()) p.reset();
     });
-  }, [dev, userId, email, tier]);
+  }, [dev, userId, email, tier, owner]);
 
   return null;
 }
