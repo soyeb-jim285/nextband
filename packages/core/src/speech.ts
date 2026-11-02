@@ -196,12 +196,12 @@ export type AudioDisfluencies = { filledPauses: number[]; repetitions: number[];
 const CUT = /^(\p{L}+)(?:(?:[-–—]+)|(…|\.{2,}))$/u;
 const STUTTER = /^(\p{L}{1,3})[-–](\p{L}{2,})$/u;
 const SUBJECTS = new Set('i we he she they you it my our there is was are do'.split(' '));
-const commonWords = new Set(COMMON_WORDS.split(' '));
+let commonWords: Set<string> | undefined; // built on first use, like text.ts: a module-level Set kept the 34 KB list in every bundle that imports core
 function cutOff(w: string): 'false_start' | 'partial' | undefined {
   const t = w.trim(), m = CUT.exec(t);
   if (m) {
     const stem = m[1]!.toLowerCase();
-    if (m[2]) return stem.length <= 5 && !commonWords.has(stem) ? 'partial' : undefined;
+    if (m[2]) return stem.length <= 5 && !(commonWords ??= new Set(COMMON_WORDS.split(' '))).has(stem) ? 'partial' : undefined;
     return stem.length >= 4 || FUNCTION_WORDS.has(stem) || SUBJECTS.has(stem) ? 'false_start' : 'partial';
   }
   const s = STUTTER.exec(t);

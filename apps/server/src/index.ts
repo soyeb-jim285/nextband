@@ -25,7 +25,12 @@ if (existsSync(env.WEB_DIST)) {
   app.use('/*', async (c, next) => {
     await next();
     if (c.req.path.startsWith('/assets/') && c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable');
-    else if (c.res.headers.get('Content-Type')?.startsWith('text/html')) c.header('Cache-Control', 'no-cache');
+    else if (c.res.headers.get('Content-Type')?.startsWith('text/html')) {
+      c.header('Cache-Control', 'no-cache');
+      // The shell holds no per-user data, so Cloudflare may keep a page for 5 minutes (the trip to this origin was most of
+      // the landing's TTFB). Edge only, and only with a Cloudflare cache rule making HTML eligible; browsers still revalidate.
+      if (c.res.status === 200) c.header('Cloudflare-CDN-Cache-Control', 'max-age=300');
+    }
   });
   // "/" would otherwise be served as the raw index.html by serveStatic, without this page's title and share card.
   app.get('/', (c) => c.html(renderShell(indexHtml, '/')));
