@@ -10,7 +10,7 @@ const DEFAULT: PageMeta = {
   title: `${SITE_NAME}: ${SITE_TAGLINE}`,
   description:
     'Free IELTS practice for Speaking, Writing, Listening and Reading. Timed real-format tests, an AI examiner and a band for every criterion, each mistake marked.',
-  image: '/og/home.png',
+  image: '/og/home.png?v=2',
   index: true,
 };
 
@@ -20,36 +20,36 @@ const PAGES: Record<string, Omit<PageMeta, 'index'>> = {
     title: `Free IELTS practice tests with band scores | ${SITE_NAME}`,
     description:
       'Free IELTS practice tests for Listening, Reading, Writing and Speaking, with an AI examiner and a band for every criterion. Each mistake marked, made in Bangladesh.',
-    image: '/og/landing.png',
+    image: '/og/landing.png?v=2',
   },
   '/speaking': {
     title: `Free IELTS Speaking practice test with band score | ${SITE_NAME}`,
     description:
       'Free IELTS Speaking practice: Part 1, 2 and 3 with a live AI examiner or a recorded one. A band for each criterion, with every pause and mistake marked.',
-    image: '/og/speaking.png',
+    image: '/og/speaking.png?v=2',
   },
   '/writing': {
     title: `Free IELTS Writing Task 1 & 2 practice | ${SITE_NAME}`,
     description:
       'Free IELTS Writing Task 1 and Task 2 practice, Academic and General. A band for each criterion, every error marked with the fix, and a rewrite one band higher.',
-    image: '/og/writing.png',
+    image: '/og/writing.png?v=2',
   },
   '/listening': {
     title: `Free IELTS Listening practice tests online | ${SITE_NAME}`,
     description:
       'Free IELTS Listening practice tests with real-exam audio and timing. Instant score and band, the transcript at each answer, and spelling practice for misses.',
-    image: '/og/listening.png',
+    image: '/og/listening.png?v=2',
   },
   '/reading': {
     title: `Free IELTS Reading practice tests, Academic & GT | ${SITE_NAME}`,
     description:
       'Free IELTS Academic and General Training Reading tests. Instant band, where each answer sits in the passage, and True/False/Not Given analysis.',
-    image: '/og/reading.png',
+    image: '/og/reading.png?v=2',
   },
   '/bank': {
     title: `IELTS question bank: Speaking & Writing topics | ${SITE_NAME}`,
     description: 'Browse hundreds of IELTS Speaking cue cards, Part 1 and Part 3 topics, and Writing Task 1 and 2 questions free, and practise any of them.',
-    image: '/og/home.png',
+    image: '/og/home.png?v=2',
   },
   '/mock': {
     title: `Free full IELTS mock test online | ${SITE_NAME}`,
