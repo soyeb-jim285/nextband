@@ -16,6 +16,8 @@ import com.soyeb.ieltspractice.media.Tts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -48,6 +50,26 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
     val pending = PendingStore(File(app.filesDir, if (demo == null) "PendingRecordings" else "DemoPendingRecordings"), scope)
 
     val tts: Tts by lazy { Tts(app) }
+
+    init {
+        // A goal picked in onboarding before there was a session (prefs "goal:*") goes to the account once one exists,
+        // then the device copy is dropped. A failed save stays queued for the next sign-in or launch.
+        if (demo == null) scope.launch {
+            api.signedIn.filter { it }.collect {
+                val band = prefs.getString(GOAL_BAND)?.toDoubleOrNull() ?: return@collect
+                val date = prefs.getString(GOAL_DATE)
+                runCatching { api.saveSettings(targetBand = band, examDate = date) }.onSuccess {
+                    prefs.setString(GOAL_BAND, null)
+                    prefs.setString(GOAL_DATE, null)
+                }
+            }
+        }
+    }
+
+    companion object {
+        const val GOAL_BAND = "goal:targetBand"
+        const val GOAL_DATE = "goal:examDate"
+    }
 }
 
 val LocalGraph = staticCompositionLocalOf<AppGraph> { error("LocalGraph not provided") }

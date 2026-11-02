@@ -65,6 +65,7 @@ import com.soyeb.ieltspractice.design.components.CardTone
 import com.soyeb.ieltspractice.design.components.ErrorState
 import com.soyeb.ieltspractice.design.components.IconTile
 import com.soyeb.ieltspractice.design.components.Meter
+import com.soyeb.ieltspractice.design.components.Sparkline
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbListRow
@@ -341,7 +342,7 @@ private fun BandsCard(nav: Nav, bands: SkillBands, target: Double) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Skill.entries.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    pair.forEach { s -> BandCell(s, bands.of(s), target, Modifier.weight(1f)) { nav.openTab(skillTab(s)) } }
+                    pair.forEach { s -> BandCell(s, bands.of(s), bands.series[s].orEmpty(), target, Modifier.weight(1f)) { nav.openTab(skillTab(s)) } }
                 }
             }
         }
@@ -349,17 +350,21 @@ private fun BandsCard(nav: Nav, bands: SkillBands, target: Double) {
 }
 
 @Composable
-private fun BandCell(skill: Skill, band: Double?, target: Double, modifier: Modifier, onClick: () -> Unit) {
+private fun BandCell(skill: Skill, band: Double?, series: List<Double>, target: Double, modifier: Modifier, onClick: () -> Unit) {
     val tone = bandTone(band, target)
     NbCard(modifier, tone = CardTone.Inset, onClick = onClick, padding = PaddingValues(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SkillTile(skill, 32.dp)
             Spacer(Modifier.width(10.dp))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(skill.label, style = NB.type.caption, color = NB.colors.muted, maxLines = 1)
                 if (band != null) Text(fmtBand(band), style = NB.type.title2.copy(fontFeatureSettings = "tnum"), color = tone.fg())
                 else Text("Take a test", style = NB.type.label, color = NB.colors.brandText)
             }
+            Sparkline(
+                series, target, tone.fill(), "${skill.label}: last ${series.size} bands, latest ${series.lastOrNull()?.let(::fmtBand).orEmpty()}",
+                Modifier.size(width = 44.dp, height = 28.dp),
+            )
         }
         Spacer(Modifier.height(8.dp))
         Meter(band, target = target, color = tone.fill(), height = 4.dp)

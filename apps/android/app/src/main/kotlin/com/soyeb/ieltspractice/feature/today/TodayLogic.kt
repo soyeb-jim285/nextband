@@ -53,7 +53,11 @@ fun examChipText(days: Int): String = when (days) {
 fun averageBand(bands: List<Double>): Double? = bands.takeLast(5).takeIf { it.isNotEmpty() }?.let { Band.round(it.sum() / it.size) }
 
 /** The four predicted skill bands. Speaking and Writing use the server's prediction, Listening and Reading average their recent tests. */
-data class SkillBands(val listening: Double?, val reading: Double?, val writing: Double?, val speaking: Double?) {
+data class SkillBands(
+    val listening: Double?, val reading: Double?, val writing: Double?, val speaking: Double?,
+    /** Recent bands per skill, oldest first (the last 8), for the sparklines. */
+    val series: Map<Skill, List<Double>> = emptyMap(),
+) {
     fun of(skill: Skill): Double? = when (skill) {
         Skill.Listening -> listening; Skill.Reading -> reading; Skill.Writing -> writing; Skill.Speaking -> speaking
     }
@@ -70,6 +74,10 @@ fun skillBands(p: ProgressData?, lr: LrProgress?): SkillBands {
         reading = averageBand(lrTrend("reading")),
         writing = p?.predicted?.writing ?: averageBand(trend("writing")),
         speaking = p?.predicted?.speaking ?: averageBand(trend("speaking")),
+        series = mapOf(
+            Skill.Listening to lrTrend("listening"), Skill.Reading to lrTrend("reading"),
+            Skill.Writing to trend("writing"), Skill.Speaking to trend("speaking"),
+        ).mapValues { it.value.takeLast(8) },
     )
 }
 

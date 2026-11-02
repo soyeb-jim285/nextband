@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.LocalDemo
+import com.soyeb.ieltspractice.AppGraph
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
@@ -113,14 +114,19 @@ fun OnboardingScreen(nav: Nav) {
             busy = true
             if (save) {
                 prefs.setTestType(type)
-                prefs.setString("goal:targetBand", band.toString())
-                prefs.setString("goal:examDate", date?.toString())
-                if (signedIn) try {
+                // No session yet: kept on the device and sent when one exists (AppGraph).
+                suspend fun queue() {
+                    prefs.setString(AppGraph.GOAL_BAND, band.toString())
+                    prefs.setString(AppGraph.GOAL_DATE, date?.toString())
+                }
+                if (!signedIn) queue()
+                else try {
                     api.saveSettings(targetBand = band, examDate = date?.toString(), clearExamDate = date == null && me?.settings?.examDate != null)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    graph.scope.launch { snack.showSnackbar("Couldn't save your goal. You can set it later in You.") }
+                    queue()
+                    graph.scope.launch { snack.showSnackbar("Couldn't save your goal yet. It will sync next time you're online.") }
                 }
             }
             prefs.setOnboardingDone()

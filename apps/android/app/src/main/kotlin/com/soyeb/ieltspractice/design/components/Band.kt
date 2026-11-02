@@ -134,3 +134,31 @@ fun CriterionBar(label: String, band: Double?, target: Double? = null, modifier:
         Meter(band, target = target, color = tone.fill())
     }
 }
+
+/**
+ * A band over time, compact (web BandTrend compact): a 2 dp line, the latest point as a dot, the target dashed. Oldest first.
+ * Needs two points; one test is not a trend. Decorative for screen readers: [description] says what it shows.
+ */
+@Composable
+fun Sparkline(bands: List<Double>, target: Double, color: Color, description: String, modifier: Modifier = Modifier) {
+    if (bands.size < 2) return
+    val c = NB.colors
+    val lo = (minOf(bands.min(), target) - 0.5).coerceAtLeast(0.0)
+    val hi = (maxOf(bands.max(), target) + 0.5).coerceAtMost(9.0)
+    Canvas(modifier.clearAndSetSemantics { contentDescription = description }) {
+        val pad = 4.dp.toPx()
+        val w = size.width - pad * 2
+        val h = size.height - pad * 2
+        fun x(i: Int) = pad + w * i / (bands.size - 1)
+        fun y(v: Double) = pad + h * (1 - ((v - lo) / (hi - lo)).toFloat())
+        drawLine(
+            c.line, androidx.compose.ui.geometry.Offset(pad, y(target)), androidx.compose.ui.geometry.Offset(pad + w, y(target)),
+            strokeWidth = 1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+        )
+        val path = androidx.compose.ui.graphics.Path().apply {
+            bands.forEachIndexed { i, v -> if (i == 0) moveTo(x(i), y(v)) else lineTo(x(i), y(v)) }
+        }
+        drawPath(path, color, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        drawCircle(color, 3.dp.toPx(), androidx.compose.ui.geometry.Offset(x(bands.lastIndex), y(bands.last())))
+    }
+}
