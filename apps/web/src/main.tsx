@@ -68,8 +68,11 @@ const check = () => void isStale().then((s) => (stale ||= s));
 setInterval(check, 10 * 60_000);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
 const inExam = (path: string) => router.getMatchedRoutes(path)[0].some((r) => r.options.staticData?.exam);
+// A hash-only jump (#essay) is skipped: location.assign there doesn't reload, it fires popstate, the router navigates
+// again and this handler calls assign again, until the stack overflows.
 router.subscribe('onBeforeNavigate', ({ fromLocation, toLocation }) => {
-  if (stale && !inExam(toLocation.pathname) && !(fromLocation && inExam(fromLocation.pathname))) location.assign(toLocation.href);
+  const samePage = !!fromLocation && fromLocation.pathname === toLocation.pathname && fromLocation.searchStr === toLocation.searchStr;
+  if (stale && !samePage && !inExam(toLocation.pathname) && !(fromLocation && inExam(fromLocation.pathname))) location.assign(toLocation.href);
 });
 
 declare module '@tanstack/react-router' {
