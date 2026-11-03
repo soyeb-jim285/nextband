@@ -23,5 +23,6 @@ data/scoring-gold/
 apps/web/.tanstack/
 data/cambridge-lr/
 data/lr-generated/
+data/lr-drills/
 data/speaking-audio/
 brag-output/

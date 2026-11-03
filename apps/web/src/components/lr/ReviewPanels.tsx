@@ -96,7 +96,7 @@ export function QuestionDetail({ q, group, section, mark, entry, verdict = true,
         </Block>
       )}
       {wrong && (
-        <Block title={`Why ${mark!.given.toUpperCase().length <= 3 ? mark!.given.toUpperCase() : `"${mark!.given}"`} is not right`}>
+        <Block title={`Why ${/^[ivx]+$/.test(mark!.given) ? mark!.given /* heading numeral */ : mark!.given.length <= 3 ? mark!.given.toUpperCase() : `"${mark!.given}"`} is not right`}>
           <p className="max-w-[68ch] text-pretty">{wrong}</p>
         </Block>
       )}
