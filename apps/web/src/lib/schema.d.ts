@@ -1742,7 +1742,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Purpose-built Reading drills per question type: how many exist and your progress on them */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Per drill type: drills available, drills you submitted, marks right / total over those submits */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            type: "tfng" | "match" | "minfo" | "mfeat" | "mend" | "mcq" | "sent" | "summ" | "diag" | "short";
+                            count: number;
+                            done: number;
+                            right: number;
+                            total: number;
+                        }[];
+                    };
+                };
+            };
+        };
         put?: never;
         /**
          * Start a Reading question-type drill (or resume the open one of that type)
@@ -1760,6 +1787,12 @@ export interface paths {
                     "application/json": {
                         /** @enum {string} */
                         family: "tfng" | "match" | "gap" | "mcq";
+                    } | {
+                        /**
+                         * @description One question type (DRILL_TYPES): only purpose-built drills of that type, then full-test passages of its family
+                         * @enum {string}
+                         */
+                        type: "tfng" | "match" | "minfo" | "mfeat" | "mend" | "mcq" | "sent" | "summ" | "diag" | "short";
                     };
                 };
             };

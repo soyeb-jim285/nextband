@@ -432,4 +432,18 @@ describe('reading question-type drills', () => {
     expect((await body(await req('/api/lr/drills', { headers, body: { family: 'tfng' } }))).types).toEqual(['tfng', 'ynng']);
     expect((await req('/api/lr/drills', { headers, body: { family: 'nope' } })).status).toBe(400);
   });
+
+  it('a type card picks only drills of that slug type; the stats count them per type', async () => {
+    const tf = await seed(drillTest());
+    const other = await seed({ ...drillTest(), slug: 'drill-mfeat-a-01' }); // ponytail: a tfng group under an mfeat slug is enough for slug routing
+    const { headers } = await guestUser();
+    const a = await body(await req('/api/lr/drills', { headers, body: { type: 'mfeat' } }));
+    expect(a.testId).toBe(other);
+    await req(`/api/lr/attempts/${a.id}/submit`, { headers, body: {} });
+    const stats = await body(await req('/api/lr/drills', { headers, method: 'GET' }));
+    expect(stats.find((x: { type: string }) => x.type === 'mfeat')).toMatchObject({ count: 1, done: 1, right: 0, total: 6 });
+    expect(stats.find((x: { type: string }) => x.type === 'tfng')).toMatchObject({ count: 1, done: 0 });
+    expect((await body(await req('/api/lr/drills', { headers, body: { type: 'tfng' } }))).testId).toBe(tf);
+    expect((await req('/api/lr/drills', { headers, body: { type: 'nope' } })).status).toBe(400);
+  });
 });

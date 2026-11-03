@@ -1,48 +1,50 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { DRILL_FAMILIES, type DrillFamily } from '@ielts/core';
-import { ArrowRight } from 'lucide-react';
+import { DRILL_TYPES, type DrillType } from '@ielts/core';
 import { useState } from 'react';
-import { rowStyles } from '@/components/bank/ListRow';
-import { Section } from '@/components/result';
+import { GroupHeading, listStyles, RowChevron, rowStyles } from '@/components/bank/ListRow';
 import { Badge, Spinner, toast } from '@/components/ui';
 import { ensureSession } from '@/lib/auth';
-import { lrProgressQuery, startDrill } from '@/lib/lr';
+import { lrDrillsQuery, startDrill } from '@/lib/lr';
 import { useMe } from '@/lib/query';
 import { cn } from '@/lib/utils';
 
-const DESC: Record<DrillFamily, string> = {
+const DESC: Record<DrillType, string> = {
   tfng: 'True / False / Not Given and Yes / No / Not Given statements.',
-  match: 'Headings, information, features and sentence endings.',
-  gap: 'Sentence, summary, note and table completion.',
+  match: 'Choose the heading that sums up each paragraph.',
+  minfo: 'Find the paragraph that holds each piece of information.',
+  mfeat: 'Match each statement to a person, place or date.',
+  mend: 'Join each sentence beginning to the right ending.',
   mcq: 'One answer, or choose two.',
+  sent: 'Complete sentences with words from the passage.',
+  summ: 'Fill a summary, notes or a table, some with a word box.',
+  diag: 'Label a diagram with words from the passage.',
+  short: 'Answer questions in a few words from the passage.',
 };
-const FAMILIES = Object.keys(DRILL_FAMILIES) as DrillFamily[];
+const TYPES = Object.keys(DRILL_TYPES) as DrillType[];
+const GROUPS: { heading: string; types: DrillType[] }[] = [
+  { heading: 'Statements', types: ['tfng'] },
+  { heading: 'Matching', types: ['match', 'minfo', 'mfeat', 'mend'] },
+  { heading: 'Multiple choice', types: ['mcq'] },
+  { heading: 'Completion and short answers', types: ['sent', 'summ', 'diag', 'short'] },
+];
 
-/** Progress reports accuracy per type label (lrTypeLabel); fold the labels into the four drill families. */
-const familyOfLabel = (l: string): DrillFamily => (/^(true|yes)/i.test(l) ? 'tfng' : /^matching/i.test(l) ? 'match' : /^multiple choice/i.test(l) ? 'mcq' : 'gap');
-
-/** Reading page: practise one question type. A card starts (or resumes) the next drill of that type. */
+/** Reading page, "By question type" tab: a row starts (or resumes) the next drill of that type. */
 export function TypeDrills() {
   const me = useMe().data;
-  const progress = useQuery({ ...lrProgressQuery, enabled: !!me });
+  const stats = useQuery({ ...lrDrillsQuery, enabled: !!me });
   const navigate = useNavigate();
-  const [busy, setBusy] = useState<DrillFamily | null>(null);
+  const [busy, setBusy] = useState<DrillType | null>(null);
 
-  const acc = new Map<DrillFamily, { right: number; total: number }>();
-  for (const t of progress.data?.byType ?? []) {
-    if (t.skill !== 'reading') continue;
-    const e = acc.get(familyOfLabel(t.label)) ?? { right: 0, total: 0 };
-    acc.set(familyOfLabel(t.label), { right: e.right + t.right, total: e.total + t.total });
-  }
-  const seen = FAMILIES.filter((f) => (acc.get(f)?.total ?? 0) >= 4);
-  const weakest = seen.length >= 2 ? seen.reduce((w, f) => (pct(acc.get(f)!) < pct(acc.get(w)!) ? f : w)) : null;
+  const by = new Map((stats.data ?? []).map((s) => [s.type, s]));
+  const seen = TYPES.filter((t) => (by.get(t)?.total ?? 0) >= 4);
+  const weakest = seen.length >= 2 ? seen.reduce((w, t) => (pct(by.get(t)!) < pct(by.get(w)!) ? t : w)) : null;
 
-  const start = async (f: DrillFamily) => {
-    setBusy(f);
+  const start = async (type: DrillType) => {
+    setBusy(type);
     try {
       await ensureSession(); // a visitor gets a guest session, as for a full test
-      await navigate({ to: '/lr/run/$attemptId', params: { attemptId: await startDrill(f) } });
+      await navigate({ to: '/lr/run/$attemptId', params: { attemptId: await startDrill({ type }) } });
     } catch {
       toast('Could not start the drill. Try again.', { tone: 'bad' });
       setBusy(null);
@@ -50,28 +52,41 @@ export function TypeDrills() {
   };
 
   return (
-    <Section title="Practise one question type" caption="One short passage with questions of a single type. No timer and no band, just the questions you want to get better at." className="mb-10">
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {FAMILIES.map((f) => {
-          const a = acc.get(f);
-          return (
-            <li key={f}>
-              <button type="button" onClick={() => void start(f)} disabled={!!busy} aria-busy={busy === f} className={cn(rowStyles, 'h-full items-start rounded-lg border border-line px-4 before:inset-x-0 disabled:cursor-wait')}>
-                <span className="min-w-0 flex-1">
-                  <span className="type-subheading flex flex-wrap items-center gap-2">
-                    {DRILL_FAMILIES[f].label}
-                    {f === weakest && <Badge tone="warn">Your weakest</Badge>}
-                  </span>
-                  <span className="type-caption mt-0.5 block text-pretty">{DESC[f]}</span>
-                  <span className="type-caption type-num mt-1.5 block font-medium text-ink">{a?.total ? `${Math.round(pct(a) * 100)}% right so far (${a.right} of ${a.total})` : 'Not tried yet'}</span>
-                </span>
-                {busy === f ? <Spinner className="mt-1 size-4 shrink-0" /> : <ArrowRight className="mt-1 size-4 shrink-0 text-accent-text" aria-hidden />}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </Section>
+    <div>
+      <p className="type-caption mb-1 max-w-[68ch]">A short passage with questions of one type, about 10 minutes. No timer and no band: see which trap caught you on every wrong answer.</p>
+      {GROUPS.map((g) => (
+        <section key={g.heading} aria-label={g.heading}>
+          <GroupHeading>{g.heading}</GroupHeading>
+          <ul className={listStyles}>
+            {g.types.map((t) => {
+              const a = by.get(t);
+              return (
+                <li key={t}>
+                  <button type="button" onClick={() => void start(t)} disabled={!!busy} aria-busy={busy === t} className={cn(rowStyles, 'disabled:cursor-wait')}>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="type-subheading font-medium">{DRILL_TYPES[t].label}</span>
+                        {t === weakest && <Badge tone="warn">Your weakest</Badge>}
+                      </span>
+                      <span className="type-caption mt-0.5 block text-pretty">{DESC[t]}</span>
+                    </span>
+                    <span className="type-caption type-num shrink-0 text-right">
+                      {a?.done ? (
+                        <>
+                          <span className="block font-medium text-ink">{Math.round(pct(a) * 100)}% right</span>
+                          {a.done} of {a.count} done
+                        </>
+                      ) : a ? `${a.count} drills` : null}
+                    </span>
+                    {busy === t ? <Spinner className="size-4 shrink-0" /> : <RowChevron />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 

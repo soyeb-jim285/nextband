@@ -10312,6 +10312,68 @@
       }
     },
     "/api/lr/drills": {
+      "get": {
+        "tags": [
+          "Listening & Reading"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Purpose-built Reading drills per question type: how many exist and your progress on them",
+        "responses": {
+          "200": {
+            "description": "Per drill type: drills available, drills you submitted, marks right / total over those submits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "tfng",
+                          "match",
+                          "minfo",
+                          "mfeat",
+                          "mend",
+                          "mcq",
+                          "sent",
+                          "summ",
+                          "diag",
+                          "short"
+                        ]
+                      },
+                      "count": {
+                        "type": "number"
+                      },
+                      "done": {
+                        "type": "number"
+                      },
+                      "right": {
+                        "type": "number"
+                      },
+                      "total": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "count",
+                      "done",
+                      "right",
+                      "total"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Listening & Reading"
@@ -10328,20 +10390,48 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "family": {
-                    "type": "string",
-                    "enum": [
-                      "tfng",
-                      "match",
-                      "gap",
-                      "mcq"
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "family": {
+                        "type": "string",
+                        "enum": [
+                          "tfng",
+                          "match",
+                          "gap",
+                          "mcq"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "family"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "tfng",
+                          "match",
+                          "minfo",
+                          "mfeat",
+                          "mend",
+                          "mcq",
+                          "sent",
+                          "summ",
+                          "diag",
+                          "short"
+                        ],
+                        "description": "One question type (DRILL_TYPES): only purpose-built drills of that type, then full-test passages of its family"
+                      }
+                    },
+                    "required": [
+                      "type"
                     ]
                   }
-                },
-                "required": [
-                  "family"
                 ]
               }
             }

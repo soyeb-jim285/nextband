@@ -21,13 +21,13 @@ export { rowLink, useGuestRecent };
  * Guests have no History page, but their own few tests are listed here (same two endpoints History uses; the server caps a guest's list).
  * Renders nothing for an account or when there is nothing yet. `skill` narrows it to one hub.
  */
-export function GuestRecent({ skill }: { skill?: Skill }) {
+export function GuestRecent({ skill, className }: { skill?: Skill; className?: string }) {
   const redirect = useRouterState({ select: (s) => s.location.href });
   const rows = useGuestRecent(skill);
   if (!rows.length) return null;
 
   return (
-    <Section title="Your recent tests" id="guest-recent">
+    <Section title="Your recent tests" id="guest-recent" className={className}>
       <ul className={listStyles}>
         {rows.map((r) => {
           const Icon = ICON[r.skill];
@@ -65,12 +65,12 @@ export function GuestRecent({ skill }: { skill?: Skill }) {
           );
         })}
       </ul>
-      <p className="type-caption flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="max-w-[60ch]">These live in this browser only. Create an account to keep them and unlock full History.</span>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <p className="type-caption min-w-0 flex-1 text-pretty">These live in this browser only. Create an account to keep them and unlock full History.</p>
         <Link to="/signup" search={{ redirect }} className={buttonStyles({ size: 'sm' })}>
           Create account
         </Link>
-      </p>
+      </div>
     </Section>
   );
 }

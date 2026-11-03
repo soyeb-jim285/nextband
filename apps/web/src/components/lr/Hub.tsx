@@ -6,7 +6,7 @@ import { GroupHeading, listStyles, RowChevron, RowIcon, rowStyles } from '@/comp
 import { MockCta } from '@/components/mock/MockCta';
 import { TypeDrills } from './TypeDrills';
 import { GuestRecent } from '@/components/dashboard/GuestRecent';
-import { Alert, Badge, Button, Dialog, EmptyState, PageContainer, PageHeader, ProgressBar, Segmented } from '@/components/ui';
+import { Alert, Badge, Button, Dialog, EmptyState, PageContainer, PageHeader, ProgressBar, Segmented, Tabs } from '@/components/ui';
 import { call, client, type Schemas } from '@/lib/api';
 import { ensureSession } from '@/lib/auth';
 import { formatBand } from '@/lib/format';
@@ -140,6 +140,7 @@ export function LrHub({ skill }: { skill: LrSkill }) {
   const navigate = useNavigate();
   const [variant, setVariant] = useState<'all' | 'academic' | 'general'>('all');
   const [state, setState] = useState<'all' | 'todo' | 'done'>('all');
+  const [view, setView] = useState<'tests' | 'types'>('tests'); // reading only: full tests lead, drills by question type in the second tab
   const [pick, setPick] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
@@ -180,9 +181,17 @@ export function LrHub({ skill }: { skill: LrSkill }) {
           )
         }
       />
-      <GuestRecent skill={skill} />
+      <GuestRecent skill={skill} className="mb-10" />
       <MockCta className="mb-8" />
-      {skill === 'reading' && <TypeDrills />}
+      {skill === 'reading' && (
+        <Tabs id="rd" className="mb-5" value={view} onChange={setView} items={[{ value: 'tests', label: 'Full tests', count: data.items.length }, { value: 'types', label: 'By question type' }]} />
+      )}
+      {view === 'types' ? (
+        <div role="tabpanel" id="rd-panel" aria-labelledby="rd-types">
+          <TypeDrills />
+        </div>
+      ) : (
+      <div {...(skill === 'reading' && { role: 'tabpanel', id: 'rd-panel', 'aria-labelledby': 'rd-tests' })}>
       {done > 0 && (
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <p className="type-caption">{done} of {data.items.length} done</p>
@@ -226,6 +235,8 @@ export function LrHub({ skill }: { skill: LrSkill }) {
             </ul>
           </section>
         ))
+      )}
+      </div>
       )}
       <StartDialog key={pick?.id} test={pick} onClose={() => { setPick(null); setErr(false); }} onStart={(m, p) => pick && void start(pick, m, p)} onContinue={(id) => void open(id)} busy={busy} error={err} />
       <SeoGuide path={`/${skill}`} />

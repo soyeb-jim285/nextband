@@ -230,6 +230,24 @@ export const DRILL_FAMILIES = {
   mcq: { label: 'Multiple choice', types: ['mcq', 'mcq-multi'] },
 } as const satisfies Record<string, { label: string; types: LrType[] }>;
 export type DrillFamily = keyof typeof DRILL_FAMILIES;
+/** The question types a learner picks a purpose-built drill by; the key is the slug's subtype (drill-<type>-<tier>-<NN>). */
+export const DRILL_TYPES = {
+  tfng: { label: 'True / False / Not Given', family: 'tfng' },
+  match: { label: 'Matching headings', family: 'match' },
+  minfo: { label: 'Matching information', family: 'match' },
+  mfeat: { label: 'Matching features', family: 'match' },
+  mend: { label: 'Sentence endings', family: 'match' },
+  mcq: { label: 'Multiple choice', family: 'mcq' },
+  sent: { label: 'Sentence completion', family: 'gap' },
+  summ: { label: 'Summary, note and table completion', family: 'gap' },
+  diag: { label: 'Diagram labelling', family: 'gap' },
+  short: { label: 'Short-answer questions', family: 'gap' },
+} as const satisfies Record<string, { label: string; family: DrillFamily }>;
+export type DrillType = keyof typeof DRILL_TYPES;
+export const drillTypeOfSlug = (slug: string): DrillType | null => {
+  const t = /^drill-([a-z]+)-/.exec(slug)?.[1];
+  return t && Object.hasOwn(DRILL_TYPES, t) ? (t as DrillType) : null;
+};
 export const drillFamilyOf = (type: LrType): DrillFamily => (Object.keys(DRILL_FAMILIES) as DrillFamily[]).find((f) => (DRILL_FAMILIES[f].types as readonly LrType[]).includes(type))!;
 
 /**

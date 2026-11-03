@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { analyseAttempt, CAUSES, DRILL_FAMILIES, lrTypeLabel, maskWord, pickParts, residualGaps, scoreLr, stripAnswers, tfngPattern, type CauseFamily, type GapEntry, type LrAnalysis, type LrTest, type LrType } from '@ielts/core';
+import { analyseAttempt, CAUSES, DRILL_FAMILIES, DRILL_TYPES, type DrillType, lrTypeLabel, maskWord, pickParts, residualGaps, scoreLr, stripAnswers, tfngPattern, type CauseFamily, type GapEntry, type LrAnalysis, type LrTest, type LrType } from '@ielts/core';
 import { and, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { aiGapReasons } from '../ai/lr-mistakes';
@@ -374,25 +374,62 @@ export function register(app: App) {
 
   app.openapi(
     createRoute({
+      method: 'get',
+      path: '/api/lr/drills',
+      ...common,
+      summary: 'Purpose-built Reading drills per question type: how many exist and your progress on them',
+      responses: {
+        200: json(z.array(z.object({ type: z.enum(Object.keys(DRILL_TYPES) as [DrillType, ...DrillType[]]), count: z.number(), done: z.number(), right: z.number(), total: z.number() })), 'Per drill type: drills available, drills you submitted, marks right / total over those submits'),
+      },
+    }),
+    async (c) => {
+      const user = currentUser(c);
+      const r = (await db.execute(sql`
+        select split_part(t.slug, '-', 2) as type, count(distinct t.id)::int as count,
+          count(distinct a.test_id)::int as done, coalesce(sum(a.raw), 0)::int as right, coalesce(sum(a.total), 0)::int as total
+        from lr_tests t left join lr_attempts a on a.test_id = t.id and a.user_id = ${user.id} and a.status = 'submitted'
+        where t.kind = 'drill' and t.skill = 'reading' and not t.retired and not t.restricted
+        group by 1`)) as unknown as { type: string; count: number; done: number; right: number; total: number }[];
+      return c.json(r.filter((x): x is typeof x & { type: DrillType } => Object.hasOwn(DRILL_TYPES, x.type)), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: 'post',
       path: '/api/lr/drills',
       ...common,
       summary: 'Start a Reading question-type drill (or resume the open one of that type)',
       description:
         'Picks, in order: your unfinished drill of this type; a purpose-built drill you have not done (by slug, so tiers run A→C); else one passage of a full test, keeping only groups of this type (a passage you have not done, if any is left). Scored raw/total, no band.',
-      request: { body: { content: { 'application/json': { schema: z.object({ family: z.enum(['tfng', 'match', 'gap', 'mcq']) }) } }, required: true } },
+      request: {
+        body: {
+          content: {
+            'application/json': {
+              schema: z.union([
+                z.object({ family: z.enum(['tfng', 'match', 'gap', 'mcq']) }),
+                z.object({ type: z.enum(Object.keys(DRILL_TYPES) as [DrillType, ...DrillType[]]).openapi({ description: 'One question type (DRILL_TYPES): only purpose-built drills of that type, then full-test passages of its family' }) }),
+              ]),
+            },
+          },
+          required: true,
+        },
+      },
       responses: { 200: json(AttemptSchema, 'Attempt (resumed or new). Test is stripped.'), 404: json(ErrorSchema, 'No passage has questions of this type') },
     }),
     async (c) => {
       const user = currentUser(c);
-      const types = [...DRILL_FAMILIES[c.req.valid('json').family].types] as LrType[];
-      const firstType = sql`(t.data->'sections'->0->'groups'->0->>'type')`;
+      const body = c.req.valid('json');
+      const sub = 'type' in body ? body.type : null;
+      const types = [...DRILL_FAMILIES['type' in body ? DRILL_TYPES[body.type].family : body.family].types] as LrType[];
+      // a type card only takes purpose-built drills of that type (slug drill-<type>-…); a family card takes any of the family
+      const ofDrill = sub ? sql`t.slug like ${`drill-${sub}-%`}` : sql`(t.data->'sections'->0->'groups'->0->>'type') in ${types}`;
       const rows = <T>(q: SQL) => db.execute(q).then((r) => r as unknown as T[]);
       // 1. resume: an open drill of this family (purpose-built, or a type drill with exactly these types)
       const [resume] = await rows<{ id: string }>(sql`
         select a.id from lr_attempts a join lr_tests t on t.id = a.test_id
         where a.user_id = ${user.id} and a.status = 'in_progress'
-          and ((t.kind = 'drill' and ${firstType} in ${types}) or a.types = ${JSON.stringify(types)}::jsonb)
+          and ((t.kind = 'drill' and ${ofDrill}) or a.types = ${JSON.stringify(types)}::jsonb)
         order by a.started_at desc limit 1`);
       if (resume) {
         const { a, t } = await ownAttempt(resume.id, user);
@@ -403,7 +440,7 @@ export function register(app: App) {
       // ponytail: aim at the learner's worst trap once drills are plentiful
       const [drill] = await rows<{ id: string }>(sql`
         select t.id from lr_tests t
-        where t.kind = 'drill' and t.skill = 'reading' and not t.retired and not t.restricted and ${firstType} in ${types}
+        where t.kind = 'drill' and t.skill = 'reading' and not t.retired and not t.restricted and ${ofDrill}
           and not exists (select 1 from lr_attempts a where a.test_id = t.id and a.user_id = ${user.id})
         order by split_part(t.slug, '-', 3), split_part(t.slug, '-', 4), t.slug limit 1`);
       if (drill) {

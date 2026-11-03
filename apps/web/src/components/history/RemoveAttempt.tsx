@@ -11,7 +11,7 @@ type Listy = { items?: { id: string }[]; pages?: { items: { id: string }[]; tota
 // Every cached list that can show an attempt (History pages, hub "recent", guest "Your recent tests").
 const LISTS = [['attempts'], ['lr-attempts'], ['guest-recent'], ['writing-recent']];
 // Derived views that must forget it too (the server recomputes them from the remaining attempts).
-const DERIVED = [['progress'], ['lr-progress'], ['lr-spelling'], ['mistakes'], ['cards']];
+const DERIVED = [['progress'], ['lr-progress'], ['lr-drills'], ['lr-spelling'], ['mistakes'], ['cards']];
 
 function without(d: unknown, id: string): unknown {
   const l = d as Listy | undefined;
