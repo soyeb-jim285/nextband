@@ -85,7 +85,7 @@ for (const dir of dirs) {
         await storage.put(`lr/${k}`, readFileSync(file), MIME[extname(k).toLowerCase()] ?? 'application/octet-stream');
         uploaded++;
       }
-      const row = { skill: t.skill, variant: t.variant, source: t.source, ref: t.ref, title: t.title, data: t, restricted: t.source === 'cambridge', kind: t.kind ?? 'test' };
+      const row = { skill: t.skill, variant: t.variant, source: t.source, ref: t.ref, title: t.title, data: t, restricted: t.source === 'cambridge', kind: (t.kind ?? 'test') as 'test' | 'drill' };
       await db.insert(lrTests).values({ slug: t.slug, ...row }).onConflictDoUpdate({ target: lrTests.slug, set: row });
     }
     ok++;

@@ -127,7 +127,7 @@ describe('type drills', () => {
     expect(validateLrTest(drill)).toEqual([]);
     expect(validateLrTest({ ...drill, sections: [{ part: 1, passage, groups: [g(1, 4, 'tfng'), g(5, 3, 'ynng')] }] })).toEqual([]); // same family
     expect(validateLrTest({ ...drill, sections: [{ part: 1, passage, groups: [g(1, 4, 'tfng'), g(5, 3, 'gap')] }] }).join()).toMatch(/mixes/);
-    const bad = structuredClone(drill);
+    const bad = JSON.parse(JSON.stringify(drill)) as typeof drill;
     bad.sections[0]!.groups[0]!.questions[0]!.review = { trap: 'nope' };
     expect(validateLrTest(bad).join()).toMatch(/unknown trap/);
   });
