@@ -12,10 +12,12 @@ function jsonLd(path: string, url: string, origin: string, title: string, descri
     {
       '@type': 'Organization',
       '@id': id('org'),
-      name: 'Dolphin Commerce',
+      name: SITE_NAME,
+      legalName: 'Dolphin Commerce',
       url: `${origin}/`,
       logo: `${origin}/icon-512.png`,
       email: 'support@nextband.app',
+      contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'support@nextband.app', url: `${origin}/contact`, availableLanguage: 'en' },
       brand: { '@id': id('brand') },
       address: { '@type': 'PostalAddress', streetAddress: 'Sutia Bazar, Ward 6, Jatia Union, Ishwarganj', addressLocality: 'Mymensingh', postalCode: '2280', addressCountry: 'BD' },
     },
@@ -113,7 +115,7 @@ const LLMS = (o: string) => `# ${SITE_NAME}
 
 > IELTS practice for all four skills, made in Bangladesh by Dolphin Commerce. Timed real-format tests, a live AI Speaking examiner, and an estimated band for every criterion with each mistake marked. Practice, not the official test: bands are estimates.
 
-Free with an account: 5 Writing tests a week, 10 recorded Speaking tests a month, 5 live examiner sessions a month, most Listening and Reading tests. Paid plan: ৳${PAID_PLANS.month.bdt} for 1 month or ৳${PAID_PLANS.quarter.bdt} for 3 months (one payment by bKash, Nagad, Rocket, Upay or card; no auto-renewal; full refund within 7 days if unused).
+Free with an account: 5 Writing tests a week, 10 recorded Speaking tests a month, 5 live examiner sessions a month, 30 Listening and 30 Reading tests. Paid plan: ৳${PAID_PLANS.month.bdt} for 1 month or ৳${PAID_PLANS.quarter.bdt} for 3 months (one payment by bKash, Nagad, Rocket, Upay or card; no auto-renewal; full refund within 7 days if unused).
 
 ## Practise
 - [Speaking practice](${o}/speaking): Part 1, 2 and 3, recorded or with the live AI examiner

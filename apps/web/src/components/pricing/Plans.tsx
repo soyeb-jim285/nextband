@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { buttonStyles, Card } from '@/components/ui';
 
 /** What a free account gets (quota.ts PLANS.community, LR_PLANS). */
-export const FREE = ['5 Writing tests a week', '10 recorded Speaking tests a month', '5 live examiner sessions a month', 'most Listening and Reading tests'];
+export const FREE = ['5 Writing tests a week', '10 recorded Speaking tests a month', '5 live examiner sessions a month', '30 Listening and 30 Reading tests'];
 /** What the paid plan adds (quota.ts PLANS.subscriber). */
 export const PAID = ['Unlimited Writing tests', 'Unlimited recorded Speaking tests', 'Live examiner: 5 a day, 40 a month', 'Every Listening and Reading test'];
 

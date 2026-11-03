@@ -74,7 +74,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
       },
       {
         h: 'Free and paid',
-        p: `Most Listening tests are free with an account. The paid plan, from 499 taka a month, opens every test. ${BANDS_NOTE}`,
+        p: `30 Listening tests are free with an account. The paid plan, from 499 taka a month, opens every test. ${BANDS_NOTE}`,
       },
     ],
   },
@@ -97,7 +97,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
       },
       {
         h: 'Free and paid',
-        p: `A number of Reading tests are free with an account. The paid plan, from 499 taka a month, opens every test. ${BANDS_NOTE}`,
+        p: `30 Reading tests, Academic and General Training, are free with an account. The paid plan, from 499 taka a month, opens every test. ${BANDS_NOTE}`,
       },
     ],
   },
@@ -131,7 +131,7 @@ export const PAGE_COPY: Record<string, PageCopy> = {
     intro:
       'Start free. The paid plan is 499 taka for 1 month or 1,199 taka for 3 months, paid once by bKash, Nagad, Rocket, Upay or card. It does not renew by itself, and an unused plan is fully refunded within 7 days.',
     sections: [
-      { h: 'Free, with an account', p: '5 Writing tests a week, 10 recorded Speaking tests a month, 5 live examiner sessions a month, and most Listening and Reading tests.' },
+      { h: 'Free, with an account', p: '5 Writing tests a week, 10 recorded Speaking tests a month, 5 live examiner sessions a month, and 30 Listening and 30 Reading tests.' },
       { h: 'Paid plan', p: 'Unlimited Writing tests, unlimited recorded Speaking tests, the live examiner up to 5 times a day and 40 times a month, and every Listening and Reading test.' },
     ],
   },
