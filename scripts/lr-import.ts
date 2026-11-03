@@ -1,6 +1,6 @@
 // Sidecars: <dir>/enrich/<slug>.json and <dir>/timings/<slug>.json (optional) are merged into the test before validation.
 // Imports Listening & Reading tests (LrTest JSON) as lr_tests rows (Cambridge = restricted to allow-listed users, generated = open to all) and uploads their assets to storage under lr/<key>.
-// Reads data/cambridge-lr/*.json and data/lr-generated/*.json (assets in <dir>/assets/<key>); PRIVATE data, never commit it.
+// Reads data/cambridge-lr/*.json, data/lr-generated/*.json and data/lr-drills/*.json (question-type drills, kind 'drill') (assets in <dir>/assets/<key>); PRIVATE data, never commit it.
 // Usage: pnpm tsx scripts/lr-import.ts [--dry] [--force] [--dev] [--retire slug,slug] [dir...]   (--dev adds the committed dev fixtures; --force imports tests that fail validation;
 //        --retire marks replaced tests retired: hidden from lists and new attempts, past results still open)
 //        A listening test whose audio files are missing is "audio pending" (PEND): always skipped, so it is never listed as playable.
@@ -14,7 +14,7 @@ const [dry, force, dev] = ['--dry', '--force', '--dev'].map((f) => args.includes
 const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const retire = args.includes('--retire') ? args[args.indexOf('--retire') + 1]!.split(',').filter(Boolean) : [];
 const dirs = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--retire');
-if (!dirs.length) dirs.push(root('data/cambridge-lr'), root('data/lr-generated'));
+if (!dirs.length) dirs.push(root('data/cambridge-lr'), root('data/lr-generated'), root('data/lr-drills'));
 if (dev) dirs.push(root('apps/server/src/test/fixtures/lr'));
 
 const MIME: Record<string, string> = { '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
@@ -85,7 +85,7 @@ for (const dir of dirs) {
         await storage.put(`lr/${k}`, readFileSync(file), MIME[extname(k).toLowerCase()] ?? 'application/octet-stream');
         uploaded++;
       }
-      const row = { skill: t.skill, variant: t.variant, source: t.source, ref: t.ref, title: t.title, data: t, restricted: t.source === 'cambridge' };
+      const row = { skill: t.skill, variant: t.variant, source: t.source, ref: t.ref, title: t.title, data: t, restricted: t.source === 'cambridge', kind: t.kind ?? 'test' };
       await db.insert(lrTests).values({ slug: t.slug, ...row }).onConflictDoUpdate({ target: lrTests.slug, set: row });
     }
     ok++;

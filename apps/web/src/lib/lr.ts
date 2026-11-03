@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import { lrTypeLabel } from '@ielts/core';
+import { DRILL_FAMILIES, drillFamilyOf, lrTypeLabel, type DrillFamily, type LrType } from '@ielts/core';
 import { call, client, type Schemas } from './api';
 
 export type LrTest = Schemas['LrTest'];
@@ -28,6 +28,13 @@ export const LR_PARTS: Record<LrSkill, number[]> = { listening: [1, 2, 3, 4], re
 /** "Part 2", "Passages 1, 3", or "Full test" when parts is null. */
 export const partsLabel = (skill: LrSkill, parts?: number[] | null) =>
   parts?.length ? `${skill === 'listening' ? 'Part' : 'Passage'}${parts.length > 1 ? 's' : ''} ${parts.join(', ')}` : 'Full test';
+
+/** A question-type drill (purpose-built, or one passage of a full test filtered to a type): its family, else null for a test. */
+export const drillOf = (a: Pick<LrAttempt, 'types' | 'test'>): DrillFamily | null =>
+  a.types?.length ? drillFamilyOf(a.types[0] as LrType) : a.test.kind === 'drill' ? drillFamilyOf(a.test.sections[0]!.groups[0]!.type as LrType) : null;
+export const drillLabel = (f: DrillFamily) => `${DRILL_FAMILIES[f].label} drill`;
+/** Starts (or resumes) the next drill of this family; returns the attempt id. */
+export const startDrill = async (family: DrillFamily) => (await call(client.POST('/api/lr/drills', { body: { family } }))).id;
 
 export type FlatQ = { n: number; part: number; group: LrGroup; q: LrQuestion };
 export const flatQuestions = (t: LrTest): FlatQ[] => t.sections.flatMap((s) => s.groups.flatMap((g) => g.questions.map((q) => ({ n: q.n, part: s.part, group: g, q }))));

@@ -2697,6 +2697,24 @@
             },
             "description": "Chosen parts (listening 1–4, reading passages 1–3); null = the whole test. Partial attempts are scored raw/total with no band."
           },
+          "types": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "gap",
+                "mcq",
+                "mcq-multi",
+                "tfng",
+                "ynng",
+                "match"
+              ]
+            },
+            "description": "Type drill on a full test: only groups of these types; null = all"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -2792,6 +2810,7 @@
           "testId",
           "mode",
           "parts",
+          "types",
           "status",
           "responses",
           "elapsedS",
@@ -3074,6 +3093,13 @@
           "title": {
             "type": "string"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "drill"
+            ],
+            "description": "drill = one passage of one question type; absent = a full test"
+          },
           "sections": {
             "type": "array",
             "items": {
@@ -3327,6 +3353,10 @@
               }
             },
             "description": "[question wording, passage wording] pairs"
+          },
+          "trap": {
+            "type": "string",
+            "description": "Drills: the trap this item sets (LR_TRAPS id)"
           }
         },
         "description": "Only after submission"
@@ -10270,6 +10300,66 @@
           },
           "404": {
             "description": "Not found (also for a Cambridge test this user may not open)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LrError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lr/drills": {
+      "post": {
+        "tags": [
+          "Listening & Reading"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a Reading question-type drill (or resume the open one of that type)",
+        "description": "Picks, in order: your unfinished drill of this type; a purpose-built drill you have not done (by slug, so tiers run A→C); else one passage of a full test, keeping only groups of this type (a passage you have not done, if any is left). Scored raw/total, no band.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "family": {
+                    "type": "string",
+                    "enum": [
+                      "tfng",
+                      "match",
+                      "gap",
+                      "mcq"
+                    ]
+                  }
+                },
+                "required": [
+                  "family"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attempt (resumed or new). Test is stripped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LrAttempt"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No passage has questions of this type",
             "content": {
               "application/json": {
                 "schema": {

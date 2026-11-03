@@ -4,6 +4,7 @@ import { BookOpen, Headphones } from 'lucide-react';
 import { useState } from 'react';
 import { GroupHeading, listStyles, RowChevron, RowIcon, rowStyles } from '@/components/bank/ListRow';
 import { MockCta } from '@/components/mock/MockCta';
+import { TypeDrills } from './TypeDrills';
 import { GuestRecent } from '@/components/dashboard/GuestRecent';
 import { Alert, Badge, Button, Dialog, EmptyState, PageContainer, PageHeader, ProgressBar, Segmented } from '@/components/ui';
 import { call, client, type Schemas } from '@/lib/api';
@@ -181,6 +182,7 @@ export function LrHub({ skill }: { skill: LrSkill }) {
       />
       <GuestRecent skill={skill} />
       <MockCta className="mb-8" />
+      {skill === 'reading' && <TypeDrills />}
       {done > 0 && (
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <p className="type-caption">{done} of {data.items.length} done</p>

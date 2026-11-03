@@ -1735,6 +1735,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lr/drills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a Reading question-type drill (or resume the open one of that type)
+         * @description Picks, in order: your unfinished drill of this type; a purpose-built drill you have not done (by slug, so tiers run A→C); else one passage of a full test, keeping only groups of this type (a passage you have not done, if any is left). Scored raw/total, no band.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        family: "tfng" | "match" | "gap" | "mcq";
+                    };
+                };
+            };
+            responses: {
+                /** @description Attempt (resumed or new). Test is stripped. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LrAttempt"];
+                    };
+                };
+                /** @description No passage has questions of this type */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LrError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lr/tests/{id}": {
         parameters: {
             query?: never;
@@ -5756,6 +5811,8 @@ export interface components {
             mode: "exam" | "practice";
             /** @description Chosen parts (listening 1–4, reading passages 1–3); null = the whole test. Partial attempts are scored raw/total with no band. */
             parts: number[] | null;
+            /** @description Type drill on a full test: only groups of these types; null = all */
+            types: ("gap" | "mcq" | "mcq-multi" | "tfng" | "ynng" | "match")[] | null;
             /** @enum {string} */
             status: "in_progress" | "submitted";
             responses: components["schemas"]["LrResponses"];
@@ -5849,6 +5906,11 @@ export interface components {
             source: "cambridge" | "generated";
             ref: string;
             title: string;
+            /**
+             * @description drill = one passage of one question type; absent = a full test
+             * @enum {string}
+             */
+            kind?: "drill";
             sections: {
                 part: number;
                 title?: string;
@@ -5913,6 +5975,8 @@ export interface components {
             };
             /** @description [question wording, passage wording] pairs */
             paraphrase?: string[][];
+            /** @description Drills: the trap this item sets (LR_TRAPS id) */
+            trap?: string;
         };
         LrError: {
             error: string;

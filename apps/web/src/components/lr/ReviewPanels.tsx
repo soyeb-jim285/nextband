@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { audioWindow, dictationDiff, dictationScore, TFNG_RULES, tfngValue, wordsBetween, type GapEntry, type LrTimings, type TfngPattern, type TfngRow, type LrStats } from '@ielts/core';
+import { audioWindow, dictationDiff, dictationScore, LR_TRAPS, TFNG_RULES, tfngValue, wordsBetween, type GapEntry, type LrTimings, type TfngPattern, type TfngRow, type LrStats } from '@ielts/core';
 import { Check, ChevronRight, Ear, Plus, Play, Volume2, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Disclosure } from '@/components/result';
@@ -83,6 +83,12 @@ export function QuestionDetail({ q, group, section, mark, entry, verdict = true,
           {entry.kind === 'spelling' && !!entry.before && <p className="text-warn-text">You've misspelt '{entry.word}' {timesText(entry.before)} before.</p>}
           {entry.kind === 'plural' && !!entry.before && <p className="text-warn-text">You've slipped on the ending of '{entry.word}' {timesText(entry.before)} before.</p>}
         </div>
+      )}
+      {r?.trap && r.trap in LR_TRAPS && (
+        // drills: name the trap, so the same one is recognised next time
+        <Block title={`The trap: ${LR_TRAPS[r.trap as keyof typeof LR_TRAPS].label}`}>
+          <p className="max-w-[68ch] text-pretty">{LR_TRAPS[r.trap as keyof typeof LR_TRAPS].explain}</p>
+        </Block>
       )}
       {r?.why && (
         <Block title="Why this is the answer">

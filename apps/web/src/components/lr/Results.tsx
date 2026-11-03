@@ -1,14 +1,14 @@
 import { useNavigate } from '@tanstack/react-router';
 import { Check, Play, RotateCcw, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { audioWindow, evidenceSpan, questionMoments, sectionParagraphs, type GapEntry, type LrTimings } from '@ielts/core';
+import { audioWindow, evidenceSpan, LR_TRAPS, questionMoments, sectionParagraphs, type GapEntry, type LrTimings } from '@ielts/core';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { RemoveAttempt } from '@/components/history/RemoveAttempt';
 import { ActionRow, Disclosure, NextSteps, NextTabButton, RankedList, ResultScaffold, ScoreHero, Section, StatusLine } from '@/components/result';
 import { Button, Segmented, Tabs } from '@/components/ui';
 import { call, client } from '@/lib/api';
 import { formatClock, formatDate, formatDuration } from '@/lib/format';
-import { accuracyBy, flatQuestions, lrProgressQuery, partsLabel, readingSeconds, typeLabel, type LrAttempt } from '@/lib/lr';
+import { accuracyBy, drillLabel, drillOf, flatQuestions, lrProgressQuery, partsLabel, readingSeconds, startDrill, typeLabel, type LrAttempt } from '@/lib/lr';
 import { useMe } from '@/lib/query';
 import { cn } from '@/lib/utils';
 import { PracticeAudio } from './Audio';
@@ -67,6 +67,30 @@ export function Results({ attempt }: { attempt: LrAttempt }) {
       setBusy(false);
     }
   };
+
+  const drill = drillOf(attempt);
+  const nextDrill = async () => {
+    setBusy(true);
+    try {
+      await navigate({ to: '/lr/run/$attemptId', params: { attemptId: await startDrill(drill!) } });
+    } finally {
+      setBusy(false);
+    }
+  };
+  // a drill with nothing to review leads with the next drill
+  const again = drill ? (
+    <Button key="r" variant={wrongCount > 0 ? 'outline' : 'primary'} loading={busy} onClick={nextDrill}>Next drill</Button>
+  ) : (
+    <Button key="r" variant="outline" icon={<RotateCcw />} loading={busy} onClick={retake}>Retake</Button>
+  );
+  // drills: wrong answers by the trap they fell for, most first
+  const traps = Object.entries(
+    flat.reduce<Record<string, number[]>>((m, f) => {
+      const t = f.q.review?.trap;
+      if (t && t in LR_TRAPS && !marks.get(f.n)?.correct) (m[t] ??= []).push(f.n);
+      return m;
+    }, {}),
+  ).sort((a, b) => b[1].length - a[1].length);
 
   const sel = selected != null ? flat.find((f) => f.n === selected) : undefined;
   const selSection = sel ? test.sections.find((s) => s.part === sel.part) : undefined;
@@ -138,27 +162,27 @@ export function Results({ attempt }: { attempt: LrAttempt }) {
   ].filter(Boolean).slice(0, 2);
   const rowsBy = (by === 'type' ? byType : byPart).map((r) => ({ label: r.label, right: r.right, total: r.total }));
   const wrongLabel = `${wrongCount} ${wrongCount === 1 ? 'mistake' : 'mistakes'}`;
-  const whole = !attempt.parts;
+  const whole = !attempt.parts && !drill;
 
   return (
     <ResultScaffold
       back={{ to: listening ? '/listening' : '/reading', label: `All ${test.skill} tests` }}
       title={test.title}
-      meta={<StatusLine items={[test.variant === 'academic' ? 'Academic' : 'General Training', attempt.parts && partsLabel(test.skill, attempt.parts), `${attempt.mode} mode`, formatDate(attempt.submittedAt ?? attempt.startedAt), time]} />}
+      meta={<StatusLine items={[test.variant === 'academic' ? 'Academic' : 'General Training', drill ? drillLabel(drill) : attempt.parts && partsLabel(test.skill, attempt.parts), `${attempt.mode} mode`, formatDate(attempt.submittedAt ?? attempt.startedAt), time]} />}
       actions={<RemoveAttempt kind="lr" id={attempt.id} title={test.title} variant="menu" onRemoved={() => void navigate({ to: listening ? '/listening' : '/reading' })} />}
       hero={
         whole ? (
           <ScoreHero value={attempt.band ?? null} label="Band" target={target} secondary={`${attempt.raw} of ${attempt.total} correct`} emptyText="No band for this attempt." />
         ) : (
           // a part on its own has no band: IELTS bands only map from all 40 questions
-          <ScoreHero unit="raw" value={attempt.raw ?? 0} total={attempt.total ?? 0} label="Score" lede={`${partsLabel(test.skill, attempt.parts!)} only. Take the full test for a band score.`} />
+          <ScoreHero unit="raw" value={attempt.raw ?? 0} total={attempt.total ?? 0} label="Score" lede={drill ? `${drillLabel(drill)}. Take a full test for a band score.` : `${partsLabel(test.skill, attempt.parts)} only. Take the full test for a band score.`} />
         )
       }
       action={
         <div className="space-y-4">
           <ActionRow
-            primary={wrongCount > 0 ? <Button onClick={toMistakes}>Review your {wrongLabel}</Button> : <Button variant="outline" icon={<RotateCcw />} loading={busy} onClick={retake}>Retake</Button>}
-            links={wrongCount > 0 ? [<Button key="r" variant="outline" icon={<RotateCcw />} loading={busy} onClick={retake}>Retake</Button>] : undefined}
+            primary={wrongCount > 0 ? <Button onClick={toMistakes}>Review your {wrongLabel}</Button> : again}
+            links={wrongCount > 0 ? [again] : undefined}
           />
           {takeaways.length > 0 && (
             <div className="max-w-[68ch] space-y-1">
@@ -187,6 +211,25 @@ export function Results({ attempt }: { attempt: LrAttempt }) {
         <div role="tabpanel" id="res-tab-panel" aria-labelledby={`res-tab-${tab}`} className="space-y-8 pt-6 sm:pt-8 md:space-y-12">
           {tab === 'overview' && (
             <>
+              {traps.length > 0 && (
+                <Section title="Traps you fell for" caption="Each wrong answer, by the trap it set. Learn to spot these and the next drill gets easier.">
+                  <ul className="space-y-4">
+                    {traps.map(([t, ns]) => (
+                      <li key={t} className="max-w-[68ch]">
+                        <p className="type-subheading">
+                          {LR_TRAPS[t as keyof typeof LR_TRAPS].label} <span className="type-num text-muted">×{ns.length}</span>
+                        </p>
+                        <p className="type-caption mt-0.5 text-pretty">{LR_TRAPS[t as keyof typeof LR_TRAPS].explain}</p>
+                        <p className="type-caption mt-1 flex flex-wrap gap-2">
+                          {ns.map((n) => (
+                            <TextButton key={n} onClick={() => openAnswer(n)}>Question {n}</TextButton>
+                          ))}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
               {causes.length > 0 && (
                 <Section title="Why you lost marks" caption={trend ?? 'Every wrong or blank answer, grouped by what went wrong. Tap a number to see that answer.'}>
                   <RankedList

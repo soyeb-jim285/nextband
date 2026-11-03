@@ -12,7 +12,7 @@ const fixture = (n: string) => JSON.parse(readFileSync(new URL(`../test/fixtures
 const ALLOWED = 'soyebjim@gmail.com';
 
 async function seed(t: LrTest) {
-  const [row] = await db.insert(lrTests).values({ slug: t.slug, skill: t.skill, variant: t.variant, source: t.source, ref: t.ref, title: t.title, data: t, restricted: t.source === 'cambridge' }).returning();
+  const [row] = await db.insert(lrTests).values({ slug: t.slug, skill: t.skill, variant: t.variant, source: t.source, ref: t.ref, title: t.title, data: t, restricted: t.source === 'cambridge', kind: t.kind ?? 'test' }).returning();
   return row!.id;
 }
 /** Answers every question of a test correctly, as the client would send them (string keys). */
@@ -381,5 +381,55 @@ describe('listening & reading review', () => {
     expect((await body(await req('/api/lr/progress', { headers: (await guestUser()).headers }))).trend).toEqual([]);
     expect((await req('/api/lr/progress')).status).toBe(401);
     expect((await req('/api/lr/spelling')).status).toBe(401);
+  });
+});
+
+describe('reading question-type drills', () => {
+  const drillTest = (): LrTest => {
+    const full = fixture('reading');
+    const s = structuredClone(full.sections[0]!);
+    s.groups = [s.groups[0]!]; // tfng 1–6
+    s.groups[0]!.questions[1]!.review = { why: 'w', trap: 'ng-unstated-comparison' };
+    return { ...full, slug: 'drill-tfng-a-01', title: 'Night bees', kind: 'drill', sections: [s] };
+  };
+
+  it('falls back to one passage of a full test with only that type, keeps it apart from the full test, scores without a band', async () => {
+    const rid = await seed(fixture('reading'));
+    const { headers } = await testUser(ALLOWED);
+    const a = await body(await req('/api/lr/drills', { headers, body: { family: 'tfng' } }));
+    expect(a.types).toEqual(['tfng', 'ynng']);
+    expect(a.parts).toHaveLength(1);
+    const groups = a.test.sections.flatMap((s: LrTest['sections'][number]) => s.groups.map((g) => g.type));
+    expect(groups.length).toBe(1);
+    expect(['tfng', 'ynng']).toContain(groups[0]);
+    // asking again resumes it
+    expect((await body(await req('/api/lr/drills', { headers, body: { family: 'tfng' } }))).id).toBe(a.id);
+    // the full test neither lists it as its resume nor resumes it
+    const item = (await body(await req('/api/lr/tests', { headers }))).items.find((t: { id: string }) => t.id === rid);
+    expect(item.attemptId).toBeNull();
+    const whole = await body(await req(`/api/lr/tests/${rid}/attempts`, { headers, body: { mode: 'practice' } }));
+    expect(whole.id).not.toBe(a.id);
+    expect(whole.types).toBeNull();
+    const s = await body(await req(`/api/lr/attempts/${a.id}/submit`, { headers, body: { responses: { [a.test.sections[0].groups[0].from]: 'TRUE' } } }));
+    expect(s.band).toBeNull();
+    expect(s.total).toBe(a.test.sections[0].groups[0].to - a.test.sections[0].groups[0].from + 1);
+  });
+
+  it('prefers a purpose-built drill, open to guests, never listed as a test; its trap comes back after submit', async () => {
+    const did = await seed(drillTest());
+    await seed(fixture('reading'));
+    const { headers } = await guestUser();
+    const a = await body(await req('/api/lr/drills', { headers, body: { family: 'tfng' } }));
+    expect(a.testId).toBe(did);
+    expect(a.test.kind).toBe('drill');
+    expect(JSON.stringify(a)).not.toContain('ng-unstated-comparison');
+    expect((await body(await req('/api/lr/tests', { headers }))).items.map((t: { id: string }) => t.id)).not.toContain(did);
+    const s = await body(await req(`/api/lr/attempts/${a.id}/submit`, { headers, body: {} }));
+    expect(s.band).toBeNull();
+    expect(s.total).toBe(6);
+    expect(s.test.sections[0].groups[0].questions[1].review.trap).toBe('ng-unstated-comparison');
+    // drill done: the next one falls back to a full-test passage
+    expect((await body(await req('/api/lr/drills', { headers, body: { family: 'tfng' } }))).types).toEqual(['tfng', 'ynng']);
+    expect((await req('/api/lr/drills', { headers, body: { family: 'nope' } })).status).toBe(400);
   });
 });

@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { analyseAttempt, CAUSES, lrTypeLabel, maskWord, pickParts, residualGaps, scoreLr, stripAnswers, tfngPattern, type CauseFamily, type GapEntry, type LrAnalysis, type LrTest } from '@ielts/core';
-import { and, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
+import { analyseAttempt, CAUSES, DRILL_FAMILIES, lrTypeLabel, maskWord, pickParts, residualGaps, scoreLr, stripAnswers, tfngPattern, type CauseFamily, type GapEntry, type LrAnalysis, type LrTest, type LrType } from '@ielts/core';
+import { and, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { aiGapReasons } from '../ai/lr-mistakes';
 import { currentUser, isCambridgeAllowed, isOwner, requireUser } from '../auth';
@@ -13,8 +13,10 @@ import type { App } from '../types';
 import { insertCards } from './cards';
 
 /** The one place a Listening & Reading attempt row is created (the normal start and the full mock test). */
-export const insertLrAttempt = (userId: string, testId: string, mode: 'exam' | 'practice', parts: number[] | null) =>
-  db.insert(lrAttempts).values({ userId, testId, mode, parts }).returning().then((r) => r[0]!);
+export const insertLrAttempt = (userId: string, testId: string, mode: 'exam' | 'practice', parts: number[] | null, types: LrType[] | null = null) =>
+  db.insert(lrAttempts).values({ userId, testId, mode, parts, types }).returning().then((r) => r[0]!);
+/** Drills, type drills and part attempts are scored raw/total only: a band needs the whole 40-question test. */
+const noBand = (a: { parts: number[] | null; types: LrType[] | null }, t: { kind: string }) => !!(a.parts || a.types || t.kind === 'drill');
 
 /** Where importer-uploaded assets live in storage (scripts/lr-import.ts). */
 export const lrAssetKey = (key: string) => `lr/${key}`;
@@ -50,7 +52,8 @@ async function openSlugs(u: Viewer): Promise<{ cambridge: boolean; slugs: string
 /** A replaced test keeps its plan: gen-l-01-v2 counts as gen-l-01. */
 const baseSlug = (slug: string) => slug.replace(/-v\d+$/, '');
 const baseSlugSql = sql`regexp_replace(${lrTests.slug}, '-v[0-9]+$', '')`;
-export async function canOpen(t: { restricted: boolean; slug: string }, u: Viewer) {
+export async function canOpen(t: { restricted: boolean; slug: string; kind?: string }, u: Viewer) {
+  if (t.kind === 'drill' && !t.restricted) return true; // drills are open on every plan
   const a = await openSlugs(u);
   return a.cambridge || (!t.restricted && (!a.slugs || a.slugs.includes(baseSlug(t.slug))));
 }
@@ -65,13 +68,14 @@ export async function lrCounts(u: Viewer) {
   const rows = await db
     .select({ skill: lrTests.skill, open: sql<number>`(count(*) filter (where ${where ?? sql`true`}))::int`, total: sql<number>`(count(*) filter (where ${where ? sql`not ${lrTests.restricted}` : sql`true`}))::int` })
     .from(lrTests)
-    .where(eq(lrTests.retired, false))
+    .where(and(eq(lrTests.retired, false), eq(lrTests.kind, 'test')))
     .groupBy(lrTests.skill);
   const of = (skill: 'listening' | 'reading') => rows.find((r) => r.skill === skill) ?? { open: 0, total: 0 };
   return { listening: { open: of('listening').open, total: of('listening').total }, reading: { open: of('reading').open, total: of('reading').total } };
 }
 
 const Option = z.object({ key: z.string(), text: z.string() });
+const GroupType = z.enum(['gap', 'mcq', 'mcq-multi', 'tfng', 'ynng', 'match']);
 const QuestionReview = z
   .object({
     evidence: z.string().optional(),
@@ -79,6 +83,7 @@ const QuestionReview = z
     why: z.string().optional(),
     wrong: z.record(z.string(), z.string()).optional(),
     paraphrase: z.array(z.array(z.string())).optional().openapi({ description: '[question wording, passage wording] pairs' }),
+    trap: z.string().optional().openapi({ description: 'Drills: the trap this item sets (LR_TRAPS id)' }),
   })
   .openapi('LrQuestionReview');
 const Stats = z
@@ -123,6 +128,7 @@ const LrTestSchema = z
     source: Source,
     ref: z.string(),
     title: z.string(),
+    kind: z.enum(['drill']).optional().openapi({ description: 'drill = one passage of one question type; absent = a full test' }),
     sections: z.array(
       z.object({
         part: z.number(),
@@ -136,7 +142,7 @@ const LrTestSchema = z
           z.object({
             from: z.number(),
             to: z.number(),
-            type: z.enum(['gap', 'mcq', 'mcq-multi', 'tfng', 'ynng', 'match']),
+            type: GroupType,
             instructions: z.string(),
             wordLimit: z.string().optional(),
             title: z.string().optional(),
@@ -182,6 +188,7 @@ const AttemptSchema = z
     testId: z.string(),
     mode: Mode,
     parts: Parts,
+    types: z.array(GroupType).nullable().openapi({ description: 'Type drill on a full test: only groups of these types; null = all' }),
     status: Status,
     responses: Responses,
     elapsedS: z.number(),
@@ -248,12 +255,13 @@ async function ownAttempt(id: string, user: { id: string; email: string; emailVe
 type AttemptRow = typeof lrAttempts.$inferSelect;
 async function toAttempt(a: AttemptRow, t: typeof lrTests.$inferSelect) {
   const done = a.status === 'submitted';
-  const test = pickParts(t.data, a.parts);
+  const test = pickParts(t.data, a.parts, a.types);
   return {
     id: a.id,
     testId: a.testId,
     mode: a.mode,
     parts: a.parts ?? null,
+    types: a.types ?? null,
     status: a.status,
     responses: a.responses as Record<string, string>,
     elapsedS: a.elapsedS,
@@ -291,14 +299,14 @@ export function register(app: App) {
           sizes: sql<Record<string, number>>`(select jsonb_object_agg(s->>'part', (select count(*) from jsonb_array_elements(s->'groups') g, jsonb_array_elements(g->'questions'))) from jsonb_array_elements(${lrTests.data}->'sections') s)`,
         })
         .from(lrTests)
-        .where(and(await visibleWhere(user), eq(lrTests.retired, false), q.skill ? eq(lrTests.skill, q.skill) : undefined, q.variant ? eq(lrTests.variant, q.variant) : undefined, q.source ? eq(lrTests.source, q.source) : undefined))
+        .where(and(await visibleWhere(user), eq(lrTests.retired, false), eq(lrTests.kind, 'test'), q.skill ? eq(lrTests.skill, q.skill) : undefined, q.variant ? eq(lrTests.variant, q.variant) : undefined, q.source ? eq(lrTests.source, q.source) : undefined))
         .orderBy(lrTests.ref);
       const mine = user ? await db.select().from(lrAttempts).where(eq(lrAttempts.userId, user.id)).orderBy(desc(lrAttempts.startedAt)) : [];
       const byTest = new Map<string, typeof mine>();
       for (const a of mine) byTest.set(a.testId, [...(byTest.get(a.testId) ?? []), a]);
       const items = rows.map(({ sizes, ...t }) => {
         const as = byTest.get(t.id) ?? [];
-        const open = as.find((a) => a.status === 'in_progress');
+        const open = as.find((a) => a.status === 'in_progress' && !a.types); // a type drill on this test is not this test's resume
         const subs = as.filter((a) => a.status === 'submitted');
         return {
           ...t,
@@ -356,11 +364,65 @@ export function register(app: App) {
       if (parts?.some((p) => !have.includes(p))) throw new HTTPException(400, { message: 'This test has no such part' });
       // every part chosen = the whole test (keeps the band)
       const chosen = parts && have.some((p) => !parts.includes(p)) ? [...new Set(parts)].sort((x, y) => x - y) : null;
-      const mineOpen = and(eq(lrAttempts.userId, user.id), eq(lrAttempts.testId, t.id), eq(lrAttempts.status, 'in_progress'));
+      const mineOpen = and(eq(lrAttempts.userId, user.id), eq(lrAttempts.testId, t.id), eq(lrAttempts.status, 'in_progress'), isNull(lrAttempts.types));
       const open = await db.query.lrAttempts.findFirst({ where: mineOpen });
       if (fresh && open) await db.delete(lrAttempts).where(mineOpen);
       const a = (!fresh && open) || await insertLrAttempt(user.id, t.id, mode, chosen);
       return c.json(await toAttempt(a, t), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/api/lr/drills',
+      ...common,
+      summary: 'Start a Reading question-type drill (or resume the open one of that type)',
+      description:
+        'Picks, in order: your unfinished drill of this type; a purpose-built drill you have not done (by slug, so tiers run A→C); else one passage of a full test, keeping only groups of this type (a passage you have not done, if any is left). Scored raw/total, no band.',
+      request: { body: { content: { 'application/json': { schema: z.object({ family: z.enum(['tfng', 'match', 'gap', 'mcq']) }) } }, required: true } },
+      responses: { 200: json(AttemptSchema, 'Attempt (resumed or new). Test is stripped.'), 404: json(ErrorSchema, 'No passage has questions of this type') },
+    }),
+    async (c) => {
+      const user = currentUser(c);
+      const types = [...DRILL_FAMILIES[c.req.valid('json').family].types] as LrType[];
+      const firstType = sql`(t.data->'sections'->0->'groups'->0->>'type')`;
+      const rows = <T>(q: SQL) => db.execute(q).then((r) => r as unknown as T[]);
+      // 1. resume: an open drill of this family (purpose-built, or a type drill with exactly these types)
+      const [resume] = await rows<{ id: string }>(sql`
+        select a.id from lr_attempts a join lr_tests t on t.id = a.test_id
+        where a.user_id = ${user.id} and a.status = 'in_progress'
+          and ((t.kind = 'drill' and ${firstType} in ${types}) or a.types = ${JSON.stringify(types)}::jsonb)
+        order by a.started_at desc limit 1`);
+      if (resume) {
+        const { a, t } = await ownAttempt(resume.id, user);
+        return c.json(await toAttempt(a, t), 200);
+      }
+      // 2. a purpose-built drill not tried yet. ponytail: slug order (tier A→C); aim at the learner's worst trap once drills are plentiful
+      const [drill] = await rows<{ id: string }>(sql`
+        select t.id from lr_tests t
+        where t.kind = 'drill' and t.skill = 'reading' and not t.retired and not t.restricted and ${firstType} in ${types}
+          and not exists (select 1 from lr_attempts a where a.test_id = t.id and a.user_id = ${user.id})
+        order by t.slug limit 1`);
+      if (drill) {
+        const t = (await db.query.lrTests.findFirst({ where: eq(lrTests.id, drill.id) }))!;
+        return c.json(await toAttempt(await insertLrAttempt(user.id, t.id, 'practice', null), t), 200);
+      }
+      // 3. one passage of a full test this plan opens, only this type's groups; skip tests with an open attempt (one open attempt per test)
+      const open = await openSlugs(user);
+      const passage = (fresh: boolean) =>
+        rows<{ id: string; part: number }>(sql`
+          select t.id, (s->>'part')::int as part from lr_tests t, jsonb_array_elements(t.data->'sections') s
+          where t.skill = 'reading' and t.kind = 'test' and not t.retired
+            ${open.cambridge ? sql`` : sql`and not t.restricted`} ${open.slugs ? sql`and regexp_replace(t.slug, '-v[0-9]+$', '') in ${open.slugs}` : sql``}
+            and exists (select 1 from jsonb_array_elements(s->'groups') g where g->>'type' in ${types})
+            and not exists (select 1 from lr_attempts a where a.test_id = t.id and a.user_id = ${user.id} and a.status = 'in_progress')
+            ${fresh ? sql`and not exists (select 1 from lr_attempts a where a.test_id = t.id and a.user_id = ${user.id} and (a.parts is null or a.parts @> jsonb_build_array((s->>'part')::int)))` : sql``}
+          order by random() limit 1`);
+      const pick = (await passage(true))[0] ?? (await passage(false))[0];
+      if (!pick) throw new HTTPException(404, { message: 'No passage has questions of this type yet' });
+      const t = (await db.query.lrTests.findFirst({ where: eq(lrTests.id, pick.id) }))!;
+      return c.json(await toAttempt(await insertLrAttempt(user.id, t.id, 'practice', [pick.part], types), t), 200);
     },
   );
 
@@ -444,7 +506,7 @@ export function register(app: App) {
       const { responses, elapsedS, stats } = c.req.valid('json');
       await db
         .update(lrAttempts)
-        .set({ responses: cleanResponses(responses, pickParts(t.data, a.parts)), elapsedS, ...(stats && { stats: keepAudio(stats, a.stats) }) })
+        .set({ responses: cleanResponses(responses, pickParts(t.data, a.parts, a.types)), elapsedS, ...(stats && { stats: keepAudio(stats, a.stats) }) })
         .where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'in_progress')));
       return c.json({ savedAt: new Date().toISOString() }, 200);
     },
@@ -467,7 +529,7 @@ export function register(app: App) {
       const { a, t } = await ownAttempt(c.req.valid('param').id, currentUser(c));
       if (a.status !== 'in_progress') throw new HTTPException(409, { message: 'Attempt already submitted' });
       const body = c.req.valid('json') ?? {};
-      const test = pickParts(t.data, a.parts);
+      const test = pickParts(t.data, a.parts, a.types);
       const responses = cleanResponses(body.responses ?? (a.responses as Record<string, string>), test);
       const score = scoreLr(test, Object.fromEntries(Object.entries(responses).map(([k, v]) => [+k, v])));
       const user = currentUser(c);
@@ -479,7 +541,7 @@ export function register(app: App) {
       // status guard in WHERE: two concurrent submits cannot both score
       const [row] = await db
         .update(lrAttempts)
-        .set({ status: 'submitted', responses, elapsedS: body.elapsedS ?? a.elapsedS, submittedAt: new Date(), raw: score.raw, total: score.total, band: a.parts ? null : score.band, marks: score.marks, analysis, stats: body.stats ? keepAudio(body.stats, a.stats) : a.stats })
+        .set({ status: 'submitted', responses, elapsedS: body.elapsedS ?? a.elapsedS, submittedAt: new Date(), raw: score.raw, total: score.total, band: noBand(a, t) ? null : score.band, marks: score.marks, analysis, stats: body.stats ? keepAudio(body.stats, a.stats) : a.stats })
         .where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'in_progress')))
         .returning();
       if (!row) throw new HTTPException(409, { message: 'Attempt already submitted' });
@@ -537,7 +599,7 @@ export function register(app: App) {
             select t.id, t.title, (select coalesce(jsonb_agg(jsonb_build_object('type', g->>'type', 'title', g->>'title', 'instructions', g->>'instructions', 'options', g->'options', 'image', g->>'image', 'n', jsonb_array_length(g->'questions'))), '[]'::jsonb)
               from jsonb_array_elements(t.data->'sections') s, jsonb_array_elements(s->'groups') g) as groups
             from lr_tests t
-            where t.skill = ${weakest[0].skill} ${open.cambridge ? sql`` : sql`and t.restricted = false`} ${open.slugs ? sql`and regexp_replace(t.slug, '-v[0-9]+$', '') in ${open.slugs}` : sql``}
+            where t.skill = ${weakest[0].skill} and t.kind = 'test' ${open.cambridge ? sql`` : sql`and t.restricted = false`} ${open.slugs ? sql`and regexp_replace(t.slug, '-v[0-9]+$', '') in ${open.slugs}` : sql``}
               and not exists (select 1 from lr_attempts a where a.test_id = t.id and a.user_id = ${user.id} and a.status = 'submitted' and a.parts is null)
           `)) as unknown as { id: string; title: string; groups: { type: 'gap'; title?: string; instructions: string; options?: unknown; image?: unknown; n: number }[] }[])
         : [];

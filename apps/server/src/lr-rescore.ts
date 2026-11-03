@@ -10,7 +10,7 @@ const dry = process.argv.includes('--dry');
 const rows = await db.select({ a: lrAttempts, t: lrTests }).from(lrAttempts).innerJoin(lrTests, eq(lrTests.id, lrAttempts.testId)).where(eq(lrAttempts.status, 'submitted'));
 let changed = 0;
 for (const { a, t } of rows) {
-  const test = pickParts(t.data, a.parts);
+  const test = pickParts(t.data, a.parts, a.types);
   const responses = Object.fromEntries(Object.entries((a.responses ?? {}) as Record<string, string>).map(([k, v]) => [+k, v]));
   const score = scoreLr(test, responses);
   if (score.raw === a.raw) continue;
@@ -19,7 +19,7 @@ for (const { a, t } of rows) {
   if (dry) continue;
   // ponytail: no prior-mistake counts here (the "missed before" hints of the original submit are not rebuilt)
   const analysis = analyseAttempt(test, score.marks, responses);
-  await db.update(lrAttempts).set({ raw: score.raw, band: a.parts ? null : score.band, marks: score.marks, analysis }).where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'submitted')));
+  await db.update(lrAttempts).set({ raw: score.raw, band: a.parts || a.types || t.kind === 'drill' ? null : score.band, marks: score.marks, analysis }).where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'submitted')));
 }
 console.log(`${dry ? 'would re-mark' : 're-marked'} ${changed} of ${rows.length} attempts`);
 await sql.end();

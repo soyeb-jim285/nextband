@@ -197,7 +197,7 @@ const pickLr = async (userId: string, skill: 'listening' | 'reading', variant: '
     await db
       .select({ id: lrTests.id })
       .from(lrTests)
-      .where(and(eq(lrTests.skill, skill), eq(lrTests.retired, false), where))
+      .where(and(eq(lrTests.skill, skill), eq(lrTests.retired, false), eq(lrTests.kind, 'test'), where))
       .orderBy(
         sql`exists(select 1 from lr_attempts a where a.test_id = "lr_tests".id and a.user_id = ${userId} and a.status = 'submitted')`,
         ...(skill === 'listening' ? [sql`(${lrTests.variant} = ${variant}) desc`] : []),
@@ -251,7 +251,7 @@ export function register(app: App) {
         db.select({ ref: mockExams.ref }).from(mockExams).where(eq(mockExams.userId, user.id)),
         db.execute(sql`select (
             exists (select 1 from lr_tests where skill = 'listening' and source = 'generated')
-            and exists (select 1 from lr_tests where skill = 'reading' and source = 'generated' and variant = ${variant})
+            and exists (select 1 from lr_tests where skill = 'reading' and source = 'generated' and kind = 'test' and variant = ${variant})
             and exists (select 1 from prompts where skill = 'writing' and source = 'generated' and part = 1 and variant = ${variant})
             and exists (select 1 from prompts where skill = 'writing' and source = 'generated' and part = 2)
             and exists (select 1 from prompts where skill = 'speaking' and source = 'generated' and part = 2)) as ok`),

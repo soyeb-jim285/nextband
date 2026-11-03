@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkEndsAt, expandAnswer, isCorrect, lrBand, normalizeLrContent, scoreLr, stripAnswers, validateLrTest, type LrTest } from './lr';
+import { checkEndsAt, expandAnswer, isCorrect, lrBand, normalizeLrContent, pickParts, scoreLr, stripAnswers, validateLrTest, type LrGroup, type LrTest } from './lr';
 
 describe('answer matching', () => {
   it('expands optional words', () => expect(expandAnswer('(the) old (town) hall').sort()).toEqual(['old hall', 'old town hall', 'the old hall', 'the old town hall']));
@@ -100,5 +100,35 @@ describe('checkEndsAt', () => {
     const s = stripAnswers(t('you now have one minute to check your answers'.split(' ')));
     expect(s.checkEndsAt).toBe(Math.round(100.5 + 8 + 60));
     expect(s.sections[1]!.timings).toBeUndefined();
+  });
+});
+
+describe('type drills', () => {
+  const g = (from: number, n: number, type: LrGroup['type']): LrGroup => ({
+    from, to: from + n - 1, type, instructions: `Questions ${from}–${from + n - 1}.`,
+    questions: Array.from({ length: n }, (_, i) => ({ n: from + i, text: 's', answer: [type === 'ynng' ? 'YES' : 'TRUE'] })),
+  });
+  const passage = { title: 'P', paragraphs: [{ text: 'x' }] };
+  const full: LrTest = { slug: 't', skill: 'reading', variant: 'academic', source: 'generated', ref: 'R', title: 'T', sections: [
+    { part: 1, passage, groups: [g(1, 7, 'tfng'), g(8, 6, 'gap')] },
+    { part: 2, passage, groups: [g(14, 13, 'gap')] },
+    { part: 3, passage, groups: [g(27, 8, 'gap'), g(35, 6, 'ynng')] },
+  ] };
+
+  it('pickParts keeps only groups of the chosen types and drops empty parts', () => {
+    const t = pickParts(full, null, ['tfng', 'ynng']);
+    expect(t.sections.map((s) => [s.part, s.groups.map((x) => x.type)])).toEqual([[1, ['tfng']], [3, ['ynng']]]);
+    expect(pickParts(full, [3], ['tfng', 'ynng']).sections.flatMap((s) => s.groups.map((x) => x.from))).toEqual([35]);
+    expect(pickParts(full, [1])).toEqual({ ...full, sections: [full.sections[0]] });
+  });
+
+  it('validates a drill as one passage of one question family', () => {
+    const drill: LrTest = { ...full, kind: 'drill', sections: [{ part: 1, passage, groups: [g(1, 7, 'tfng')] }] };
+    expect(validateLrTest(drill)).toEqual([]);
+    expect(validateLrTest({ ...drill, sections: [{ part: 1, passage, groups: [g(1, 4, 'tfng'), g(5, 3, 'ynng')] }] })).toEqual([]); // same family
+    expect(validateLrTest({ ...drill, sections: [{ part: 1, passage, groups: [g(1, 4, 'tfng'), g(5, 3, 'gap')] }] }).join()).toMatch(/mixes/);
+    const bad = structuredClone(drill);
+    bad.sections[0]!.groups[0]!.questions[0]!.review = { trap: 'nope' };
+    expect(validateLrTest(bad).join()).toMatch(/unknown trap/);
   });
 });

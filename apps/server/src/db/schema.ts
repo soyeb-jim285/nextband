@@ -270,6 +270,8 @@ export const lrTests = pgTable('lr_tests', {
   restricted: boolean('restricted').notNull().default(true),
   /** Replaced by a newer version: hidden from lists and new attempts, still readable for past results. */
   retired: boolean('retired').notNull().default(false),
+  /** 'drill': a one-passage, one-question-type practice set (LrTest.kind); kept out of test lists, mocks and plan counts. */
+  kind: text('kind').$type<'test' | 'drill'>().notNull().default('test'),
   createdAt: createdAt(),
 }, (t) => [index('lr_tests_skill_source_idx').on(t.skill, t.source)]);
 
@@ -289,6 +291,7 @@ export const lrAttempts = pgTable('lr_attempts', {
   marks: jsonb('marks').$type<import('@ielts/core').LrMark[]>(),
   stats: jsonb('stats').$type<import('@ielts/core').LrStats>(), // runner pacing: seconds per part, answer changes, late answers
   analysis: jsonb('analysis').$type<import('@ielts/core').LrAnalysis>(), // deterministic review of the submit (gap mistake labels, TFNG rows, accuracy by type)
+  types: jsonb('types').$type<import('@ielts/core').LrType[]>(), // type drill on a full test: only groups of these types (with `parts`); null = every type. Gets no band.
   parts: jsonb('parts').$type<number[]>(), // chosen parts (listening 1–4, reading passages 1–3); null = the whole test. Partial attempts get no band.
 }, (t) => [
   index('lr_attempts_user_started_idx').on(t.userId, t.startedAt),

@@ -42,6 +42,8 @@ export interface LrQuestionReview {
   wrong?: Record<string, string>;
   /** question wording ↔ passage/transcript wording, e.g. ["decline", "fell sharply"] */
   paraphrase?: [string, string][];
+  /** drills: which trap the item sets (an LR_TRAPS id), shown with the answer and counted for the next drill */
+  trap?: string;
 }
 export interface LrVocab { word: string; meaning: string; example?: string }
 /** listening word timings for one part: [word, start s, end s] */
@@ -91,6 +93,8 @@ export interface LrTest {
   ref: string;
   title: string;
   sections: LrSection[];
+  /** 'drill': a short one-passage practice set of one question type (see DRILL_FAMILIES); absent = a full test */
+  kind?: 'drill';
   /** listening, stripped copy only: when the answer-checking time the recording announces at its end runs out, in seconds into the last part's audio (see checkEndsAt) */
   checkEndsAt?: number;
 }
@@ -208,10 +212,50 @@ export function lrBand(skill: LrSkill, variant: 'academic' | 'general', raw: num
   return roundBand(table.find(([min]) => r >= min)?.[1] ?? 0);
 }
 
-/** Only the chosen parts (listening 1–4, reading passages 1–3); null / empty = the whole test. Question numbers keep their place (Part 2 is 11–20). */
-export function pickParts(test: LrTest, parts?: number[] | null): LrTest {
-  return parts?.length ? { ...test, sections: test.sections.filter((s) => parts.includes(s.part)) } : test;
+/**
+ * Only the chosen parts (listening 1–4, reading passages 1–3); null / empty = the whole test. Question numbers keep their place (Part 2 is 11–20).
+ * `types` (a type drill on a full test) also keeps only the groups of those types, and drops parts left with none.
+ */
+export function pickParts(test: LrTest, parts?: number[] | null, types?: LrType[] | null): LrTest {
+  const t = parts?.length ? { ...test, sections: test.sections.filter((s) => parts.includes(s.part)) } : test;
+  if (!types?.length) return t;
+  return { ...t, sections: t.sections.map((s) => ({ ...s, groups: s.groups.filter((g) => types.includes(g.type)) })).filter((s) => s.groups.length) };
 }
+
+/** Question-type drills: what the learner picks → the group types it covers. */
+export const DRILL_FAMILIES = {
+  tfng: { label: 'True / False / Not Given', types: ['tfng', 'ynng'] },
+  match: { label: 'Matching', types: ['match'] },
+  gap: { label: 'Completion', types: ['gap'] },
+  mcq: { label: 'Multiple choice', types: ['mcq', 'mcq-multi'] },
+} as const satisfies Record<string, { label: string; types: LrType[] }>;
+export type DrillFamily = keyof typeof DRILL_FAMILIES;
+export const drillFamilyOf = (type: LrType): DrillFamily => (Object.keys(DRILL_FAMILIES) as DrillFamily[]).find((f) => (DRILL_FAMILIES[f].types as readonly LrType[]).includes(type))!;
+
+/**
+ * Traps a drill item can set (docs/question-audit/reading-drills-authoring.md). `explain` is shown under a wrong answer;
+ * ids are stable (stored in sidecars and counted per learner), labels may change.
+ */
+export const LR_TRAPS = {
+  // TRUE / FALSE / NOT GIVEN and YES / NO / NOT GIVEN
+  'true-paraphrase': { family: 'tfng', label: 'True, but reworded', explain: 'The statement says the same thing as the passage in different words. Match the meaning, not the words.' },
+  'false-number': { family: 'tfng', label: 'Changed number or name', explain: 'One detail (a number, date or name) differs from the passage. Check every detail, not just the topic.' },
+  'false-qualifier': { family: 'tfng', label: 'Changed qualifier', explain: 'A word like all, some, always, usually, only or first changes the claim. The passage says something weaker or stronger.' },
+  'false-comparison': { family: 'tfng', label: 'Reversed comparison or direction', explain: 'The statement flips more/less, rise/fall, before/after or cause/effect. The passage says the opposite.' },
+  'false-cause': { family: 'tfng', label: 'Wrong cause', explain: 'The passage gives a different reason for what happened.' },
+  'ng-unstated-comparison': { family: 'tfng', label: 'Comparison never made', explain: 'Both things are mentioned, but the passage never compares them. With no comparison stated, the answer is NOT GIVEN.' },
+  'ng-unstated-superlative': { family: 'tfng', label: '"First", "most" or "only" never stated', explain: 'The passage describes it but never says it was the first, the most or the only one. That claim is NOT GIVEN.' },
+  'ng-unstated-reason': { family: 'tfng', label: 'Reason never given', explain: 'The event is in the passage, but no reason is given for it. A plausible reason is still NOT GIVEN.' },
+  'ng-reused-words': { family: 'tfng', label: 'Familiar words, new claim', explain: 'The statement reuses words from the passage, but the passage never makes this claim. Familiar words are not evidence.' },
+  'ng-outside-knowledge': { family: 'tfng', label: 'True in real life, not in the text', explain: 'It may be true in the real world, but the passage does not say it. Answer from the passage only.' },
+  'no-writer-rejects': { family: 'tfng', label: 'Writer rejects a view others hold', explain: 'Someone in the passage holds this view, but the writer argues against it, so the answer is NO.' },
+  'ng-others-view': { family: 'tfng', label: "Someone else's view, not the writer's", explain: 'The passage reports this view from someone else, and the writer neither agrees nor disagrees. That is NOT GIVEN.' },
+  // Matching headings
+  'heading-detail': { family: 'match', label: 'Heading fits a detail, not the main idea', explain: 'The paragraph mentions this, but it is not what the whole paragraph is about. A heading matches the main idea.' },
+  'heading-keyword': { family: 'match', label: 'Keyword match', explain: 'This heading shares a word with the paragraph, but not its meaning. Read for the point of the paragraph, not repeated words.' },
+  'heading-scope': { family: 'match', label: 'Close heading, wrong scope', explain: 'Two headings are similar, but differ in scope: cause or effect, problem or solution, past or future. Check which one the paragraph covers.' },
+} as const satisfies Record<string, { family: DrillFamily; label: string; explain: string }>;
+export type LrTrap = keyof typeof LR_TRAPS;
 
 // "You now have ten minutes to transfer your answers" (Cambridge books, the paper test), "one minute to check", "half a minute"
 const ANNOUNCED: [RegExp, number][] = [[/\bhalf a minute\b|\b(thirty|30) seconds\b/, 30], [/\b(ten|10) minutes\b/, 600], [/\b(two|2) minutes\b/, 120], [/\b(a|one|1) minute\b/, 60]];
@@ -244,7 +288,12 @@ export function validateLrTest(t: LrTest): string[] {
   const errs: string[] = [];
   const nums = t.sections.flatMap((s) => s.groups.flatMap((g) => g.questions.map((q) => q.n)));
   nums.forEach((n, i) => { if (n !== i + 1) errs.push(`question numbers not contiguous at ${n} (expected ${i + 1})`); });
-  if (nums.length !== 40) errs.push(`${nums.length} questions (expected 40)`);
+  if (t.kind === 'drill' ? t.sections.length !== 1 || nums.length < 4 || nums.length > 13 : nums.length !== 40)
+    errs.push(t.kind === 'drill' ? `drill: ${t.sections.length} passages, ${nums.length} questions (expected 1 passage, 4–13 questions)` : `${nums.length} questions (expected 40)`);
+  if (t.kind === 'drill') {
+    const fams = new Set(t.sections.flatMap((s) => s.groups.map((g) => drillFamilyOf(g.type))));
+    if (fams.size !== 1) errs.push(`drill mixes question types: ${[...fams].join(', ')}`);
+  }
   if (t.skill === 'listening' && t.sections.some((s) => !s.audio)) errs.push('listening section without audio');
   if (t.skill === 'reading' && t.sections.some((s) => !s.passage?.paragraphs.length)) errs.push('reading section without passage');
   for (const s of t.sections) for (const g of s.groups) {
@@ -259,6 +308,7 @@ export function validateLrTest(t: LrTest): string[] {
       if ((g.type === 'match' || g.type === 'mcq-multi' || (g.type === 'gap' && g.options)) && ans.some((a) => !keys.has(a.toUpperCase()))) errs.push(`Q${q.n}: answer not among group options`);
       if (g.type === 'tfng' && ans.some((a) => !['TRUE', 'FALSE', 'NOT GIVEN'].includes(a.toUpperCase()))) errs.push(`Q${q.n}: bad TFNG answer`);
       if (g.type === 'ynng' && ans.some((a) => !['YES', 'NO', 'NOT GIVEN'].includes(a.toUpperCase()))) errs.push(`Q${q.n}: bad YNNG answer`);
+      if (q.review?.trap && !(q.review.trap in LR_TRAPS)) errs.push(`Q${q.n}: unknown trap "${q.review.trap}"`);
     }
   }
   return errs;

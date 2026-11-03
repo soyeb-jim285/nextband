@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { Alert, Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Popover, Segmented, Sheet, toast } from '@/components/ui';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { formatClock, plural } from '@/lib/format';
-import { clockAlert, flatQuestions, isAnswered, lsGet, lsSet, partsLabel, readingClock, readingSeconds, type LrAttempt, type LrMark, type LrSection } from '@/lib/lr';
+import { clockAlert, drillLabel, drillOf, flatQuestions, isAnswered, lsGet, lsSet, partsLabel, readingClock, readingSeconds, type LrAttempt, type LrMark, type LrSection } from '@/lib/lr';
 import { cn } from '@/lib/utils';
 import { ExamAudioControls, PracticeAudio, useExamPlaylist } from './Audio';
 import { Navigator, type NavPart } from './Navigator';
@@ -364,9 +364,9 @@ export function Runner({ attempt, mockId }: { attempt: LrAttempt; mockId?: strin
           </Button>
           <div className="hidden min-w-0 leading-tight md:block">
             <p className="truncate text-sm font-semibold tracking-tight">
-              {test.title}, {listening ? 'Part' : 'Passage'} {section.part}
+              {test.title}{test.kind === 'drill' ? '' : `, ${listening ? 'Part' : 'Passage'} ${section.part}`}
             </p>
-            <p className="type-caption truncate">{exam ? 'Exam mode' : 'Practice mode'}{attempt.parts ? `, ${partsLabel(test.skill, attempt.parts)}` : ''}</p>
+            <p className="type-caption truncate">{drillOf(attempt) ? drillLabel(drillOf(attempt)!) : <>{exam ? 'Exam mode' : 'Practice mode'}{attempt.parts ? `, ${partsLabel(test.skill, attempt.parts)}` : ''}</>}</p>
           </div>
         </div>
         <div className="flex shrink-0 justify-center">{clock}</div>
