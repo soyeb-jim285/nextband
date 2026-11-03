@@ -34,9 +34,6 @@ const useRecentAttempts = () => {
 };
 
 function SpeakingHome() {
-  // No attempts yet: the first action is a single part, so that list leads (order-first) and the full modes follow.
-  const list = useRecentAttempts();
-  const fresh = !useAccount() || (list.isSuccess && list.data.items.length === 0);
   const live = useQuota().data?.live !== false; // unknown while loading counts as open, so the card does not flash a lock
   const q = useQuestionSource('speaking');
   const { source } = q;
@@ -56,11 +53,12 @@ function SpeakingHome() {
             link={{ to: '/speaking/live', search: { source } }}
             tone="live"
             icon={<AudioLines />}
-            kind="Live, spoken conversation"
+            kind={live ? 'Recommended: live, spoken conversation' : 'Live, spoken conversation'}
             title="Live examiner"
             body="An AI examiner asks the questions aloud, listens, and follows up on what you say, like the real interview. The whole test is scored at the end."
             meta="11-14 min, needs a microphone"
             cta="Talk to the examiner"
+            primary={live}
             note={live ? <QuotaNote skill="speaking" />  : <p className="type-caption flex items-center gap-1.5"><Lock className="size-3.5" aria-hidden />Not available right now</p>}
           />
           <ModeCard
@@ -71,12 +69,13 @@ function SpeakingHome() {
             body="All three parts in order, like test day. A recorded examiner asks each question, you record your answer, and every part is scored plus an overall band."
             meta="11-14 min, recorded"
             cta="Start full test"
+            primary={!live}
             note={<QuotaNote skill="speaking" />}
           />
         </section>
 
-        <section aria-labelledby="one-h" className={cn(fresh && 'order-first')}>
-          <PanelHeader id="one-h" title={fresh ? 'Start with one part' : 'Or practise one part'} meta={<QuotaNote skill="speaking" />} />
+        <section aria-labelledby="one-h">
+          <PanelHeader id="one-h" title="Or practise one part" meta={<QuotaNote skill="speaking" />} />
           <ul className={cn(listStyles, 'stagger')}>
             {PARTS.map((p) => (
               <li key={p.mode}>
@@ -106,7 +105,7 @@ const MODE_TONE = {
   test: { card: 'border-line bg-[color-mix(in_oklab,var(--surface-2)_75%,var(--surface))]', icon: 'text-ink' },
   live: { card: 'border-brand/25 bg-[color-mix(in_oklab,var(--accent-soft)_70%,var(--surface))]', icon: 'text-accent-text' },
 };
-function ModeCard({ link, tone = 'test', icon, kind, title, body, meta, cta, note }: { link: LinkProps; tone?: keyof typeof MODE_TONE; icon: ReactNode; kind: string; title: string; body: string; meta: string; cta: string; note?: ReactNode }) {
+function ModeCard({ link, tone = 'test', icon, kind, title, body, meta, cta, note, primary }: { primary?: boolean; link: LinkProps; tone?: keyof typeof MODE_TONE; icon: ReactNode; kind: string; title: string; body: string; meta: string; cta: string; note?: ReactNode }) {
   const t = MODE_TONE[tone];
   return (
     <div className={cn('flex flex-col gap-6 rounded-lg border p-6 sm:p-7', t.card)}>
@@ -122,7 +121,7 @@ function ModeCard({ link, tone = 'test', icon, kind, title, body, meta, cta, not
       </div>
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <span className="type-caption type-num">{meta}</span>
-        <Link {...link} className={buttonStyles({ variant: 'outline' })}>
+        <Link {...link} className={buttonStyles({ variant: primary ? undefined : 'outline' })}>
           {cta}
           <ArrowRight aria-hidden />
         </Link>

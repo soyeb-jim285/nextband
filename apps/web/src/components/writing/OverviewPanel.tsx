@@ -31,7 +31,7 @@ export function lastTryLine(overall: number, parent: number) {
 const sentences = (s: string) => s.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)?.map((x) => x.trim()) ?? [s];
 
 /** Overview tab: alert, fixes first, then one row per criterion (first sentence of the advice, the rest and the evidence behind "Show details"). */
-export function OverviewPanel({ result, order, target, alert, capNote }: { result: AnalysisResult; order: CriterionKey[]; target: number; alert?: ReactNode; capNote?: string }) {
+export function OverviewPanel({ result, order, target, alert, capNote, next }: { next?: ReactNode; result: AnalysisResult; order: CriterionKey[]; target: number; alert?: ReactNode; capNote?: string }) {
   const { pulls, weakest } = bandSummary(result, order, capNote);
   const items: CriterionItem[] = order.flatMap((k) => {
     const c = result.criteria[k];
@@ -81,10 +81,12 @@ export function OverviewPanel({ result, order, target, alert, capNote }: { resul
       {alert}
       <Section title="Summary" caption={pulls}>
         <CriteriaStrip layout="rows" items={items} />
+        {next}
       </Section>
       {result.topFixes.length > 0 && (
         <Section title={result.topFixes.length === 1 ? 'One thing to fix next' : `${result.topFixes.length} things to fix next`}>
           <FixList items={result.topFixes} />
+          {next}
         </Section>
       )}
     </>

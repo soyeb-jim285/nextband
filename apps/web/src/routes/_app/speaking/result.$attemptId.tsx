@@ -6,7 +6,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 're
 import { KeepResult, RefundNote } from '@/components/community/KeepResult';
 import { RemoveAttempt } from '@/components/history/RemoveAttempt';
 import { AnalyzingState, FailedState } from '@/components/results';
-import { ActionRow, CriteriaStrip, FixList, DetailField, InfoNote, ResultScaffold, ScoreHero, Section, StatusLine, type CriterionItem } from '@/components/result';
+import { ActionRow, CriteriaStrip, FixList, DetailField, InfoNote, NextSteps, NextTabButton, ResultScaffold, ScoreHero, Section, StatusLine, type CriterionItem } from '@/components/result';
 import { AudioBar, useAudio } from '@/components/speaking/AudioBar';
 import { CueCard } from '@/components/speaking/CueCard';
 import { ImprovePanel, useAddFixes, type AddFixes } from '@/components/speaking/ImprovePanel';
@@ -216,7 +216,7 @@ function ResultPage() {
       }
     >
       <div role="tabpanel" id="res-panel" aria-labelledby={`res-${tab}`} tabIndex={-1}>
-        <Panel tab={tab} a={a} timeline={timeline} target={target} audio={audio.controls} off={off} lean={lean} onLean={onLean} deck={deck} />
+        <Panel tab={tab} a={a} timeline={timeline} target={target} audio={audio.controls} off={off} lean={lean} onLean={onLean} deck={deck} onTab={setTab} />
       </div>
     </ResultScaffold>
   );
@@ -274,7 +274,7 @@ function RetryLine({ result }: { result: AnalysisResult }) {
 }
 
 /** Overview: the four criteria (weakest opens first), then what to fix next. */
-function Overview({ result: r, target, off, deck }: { result: AnalysisResult; target: number; off: ReturnType<typeof offTopicAnswers>; deck: AddFixes }) {
+function Overview({ result: r, target, off, deck, next }: { next?: ReactNode; result: AnalysisResult; target: number; off: ReturnType<typeof offTopicAnswers>; deck: AddFixes }) {
   const bands = SPEAKING_CRITERIA.filter((k) => r.criteria[k]).map((k) => ({ k, band: r.criteria[k]!.band }));
   const low = bands.reduce((m, x) => (x.band < m.band ? x : m), bands[0] ?? { k: SPEAKING_CRITERIA[0]!, band: 0 });
   const spread = bands.length ? Math.max(...bands.map((x) => x.band)) - low.band : 0;
@@ -338,21 +338,37 @@ function Overview({ result: r, target, off, deck }: { result: AnalysisResult; ta
       )}
       <Section title="Summary" caption={spread >= 2 ? `${criterionLabel(low.k)} (${formatBand(low.band)}) pulls the overall ${formatBand(avg)} down. Fix it first.` : 'Your four criteria, each against your target. The tick on a bar is the target.'}>
         <CriteriaStrip layout="rows" items={items} />
+        {next}
       </Section>
       {r.topFixes.length > 0 && (
         <Section title={r.topFixes.length === 1 ? 'One thing to fix next' : `${r.topFixes.length} things to fix next`}>
           <FixList items={r.topFixes.map((f) => ({ title: f.title, why: f.why, before: f.before, after: f.after }))} onAddAll={deck.add} added={deck.added} />
+          {next}
         </Section>
       )}
     </div>
   );
 }
 
-function Panel({ tab, a, timeline, target, audio, off, lean, onLean, deck }: { lean: RepeatedWord | null; onLean: (w: RepeatedWord | null) => void; tab: Tab; a: Attempt; timeline?: Timeline; target: number; audio: ReturnType<typeof useAudio>['controls']; off: ReturnType<typeof offTopicAnswers>; deck: AddFixes }) {
+function Panel({ tab, a, timeline, target, audio, off, lean, onLean, deck, onTab }: { onTab: (t: Tab) => void; lean: RepeatedWord | null; onLean: (w: RepeatedWord | null) => void; tab: Tab; a: Attempt; timeline?: Timeline; target: number; audio: ReturnType<typeof useAudio>['controls']; off: ReturnType<typeof offTopicAnswers>; deck: AddFixes }) {
   const r = a.analysis!;
   switch (tab) {
     case 'overview':
-      return <Overview result={r} target={target} off={off} deck={deck} />;
+      return (
+        <div className="space-y-8 md:space-y-12">
+          <Overview result={r} target={target} off={off} deck={deck} next={<NextTabButton tab={{ label: r.errors.length ? `See your ${r.errors.length} mistakes in the transcript` : 'See your marked transcript', desc: '', onOpen: () => onTab('transcript') }} />} />
+          <NextSteps
+            skill="speaking"
+            tabs={[
+              { label: 'Transcript', desc: 'Every mistake marked in what you said, with the fix.', count: r.errors.length, onOpen: () => onTab('transcript') },
+              ...(r.metrics && timeline ? [{ label: 'Fluency', desc: 'Your pauses, fillers and speaking speed on a timeline.', onOpen: () => onTab('fluency') }] : []),
+              { label: 'Language', desc: 'Vocabulary range, repeated words and grammar patterns.', onOpen: () => onTab('language') },
+              ...(r.pronunciation?.audio ? [{ label: 'Pronunciation', desc: 'Words that were hard to understand, to listen back to.', count: r.pronunciation.audio.words.length, onOpen: () => onTab('pronunciation') }] : []),
+              { label: 'Improve', desc: 'Better versions of your answers and what to practise next.', onOpen: () => onTab('improve') },
+            ]}
+          />
+        </div>
+      );
     case 'transcript':
       return <Transcript result={r} audio={audio} lean={lean} onClear={() => onLean(null)} />;
     case 'fluency':

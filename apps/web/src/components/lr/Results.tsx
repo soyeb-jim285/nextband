@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { audioWindow, evidenceSpan, questionMoments, sectionParagraphs, type GapEntry, type LrTimings } from '@ielts/core';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { RemoveAttempt } from '@/components/history/RemoveAttempt';
-import { ActionRow, Disclosure, RankedList, ResultScaffold, ScoreHero, Section, StatusLine } from '@/components/result';
+import { ActionRow, Disclosure, NextSteps, NextTabButton, RankedList, ResultScaffold, ScoreHero, Section, StatusLine } from '@/components/result';
 import { Button, Segmented, Tabs } from '@/components/ui';
 import { call, client } from '@/lib/api';
 import { formatClock, formatDate, formatDuration } from '@/lib/format';
@@ -211,6 +211,7 @@ export function Results({ attempt }: { attempt: LrAttempt }) {
                   />
                 </Section>
               )}
+              {wrongCount > 0 && <div><NextTabButton tab={{ label: `See your ${wrongCount} wrong answers`, desc: '', onOpen: toMistakes }} /></div>}
               <Section
                 title="Where you lost marks"
                 caption={weak ? `Weakest: ${weak.label.toLowerCase()}, ${weak.right} of ${weak.total} right.` : undefined}
@@ -241,6 +242,13 @@ export function Results({ attempt }: { attempt: LrAttempt }) {
                   )}
                 </div>
               )}
+              <NextSteps
+                skill={test.skill}
+                tabs={[
+                  { label: 'Answers', desc: 'Every question with your answer, the right one, and why.', count: wrongCount, onOpen: () => setTab('answers') },
+                  { label: listening ? 'Transcript' : 'Passage', desc: listening ? 'Replay any part and see where each answer is spoken.' : 'See where each answer is in the passage.', onOpen: () => setTab('context') },
+                ]}
+              />
             </>
           )}
 

@@ -6,6 +6,7 @@ export { CriteriaStrip, DetailField, type CriterionItem } from './CriteriaStrip'
 export { Disclosure } from './Disclosure';
 export { FixList, type FixItem } from './FixList';
 export { InfoNote } from './InfoNote';
+export { NextSteps, NextTabButton, type DeeperTab } from './NextSteps';
 export { RankedList, rankRows, type RankedRow } from './RankedList';
 export { ResultScaffold } from './ResultScaffold';
 export { ScoreHero, gapLine, formatRangeCapped } from './ScoreHero';

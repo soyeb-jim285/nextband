@@ -5,7 +5,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Check, FileText, RotateCcw } from 'lucide-react';
 import { RemoveAttempt } from '@/components/history/RemoveAttempt';
-import { ActionRow, CriteriaStrip, gapLine, ScoreHero, Section, StatusLine, ResultScaffold } from '@/components/result';
+import { ActionRow, CriteriaStrip, gapLine, NextSteps, NextTabButton, ScoreHero, Section, StatusLine, ResultScaffold } from '@/components/result';
 import { AnalyzingState, FailedState } from '@/components/results';
 import { Alert, Badge, Button, buttonStyles, EmptyState, PageContainer, PageHeader, Segmented, Skeleton, StickyTabs, Tabs, toast } from '@/components/ui';
 import { DiffView } from '@/components/writing/DiffView';
@@ -240,7 +240,18 @@ function Done({ a, r, offTopic, under, tab, setTab, target, capNote }: { a: Atte
   );
   return (
     <div key={tab} role="tabpanel" id="wr-panel" aria-labelledby={`wr-${tab}`} className="page-enter space-y-8 md:space-y-12">
-      {tab === 'overview' && <OverviewPanel result={r} order={WRITING_CRITERIA} target={target} alert={alert} capNote={capNote} />}
+      {tab === 'overview' && <OverviewPanel result={r} order={WRITING_CRITERIA} target={target} alert={alert} capNote={capNote} next={<NextTabButton tab={{ label: r.errors.length ? `See your ${r.errors.length} mistakes in the essay` : 'See your marked essay', desc: '', onOpen: () => setTab('essay') }} />} />}
+      {tab === 'overview' && (
+        <NextSteps
+          skill="writing"
+          tabs={[
+            { label: 'Essay', desc: 'Every mistake marked in your text, with the fix.', count: r.errors.length, onOpen: () => setTab('essay') },
+            { label: 'Structure', desc: 'How each paragraph works and where the argument breaks.', onOpen: () => setTab('structure') },
+            { label: 'Language', desc: 'Vocabulary range, repeated words and grammar patterns.', onOpen: () => setTab('language') },
+            { label: 'Improve', desc: 'A stronger version of your answer and what to practise next.', onOpen: () => setTab('improve') },
+          ]}
+        />
+      )}
       {tab === 'essay' &&
         (text.trim() ? (
           <EssayHighlights text={text} errors={r.errors} lean={lean} onClear={() => setLean(null)} />
