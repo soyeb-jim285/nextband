@@ -21,7 +21,7 @@ for (const s of t.sections) {
   for (const g of s.groups) {
     out.push('-'.repeat(72), g.instructions);
     if (g.title) out.push('', g.title);
-    if (g.image) out.push(`[image: data/${cam ? "cambridge-lr" : "lr-generated"}/assets/${g.image}]`);
+    if (g.image) out.push(`[image: data/${cam ? "cambridge-lr" : slug.startsWith("drill-") ? "lr-drills" : "lr-generated"}/assets/${g.image}]`);
     if (g.content) out.push('', gap(g.content));
     if (g.options) out.push('', ...g.options.map((o) => (o.text === o.key ? o.key : `${o.key}  ${o.text}`)));
     out.push('');

@@ -1,14 +1,14 @@
 // @ts-nocheck -- ponytail: offline checker over loosely-typed agent JSON (like gen-lr.ts); strict index checks add noise, not safety.
 // Deterministic (no AI, no network) end-to-end check of ONE agent-written Reading test: data/lr-generated/<slug>.json
 // plus its sidecar data/lr-generated/enrich/<slug>.json (and any diagram asset). Standard: docs/question-audit/reading-authoring.md.
-// Drills (slug drill-<tfng|match>-<a|b|c>-NN, files in data/lr-drills/): one short passage of one question type, a trap on every item.
+// Drills (slug drill-<sub>-<a|b|c>-NN, sub in DRILL_SUBS, files in data/lr-drills/): one short passage of one question type, a trap on every item.
 //        Standard: docs/question-audit/reading-drills-authoring.md. Same command.
 // Usage: pnpm tsx scripts/reading-agent-check.ts <slug> [slug ...]   -> ERROR lines fail (exit 1), WARN lines are advisory.
 //        pnpm tsx scripts/reading-agent-check.ts <slug> --solved answers.json   also compares a blind solver's answers {"1":"Ethiopia",...} with the key.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { canonAnswerText, drillFamilyOf, expandAnswer, LR_TRAPS, normalizeLrTest, scoreLr, validateLrTest } from '../packages/core/src/lr';
+import { canonAnswerText, drillFamilyOf, type DrillFamily, expandAnswer, LR_TRAPS, normalizeLrTest, scoreLr, validateLrTest } from '../packages/core/src/lr';
 
 const ROOT = join(import.meta.dirname, '..');
 const TESTS = process.env.LR_DIR ?? join(ROOT, 'data/lr-generated'); // LR_DIR: only for testing the checker on scratch copies
@@ -22,7 +22,7 @@ const NUMW = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'ei
 // [hard min, target min, target max, hard max] words per passage/section (docs/question-audit/reading.md)
 const WORDS = { academic: [[650, 700, 880, 1000], [700, 780, 900, 1000], [700, 800, 950, 1000]], general: [[450, 550, 720, 800], [500, 650, 800, 900], [500, 750, 900, 950]] };
 // ponytail: common US spellings only; extend when a review finds another
-const US = /\b(colou?r(?<!colour)s?|center(s|ed)?|behavior\w*|favorite\w*|neighbor\w*|labor(?!at)\w*|theater\w*|gray|defense|travel(ed|ing|er|ers)|analyz\w*|(organ|real|recogn|special|emphas|minim|critic|apolog|priorit|summar|categor|util)iz\w*|\w+ization)\b/gi;
+const US = /\b(colou?r(?<!colour)s?|center(s|ed)?|behavior\w*|favorite\w*|neighbor\w*|labor(?!at|ious)\w*|theater\w*|gray|defense|travel(ed|ing|er|ers)|analyz\w*|(organ|real|recogn|special|emphas|minim|critic|apolog|priorit|summar|categor|util)iz\w*|\w+ization)\b/gi;
 
 /** Every other original test and drill: passages must not repeat across both. */
 function others(slug: string) {
@@ -31,15 +31,30 @@ function others(slug: string) {
   })).filter(Boolean);
 }
 
+/** Drill subtypes: slug part → group kind(s), question count, passage words [hard min, target min, target max, hard max], paragraphs, trap id prefix, min distinct traps. */
+const DRILL_SUBS: Record<string, { fam: DrillFamily; kinds: string[]; q: [number, number]; words: [number, number, number, number]; paras: [number, number]; trap: RegExp; minTraps: number }> = {
+  tfng: { fam: 'tfng', kinds: ['tfng', 'ynng'], q: [6, 8], words: [220, 250, 400, 450], paras: [3, 6], trap: /^(true|false|ng|no)-/, minTraps: 4 },
+  match: { fam: 'match', kinds: ['headings'], q: [5, 7], words: [330, 380, 500, 550], paras: [5, 7], trap: /^heading-/, minTraps: 2 },
+  minfo: { fam: 'match', kinds: ['matchinfo'], q: [5, 7], words: [330, 380, 500, 550], paras: [5, 7], trap: /^info-/, minTraps: 2 },
+  mfeat: { fam: 'match', kinds: ['matchfeat'], q: [5, 7], words: [280, 320, 480, 530], paras: [4, 7], trap: /^feature-/, minTraps: 2 },
+  mend: { fam: 'match', kinds: ['endings'], q: [5, 6], words: [250, 280, 450, 500], paras: [3, 6], trap: /^ending-/, minTraps: 2 },
+  mcq: { fam: 'mcq', kinds: ['mcq', 'mcq-multi'], q: [5, 7], words: [280, 320, 480, 530], paras: [3, 6], trap: /^mcq-/, minTraps: 3 },
+  sent: { fam: 'gap', kinds: ['completion'], q: [6, 8], words: [250, 280, 450, 500], paras: [3, 6], trap: /^gap-/, minTraps: 2 },
+  summ: { fam: 'gap', kinds: ['completion', 'wordbox', 'table'], q: [6, 8], words: [250, 280, 450, 500], paras: [3, 6], trap: /^gap-/, minTraps: 2 },
+  diag: { fam: 'gap', kinds: ['diagram'], q: [5, 7], words: [220, 250, 420, 470], paras: [3, 6], trap: /^gap-/, minTraps: 2 },
+  short: { fam: 'gap', kinds: ['short'], q: [5, 7], words: [250, 280, 450, 500], paras: [3, 6], trap: /^gap-/, minTraps: 2 },
+};
+
 function check(slug: string): boolean {
   const E: string[] = [], W: string[] = [];
   const err = (m: string) => E.push(m), warn = (m: string) => W.push(m);
-  const dm = slug.match(/^drill-(tfng|match)-([abc])-(\d{2})$/);
+  const dm = slug.match(new RegExp(`^drill-(${Object.keys(DRILL_SUBS).join('|')})-([abc])-(\\d{2})$`));
+  const sub = dm ? DRILL_SUBS[dm[1]] : undefined;
   const drill = slug.startsWith('drill-');
   DIR = drill ? DRILLS : TESTS;
   const file = join(DIR, `${slug}.json`);
   const m = drill ? null : slug.match(/^gen-r(g?)-(\d{2,3})$/);
-  if (drill ? !dm : !m) err(drill ? `drill slug must be drill-<tfng|match>-<a|b|c>-NN (got ${slug})` : `slug must be gen-r-NN or gen-rg-NN (got ${slug})`);
+  if (drill ? !dm : !m) err(drill ? `drill slug must be drill-<${Object.keys(DRILL_SUBS).join('|')}>-<a|b|c>-NN (got ${slug})` : `slug must be gen-r-NN or gen-rg-NN (got ${slug})`);
   if (!existsSync(file)) { console.log(`${slug}\n  ERROR ${file} not found`); return false; }
   let t: any;
   try { t = JSON.parse(readFileSync(file, 'utf8')); } catch (e) { console.log(`${slug}\n  ERROR invalid JSON: ${(e as Error).message}`); return false; }
@@ -93,16 +108,17 @@ function check(slug: string): boolean {
     const P = s.part, paras: any[] = s.passage?.paragraphs ?? [], groups: any[] = s.groups ?? [];
     groupsTotal += groups.length;
     const nq = groups.reduce((a, g) => a + g.questions.length, 0);
-    const hd = dm?.[1] === 'match'; // headings drills: one question per paragraph
-    if (drill ? (hd ? nq < 5 || nq > 7 : nq < 6 || nq > 8) : nq < 13 || nq > 14) err(`P${P}: ${nq} questions (${drill ? (hd ? '5-7 per headings drill' : '6-8 per drill') : '13 or 14 per passage'})`);
-    if (drill ? groups.length !== 1 : groups.length < 2 || groups.length > 4) (drill ? err : warn)(`P${P}: ${groups.length} question groups (${drill ? 'a drill has one' : 'Cambridge: 2-4'})`);
-    if (drill && groups.some((g) => drillFamilyOf(g.type) !== dm?.[1])) err(`a ${dm?.[1]} drill holds only ${dm?.[1]} questions`);
+    const [q0, q1] = sub?.q ?? [6, 8];
+    if (drill ? nq < q0 || nq > q1 : nq < 13 || nq > 14) err(`P${P}: ${nq} questions (${drill ? `${q0}-${q1} per ${dm?.[1]} drill` : '13 or 14 per passage'})`);
+    const maxG = dm?.[1] === 'mcq' ? 2 : 1; // mcq: single-answer group + one choose-TWO pair
+    if (drill ? groups.length < 1 || groups.length > maxG : groups.length < 2 || groups.length > 4) (drill ? err : warn)(`P${P}: ${groups.length} question groups (${drill ? `a ${dm?.[1]} drill has ${maxG === 1 ? 'one' : 'one or two'}` : 'Cambridge: 2-4'})`);
+    const fam = sub?.fam;
     // passage text, words, layout
     const wc = words(paras.map((p) => p.text).join(' '));
-    const [h0, t0, t1, h1] = drill ? (hd ? [330, 380, 500, 550] : [220, 250, 400, 450]) : (WORDS[variant][P - 1] ?? [0, 0, 1e9, 1e9]);
+    const [h0, t0, t1, h1] = drill ? (sub?.words ?? [220, 250, 400, 450]) : (WORDS[variant][P - 1] ?? [0, 0, 1e9, 1e9]);
     if (wc < h0 || wc > h1) err(`P${P}: ${wc} words (allowed ${h0}-${h1}, target ${t0}-${t1})`);
     else if (wc < t0 || wc > t1) warn(`P${P}: ${wc} words (target ${t0}-${t1})`);
-    if (!gt && (drill ? (hd ? paras.length < 5 || paras.length > 7 : paras.length < 3 || paras.length > 6) : paras.length < 5 || paras.length > 10)) warn(`P${P}: ${paras.length} paragraphs (${drill ? (hd ? '5-7' : '3-6') : '5-10'})`);
+    if (!gt && (drill ? paras.length < (sub?.paras[0] ?? 3) || paras.length > (sub?.paras[1] ?? 6) : paras.length < 5 || paras.length > 10)) warn(`P${P}: ${paras.length} paragraphs (${drill ? sub?.paras.join('-') : '5-10'})`);
     if (gt && P < 3 && paras.length < 10) warn(`S${P}: ${paras.length} paragraphs (GT sections 1-2 are many short blocks, each text with its own short title paragraph)`);
     // renderers know only "### Title" paragraphs (GT text headings) and "• " bullet lines; anything else shows literally
     const md = paras.flatMap((p, i) => (/\*\*|\{\{|__/.test(p.text) || (/^\s*#/.test(p.text) && !/^### \S/.test(p.text)) ? [i + 1] : []));
@@ -130,6 +146,8 @@ function check(slug: string): boolean {
       const ins = g.instructions ?? '', id = `Q${g.from}-${g.to}`, qs: any[] = g.questions;
       const kind = g.type === 'match' ? (/heading/i.test(`${ins} ${g.title ?? ''}`) ? 'headings' : /which (paragraph|section)/i.test(ins) ? 'matchinfo' : /ending/i.test(ins) ? 'endings' : 'matchfeat')
         : g.type === 'gap' ? (g.image ? 'diagram' : g.options ? 'wordbox' : /\|/.test(g.content ?? '') ? 'table' : !g.content ? 'short' : 'completion') : g.type;
+      if (drill && sub && !sub.kinds.includes(kind)) err(`${id}: a ${dm?.[1]} drill holds ${sub.kinds.join(' or ')} questions (this group is ${kind})`);
+      if (drill && fam && drillFamilyOf(g.type) !== fam) err(`${id}: ${g.type} is not a ${fam} type`);
       // instructions
       const pre = g.from === g.to ? `Question ${g.from}.` : g.to === g.from + 1 ? `Questions ${g.from} and ${g.to}.` : `Questions ${g.from}–${g.to}.`;
       if (!ins.startsWith(pre)) err(`${id}: instructions must start "${pre}"`);
@@ -207,8 +225,7 @@ function check(slug: string): boolean {
         if (!r) { if (side) err(`Q${q.n}: no review in sidecar`); continue; }
         if (drill) {
           const tr = LR_TRAPS[r.trap];
-          if (!tr) err(`Q${q.n}: drill item needs "trap" (one of: ${Object.keys(LR_TRAPS).filter((k) => LR_TRAPS[k].family === dm?.[1]).join(', ')})`);
-          else if (tr.family !== dm?.[1]) err(`Q${q.n}: trap "${r.trap}" is a ${tr.family} trap`);
+          if (!tr || !sub?.trap.test(r.trap)) err(`Q${q.n}: drill item needs "trap" (one of: ${Object.keys(LR_TRAPS).filter((k) => sub?.trap.test(k)).join(', ')}; got ${r.trap ?? 'none'})`);
           else if (g.type === 'tfng' || g.type === 'ynng') {
             const want = r.trap.startsWith('true') ? ['TRUE'] : r.trap.startsWith('false') ? ['FALSE'] : r.trap.startsWith('no-') ? ['NO'] : ['NOT GIVEN'];
             if (r.trap === 'true-paraphrase' && g.type === 'ynng') want.push('YES');
@@ -220,7 +237,8 @@ function check(slug: string): boolean {
         else if (words(r.why) > 45) err(`Q${q.n}: "why" is ${words(r.why)} words (max 45)`);
         const okKeys = g.type === 'tfng' ? ['TRUE', 'FALSE', 'NOT GIVEN'] : g.type === 'ynng' ? ['YES', 'NO', 'NOT GIVEN'] : (q.options ?? g.options ?? []).map((o) => o.key);
         for (const [k, v] of Object.entries(r.wrong ?? {})) {
-          if (!okKeys.includes(k)) err(`Q${q.n}: wrong["${k}"] is not an option`);
+          const typed = g.type === 'gap' && !g.options; // typed answers: wrong["<tempting word>"] explains a likely wrong entry
+          if (!typed && !okKeys.includes(k)) err(`Q${q.n}: wrong["${k}"] is not an option`);
           if ((q.answer ?? []).includes(k)) err(`Q${q.n}: wrong["${k}"] is the key`);
           if (words(v as string) > 30) err(`Q${q.n}: wrong["${k}"] over 30 words`);
         }
@@ -247,7 +265,7 @@ function check(slug: string): boolean {
     }
     if (drill) {
       const used = new Set(groups.flatMap((g) => g.questions.map((q) => rev[q.n]?.trap)).filter(Boolean));
-      const need = hd ? 2 : 4; // only 3 headings traps exist
+      const need = sub?.minTraps ?? 4;
       if (used.size < need) err(`a drill needs at least ${need} different traps (has ${used.size}: ${[...used].join(', ')})`);
     }
     // vocab

@@ -398,12 +398,14 @@ export function register(app: App) {
         const { a, t } = await ownAttempt(resume.id, user);
         return c.json(await toAttempt(a, t), 200);
       }
-      // 2. a purpose-built drill not tried yet. ponytail: slug order (tier A→C); aim at the learner's worst trap once drills are plentiful
+      // 2. a purpose-built drill not tried yet. Slug drill-<subtype>-<tier>-<NN>: tier A→C, and subtypes interleaved
+      // (headings a-01, information a-01, endings a-01, … a-02) so a family card rotates its question types.
+      // ponytail: aim at the learner's worst trap once drills are plentiful
       const [drill] = await rows<{ id: string }>(sql`
         select t.id from lr_tests t
         where t.kind = 'drill' and t.skill = 'reading' and not t.retired and not t.restricted and ${firstType} in ${types}
           and not exists (select 1 from lr_attempts a where a.test_id = t.id and a.user_id = ${user.id})
-        order by t.slug limit 1`);
+        order by split_part(t.slug, '-', 3), split_part(t.slug, '-', 4), t.slug limit 1`);
       if (drill) {
         const t = (await db.query.lrTests.findFirst({ where: eq(lrTests.id, drill.id) }))!;
         return c.json(await toAttempt(await insertLrAttempt(user.id, t.id, 'practice', null), t), 200);

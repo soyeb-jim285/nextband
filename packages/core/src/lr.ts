@@ -254,6 +254,31 @@ export const LR_TRAPS = {
   'heading-detail': { family: 'match', label: 'Heading fits a detail, not the main idea', explain: 'The paragraph mentions this, but it is not what the whole paragraph is about. A heading matches the main idea.' },
   'heading-keyword': { family: 'match', label: 'Keyword match', explain: 'This heading shares a word with the paragraph, but not its meaning. Read for the point of the paragraph, not repeated words.' },
   'heading-scope': { family: 'match', label: 'Close heading, wrong scope', explain: 'Two headings are similar, but differ in scope: cause or effect, problem or solution, past or future. Check which one the paragraph covers.' },
+  // Matching information (which paragraph contains…)
+  'info-paraphrase': { family: 'match', label: 'Information in other words', explain: 'The paragraph gives this information without the words in the question. Look for the meaning, not the keywords.' },
+  'info-keyword': { family: 'match', label: 'Keyword in the wrong paragraph', explain: 'Another paragraph repeats words from the question but does not give this information. Familiar words point to the wrong place.' },
+  'info-kind': { family: 'match', label: 'Right topic, wrong kind of information', explain: 'The question asks for a specific kind of information, such as an example, a reason or a comparison. Another paragraph covers the topic but not that kind.' },
+  // Matching features (people, dates, places)
+  'feature-paraphrase': { family: 'match', label: 'View in other words', explain: 'The person said this, but in different words. Match the idea, not the wording.' },
+  'feature-nearby': { family: 'match', label: 'Named nearby, said by someone else', explain: 'This name appears close to the idea, but the idea belongs to someone else. Check who actually says it.' },
+  'feature-opposite': { family: 'match', label: 'Person said the opposite', explain: 'This person is linked to the topic but holds the opposite view. Check what each person concludes.' },
+  // Matching sentence endings
+  'ending-grammar': { family: 'match', label: 'Fits the grammar, not the meaning', explain: 'The ending makes a correct sentence, but it does not say what the passage says. Check the meaning, not just the grammar.' },
+  'ending-reused-words': { family: 'match', label: 'Familiar words, wrong ending', explain: 'The ending uses words from the passage, but from a different point. Familiar words are not evidence.' },
+  'ending-half-right': { family: 'match', label: 'Half right', explain: 'The ending matches part of the passage but changes the cause, the result or the scope. The whole sentence must match.' },
+  // Completion (sentence, summary, note, table, flow-chart, diagram, short answer)
+  'gap-word-form': { family: 'gap', label: 'Right idea, wrong word form', explain: 'The word is the right idea but the wrong form (singular or plural, noun or verb). The completed sentence must be grammatical.' },
+  'gap-word-limit': { family: 'gap', label: 'Over the word limit', explain: 'The full phrase from the passage is longer than the limit. Keep only the words the gap needs.' },
+  'gap-nearby-word': { family: 'gap', label: 'Nearby word, wrong gap', explain: 'A word close to the answer in the passage also fits the grammar, but not the meaning of the gap. Read the whole sentence around it.' },
+  'gap-paraphrase': { family: 'gap', label: 'Gap behind a paraphrase', explain: 'The words around the gap are a paraphrase, so the answer sits under different words in the passage. Match the meaning to find the place.' },
+  'gap-box-synonym': { family: 'gap', label: 'Word box: synonym needed', explain: 'The answer in the box is a synonym, not the word the passage uses. Look for the box word that means the same.' },
+  'gap-box-distractor': { family: 'gap', label: 'Word box: fits, but wrong', explain: 'Another word in the box fits the grammar and the topic, but the passage says something different.' },
+  // Multiple choice
+  'mcq-keyword': { family: 'mcq', label: 'Option repeats passage words', explain: 'The option uses words from the passage but says something the passage does not. Familiar words are not evidence.' },
+  'mcq-partial': { family: 'mcq', label: 'Only partly true', explain: 'Part of the option matches the passage, but another part does not. Every part of the option must be right.' },
+  'mcq-true-not-answer': { family: 'mcq', label: 'True, but not the answer', explain: 'The option is true according to the passage, but it does not answer this question. Check what the question asks.' },
+  'mcq-opposite': { family: 'mcq', label: 'Opposite of the passage', explain: 'The option reverses what the passage says, for example increase instead of decrease.' },
+  'mcq-too-strong': { family: 'mcq', label: 'Too strong', explain: 'The option says all, always or only where the passage says some, often or one of. It claims more than the passage does.' },
 } as const satisfies Record<string, { family: DrillFamily; label: string; explain: string }>;
 export type LrTrap = keyof typeof LR_TRAPS;
 
