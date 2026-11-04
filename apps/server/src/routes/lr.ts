@@ -298,7 +298,7 @@ export function register(app: App) {
       const a = await db.query.lrAttempts.findFirst({ where: and(eq(lrAttempts.id, card.attemptId), eq(lrAttempts.userId, uid)) });
       const gap = a?.analysis?.gaps.find((g) => g.word === word);
       const t = gap && (await db.query.lrTests.findFirst({ where: eq(lrTests.id, a!.testId) }));
-      if (!t || t.skill !== 'listening') return none();
+      if (!t || t.skill !== 'listening' || !(await canOpen(t, currentUser(c)))) return none(); // same gate as opening the test
       const section = t.data.sections.find((s) => s.groups.some((g) => g.questions.some((q) => q.n === gap!.n)));
       const q = section?.groups.flatMap((g) => g.questions).find((q) => q.n === gap!.n);
       const w = section?.audio && q ? audioWindow(section, q) : null;
