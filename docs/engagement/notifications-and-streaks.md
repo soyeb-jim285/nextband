@@ -111,6 +111,7 @@ A 10% **holdout group** gets no engagement notifications at all, only results an
   - Tapping it opens the streak page.
   - When the streak is at risk, the line becomes "Ends at midnight: a 2-minute drill saves it" with a Drill button.
 - **Streak page:** a **6-month heatmap** with month labels, plus the week strip, freezes, milestone progress and the longest streak.
+- **Android, after the 2026-11 redesign** (apps/android/DESIGN.md has the detail): the Today card sits first on Today with a compact **12-week** heatmap (squares capped at 16dp so the mock hero stays in view) and the line "N practice days in the last 12 weeks · Longest L", so the count matches the map. The streak page shows **13 weeks** that fill the width without scrolling. Web still follows the bullets above.
 
 **Daily celebration.** It appears the first time each day the student finishes something that counts, as a bottom sheet over the result or drill summary:
 - The flame grows from N−1 to N with the count, and the week strip fills in today.
