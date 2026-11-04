@@ -11,6 +11,7 @@ import { env } from './env';
 import { ApiError, type ErrorCode } from './errors';
 import { burstOk } from './ratelimit';
 import type { AppEnv } from './types';
+import { sendLimitEmail } from './upgrade-emails';
 
 /** What a quota counts: a writing test, a recorded speaking practice test, or a live examiner session (LiveKit). */
 export type Skill = 'speaking' | 'writing' | 'examiner';
@@ -142,7 +143,10 @@ export async function checkStart(p: Payer, skill: Skill, ipHash: string | null, 
   burst(p, ipHash);
   if (unitKey && covers(await unitRow(db, p, skill, unitKey), member)) return;
   const q = await evaluate(db, p, skill, ipHash, { balance: await communityBalance(), hourly: await hourlyCount(db) });
-  if (q.blocked) throw blockedError(p, skill, q);
+  if (!q.blocked) return;
+  // free account turned away: an upgrade email in the background (throttled to one a week inside; guests, paid and opted-out get none)
+  if (q.blocked === 'quota_exceeded' && p.tier === 'community') void sendLimitEmail(p.userId, { what: SKILL_NAME[skill], period: PERIOD[q.window ?? 'month'] });
+  throw blockedError(p, skill, q);
 }
 
 const LOCK = 7_260_001; // one lock serialises every reservation: per-user, per-IP and global counts stay exact (a few per second at most)

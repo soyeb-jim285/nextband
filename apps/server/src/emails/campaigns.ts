@@ -8,7 +8,7 @@ import { env } from '../env';
 import { updateSettings } from '../settings';
 
 export type Audience = 'all' | 'free' | 'paid';
-type Recipient = { id: string; email: string; name: string | null };
+export type Recipient = { id: string; email: string; name: string | null };
 
 /** Signed, non-expiring unsubscribe token for one account (the link must keep working in old emails). */
 const sign = (userId: string) => createHmac('sha256', env.BETTER_AUTH_SECRET).update(`unsubscribe:${userId}`).digest('base64url').slice(0, 32);
@@ -43,9 +43,9 @@ export const firstName = (n: string | null) => {
 export const CAMPAIGN_VARS = { name: 'Ayesha Rahman', firstName: 'Ayesha' };
 
 /** One recipient's email: personal unsubscribe link in the footer and the one-click List-Unsubscribe headers (Gmail/Yahoo bulk-sender rules). */
-export function campaignEmail(r: { subject: string; html: string }, u: Recipient) {
+export function campaignEmail(r: { subject: string; html: string }, u: Recipient, vars: Record<string, string> = {}) {
   const url = unsubscribeUrl(u.id);
-  const m = personalise(r, { name: u.name?.trim() || 'there', firstName: firstName(u.name), unsubscribeUrl: url });
+  const m = personalise(r, { ...vars, name:u.name?.trim() || 'there', firstName: firstName(u.name), unsubscribeUrl: url });
   return { to: u.email, ...m, headers: { 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } };
 }
 

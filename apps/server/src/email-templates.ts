@@ -117,6 +117,53 @@ export const TEMPLATES = {
       ],
     },
   },
+  // Upgrade emails (upgrade-emails.ts): free accounts only, news-and-tips opt-out applies. Links are fine here: email is outside the app,
+  // unlike the Play build, which may only say "Upgrade at nextband.app" in plain text (consumption-only).
+  'welcome-free': {
+    name: 'Welcome (free plan)',
+    description: 'Sent once when a free account confirms its email. Explains Free vs Pro and where to buy Pro.',
+    reason: 'You got this because you have a NextBand account with news and tips turned on.',
+    kind: 'promo',
+    vars: { firstName: 'Ayesha' },
+    defaults: {
+      subject: 'Welcome to NextBand, {{firstName}}',
+      preheader: 'Practise free, or get Pro at nextband.app with bKash, Nagad or card.',
+      blocks: [
+        { type: 'hero', eyebrow: 'Welcome', title: 'You are all set', subtitle: '', tone: 'brand' },
+        { type: 'text', text: 'Hi {{firstName}}, thanks for joining. You are on the free plan. Here is how it compares with Pro:' },
+        {
+          type: 'details',
+          title: 'Free vs Pro',
+          rows: [
+            { label: 'Writing tests', value: 'Free: 5 a week. Pro: unlimited' },
+            { label: 'Speaking tests', value: 'Free: 10 a month. Pro: unlimited' },
+            { label: 'Live examiner', value: 'Free: 5 a month. Pro: 5 a day' },
+            { label: 'Listening and Reading', value: 'Free: many tests. Pro: every test' },
+          ],
+        },
+        { type: 'text', text: 'Pro is bought on our website, **nextband.app**, with bKash, Nagad or a card. Sign in to the app with this account and Pro unlocks there too.' },
+        { type: 'button', label: 'See Pro plans', url: '/pricing', variant: 'solid' },
+        { type: 'text', text: 'Happy practising!' },
+      ],
+    },
+  },
+  'limit-reached': {
+    name: 'Free limit reached',
+    description: 'Sent when a free account is stopped from starting a test by its limit. At most once every 7 days.',
+    reason: 'You got this because you have a NextBand account with news and tips turned on.',
+    kind: 'promo',
+    vars: { firstName: 'Ayesha', what: 'writing tests', period: 'this week' },
+    defaults: {
+      subject: "You've used your free {{what}}",
+      preheader: 'More practice is waiting. Pro gives unlimited Writing and Speaking.',
+      blocks: [
+        { type: 'hero', eyebrow: 'Free plan', title: 'You reached your free limit', subtitle: '', tone: 'brand' },
+        { type: 'text', text: "Hi {{firstName}}, you've used your free {{what}} for {{period}}. Nice work keeping at it! Your free tests come back on their own." },
+        { type: 'text', text: "Don't want to wait? Pro gives unlimited Writing and Speaking tests, from ৳499. Buy it at **nextband.app** with bKash, Nagad or a card, and it unlocks in the app when you sign in." },
+        { type: 'button', label: 'Get Pro', url: '/pricing', variant: 'solid' },
+      ],
+    },
+  },
   'weekly-report': {
     name: 'Weekly coach report',
     description: 'Sent on Monday morning (from 9am local time) to students who practised that week and have news and tips on. The headline is the win line when there is one; stats are added when it sends.',
