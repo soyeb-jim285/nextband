@@ -13,6 +13,7 @@ export const realPlans = () => structuredClone(real!);
 
 // Clean slate per test; storage is in-memory. AI fetch is injected per test (see helpers.fakeFetch).
 beforeEach(async () => {
+  await (await import('../upgrade-emails')).drainBackground(); // background emails from the last test finish before the wipe
   await sql.unsafe(
     `TRUNCATE "user","session","account","verification","user_settings","prompts","attempts","analyses","mistakes","cards","live_sessions","quota_usage","user_api_keys","lr_attempts","lr_tests","email_log","cambridge_access","replay_sessions","feedback","guest_conversions","ai_costs","stt_playground_runs" RESTART IDENTITY CASCADE`,
   );

@@ -12,7 +12,7 @@ import { ApiError } from './errors';
 import { linkGuest } from './link';
 import { replayPrefix } from './replay';
 import { storage } from './storage';
-import { sendWelcomeEmail } from './upgrade-emails';
+import { inBackground, sendWelcomeEmail } from './upgrade-emails';
 import type { AppEnv } from './types';
 
 const ORIGINS = [env.WEB_ORIGIN, env.BETTER_AUTH_URL, ...env.EXTRA_ORIGINS];
@@ -45,7 +45,7 @@ export const auth = betterAuth({
     sendOnSignUp: !IS_TEST,
     autoSignInAfterVerification: true,
     // Free accounts get one welcome explaining Free vs Pro; in the background so verifying never waits on the email provider.
-    afterEmailVerification: async (u) => void sendWelcomeEmail(u.id),
+    afterEmailVerification: async (u) => inBackground(sendWelcomeEmail(u.id)),
   },
   user: {
     deleteUser: {

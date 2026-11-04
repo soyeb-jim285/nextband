@@ -49,3 +49,11 @@ export const sendWelcomeEmail = (userId: string) => sendOnce(userId, 'welcome-fr
 /** A free account was refused a test start for its quota: at most one every 7 days. `what`/`period`: "writing tests", "this week". */
 export const sendLimitEmail = (userId: string, vars: { what: string; period: string }, now = new Date()) =>
   sendOnce(userId, 'limit-reached', new Date(now.getTime() - WEEK), vars);
+
+/** Fire-and-forget an email without losing track of it: the test setup drains these before it wipes the DB (else they race the TRUNCATE). */
+const inFlight = new Set<Promise<unknown>>();
+export function inBackground(p: Promise<unknown>) {
+  const t = p.catch(() => {}).finally(() => inFlight.delete(t));
+  inFlight.add(t);
+}
+export const drainBackground = () => Promise.all(inFlight);
