@@ -208,7 +208,12 @@ fun ReviewScreen(nav: Nav, route: Review) {
         // Screenshots: a checked answer with a wrong attempt.
         if (tab == "Checked" && s.card != null) { s.typed = "I living there since 2015"; s.checked = true }
     }
-    LaunchedEffect(s.finished) { if (s.finished) s.refreshCount() }
+    LaunchedEffect(s.finished) {
+        if (s.finished) {
+            s.refreshCount()
+            g.streak.refresh(afterPractice = true) // 5 graded cards make a practice day: may open the daily celebration
+        }
+    }
 
     PushedScreen(
         route.pattern?.let(::categoryLabel) ?: "Drill", nav::back,

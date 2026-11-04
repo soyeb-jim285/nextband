@@ -22,6 +22,7 @@ import kotlinx.serialization.Serializable
 /** The drill. [pattern]: one mistake category; [ahead]: cards not yet due too (a drill on demand). */
 @Serializable data class Review(val pattern: String? = null, val ahead: Boolean = false) // feature/study
 @Serializable data object CoachRoute                              // feature/study
+@Serializable data object StreakRoute                             // feature/streak
 /** Prompt bank. [skill]: speaking | writing. */
 @Serializable data class Bank(val skill: String = "speaking", val part: Int? = null, val variant: String? = null) // feature/study
 

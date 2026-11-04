@@ -421,11 +421,12 @@ class Api(
         }
     }
 
-    /** Deleting needs the account password (Better Auth delete-user), like the web dialog. */
+    /** An account deletes with its password (Better Auth delete-user), like the web dialog; a guest (no password) uses DELETE /api/me/guest. */
     suspend fun deleteAccount(password: String? = null) {
         val sent = _token.value
         try {
-            raw("POST", "/api/auth/delete-user", password?.let { buildJsonObject { put("password", it) } })
+            if (password == null) raw("DELETE", "/api/me/guest")
+            else raw("POST", "/api/auth/delete-user", buildJsonObject { put("password", password) })
         } catch (e: ApiError) {
             // 401 is the session, not the password (a wrong one is 400), e.g. revoked by a password reset. raw() leaves /api/auth/ 401s alone.
             if (e.status != 401 || sent == null || _token.value != sent) throw e
@@ -594,6 +595,9 @@ class Api(
     }
 
     // Progress, mistakes, cards
+
+    /** GET /api/streak: count, freezes, this week and the last 182 days, in the student's time zone. Guests too. */
+    suspend fun streak(): Streak = get("/api/streak")
 
     /** GET /api/progress; [skill] filters the trend to speaking or writing. */
     suspend fun progress(skill: String? = null): ProgressData = get("/api/progress", mapOf("skill" to skill))

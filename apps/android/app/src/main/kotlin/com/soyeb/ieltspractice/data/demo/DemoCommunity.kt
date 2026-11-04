@@ -63,6 +63,7 @@ object DemoCommunity {
         }
         out["/api/quota"] = quotaJson.toString()
         DemoToday.apply(out, screen)
+        out["/api/streak"] = DemoToday.streak(fresh = screen == "today-new")
         DemoStudy.apply(out, screen, tab)
         return out
     }

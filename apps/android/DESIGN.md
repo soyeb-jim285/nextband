@@ -170,6 +170,7 @@ Study tools & you
 - ✓ Prompt bank (search, skill/part/topic filters)
 - ✓ You / profile, Settings, Plan & limits (tier, tests left; `play` channel is consumption-only: plain non-clickable "upgrade at nextband.app" text, no prices/links/checkout; `web` channel APK (`-Pnextband.channel=web`) keeps the PayStation checkout in a Custom Tab; plan re-read on foreground and on Plan open), Help/legal (Custom Tabs to nextband.app pages)
 - ✓ Limit / fair-use / busy sheets (`GateHost`)
+- ✓ Streak (`feature/streak/`, `GET /api/streak`, docs/engagement/notifications-and-streaks.md §3): Today card under the bands (flame + count, ❄ freezes, 5-week heatmap, "N of the last 35 days"; after 18:00 with nothing done and a 2+ streak it warns and offers Drill), streak screen (week strip, freezes, milestone meter, longest, 6-month heatmap scrolled to today, repair banner, one CTA: drills due else a practice test), daily celebration sheet once per local day after a result or drill summary (N-1 → N; reduced motion only changes the numbers). Colour: `warn` only on the flame and count; heatmap is brandSoft → brand by fill strength (`lerp`), frozen = ice tint + ❄, today outlined
 
 ## 5. Architecture
 

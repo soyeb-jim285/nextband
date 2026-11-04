@@ -109,8 +109,12 @@ import com.soyeb.ieltspractice.nav.Review
 import com.soyeb.ieltspractice.nav.SpeakingSession
 import com.soyeb.ieltspractice.nav.WritingTask
 import com.soyeb.ieltspractice.nav.You
+import com.soyeb.ieltspractice.data.model.Streak
+import com.soyeb.ieltspractice.feature.streak.StreakCard
+import com.soyeb.ieltspractice.feature.streak.StreakStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** Everything Today shows for an account, loaded in parallel. Only progress is required; the rest degrades to "nothing yet". */
 private class TodayData(
@@ -123,7 +127,8 @@ private class TodayData(
     val recent: List<HistoryItem>,
 )
 
-private suspend fun loadToday(api: Api): TodayData = coroutineScope {
+private suspend fun loadToday(api: Api, streak: StreakStore): TodayData = coroutineScope {
+    launch { streak.refresh() } // the card hides when it fails
     val progress = async { api.progress() }
     val lr = async { runCatching { api.lrProgress() }.getOrNull() }
     val due = async { runCatching { api.dueCards().dueTotal }.getOrDefault(0) }
@@ -165,7 +170,8 @@ private fun TodayScreen(nav: Nav) {
     val graph = LocalGraph.current
     val api = graph.api
     val me by api.me.collectAsState()
-    val loader = rememberLoad { loadToday(api) }
+    val loader = rememberLoad { loadToday(api, graph.streak) }
+    val streak by graph.streak.value.collectAsState()
     val onboarded by graph.prefs.onboardingDone.collectAsState(initial = true)
     val testType by graph.prefs.testType.collectAsState(initial = "academic")
     val demo = LocalDemo.current
@@ -184,14 +190,15 @@ private fun TodayScreen(nav: Nav) {
 
     TabScreen(
         title = greeting(hourNow(), me?.user?.name),
-        subtitle = data?.let { subtitle(it.progress.streak, it.progress.minutesThisWeek) },
+        // The streak card says the count; the subtitle keeps it only when the card is missing.
+        subtitle = data?.let { subtitle(if (streak != null) 0 else it.progress.streak, it.progress.minutesThisWeek) },
         actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(me?.user?.name, onClick = { nav.go(You) }) },
         refreshing = loader.refreshing, onRefresh = loader.reload, listState = listState,
     ) {
         when (val s = loader.state) {
             is com.soyeb.ieltspractice.design.components.Load.Loading -> item { TodaySkeleton() }
             is com.soyeb.ieltspractice.design.components.Load.Failed -> item { ErrorState(s.message, loader.reload) }
-            is com.soyeb.ieltspractice.design.components.Load.Ready -> readyItems(nav, s.value, me, target, testType, nudge)
+            is com.soyeb.ieltspractice.design.components.Load.Ready -> readyItems(nav, s.value, me, target, testType, nudge, streak)
         }
     }
 }
@@ -206,7 +213,7 @@ private fun TodaySkeleton() {
     }
 }
 
-private fun LazyListScope.readyItems(nav: Nav, d: TodayData, me: Me?, target: Double, testType: String, nudge: Boolean) {
+private fun LazyListScope.readyItems(nav: Nav, d: TodayData, me: Me?, target: Double, testType: String, nudge: Boolean, streak: Streak?) {
     val days = daysToExam(me?.settings?.examDate)
     val bands = skillBands(d.progress, d.lr)
     val next = pickUpNext(d.coach, d.progress, d.lr, target)
@@ -215,6 +222,7 @@ private fun LazyListScope.readyItems(nav: Nav, d: TodayData, me: Me?, target: Do
     if (nudge) item { Box(Modifier.rise(0)) { GoalNudge(nav) } }
     item { Box(Modifier.rise(1)) { MockHero(nav, d.mock, d.lastMock, target) } }
     item { Box(Modifier.rise(2)) { Section("Your bands") { BandsCard(nav, bands, target) } } }
+    if (streak != null) item { Box(Modifier.rise(3)) { StreakCard(streak, nav) } }
     item { Box(Modifier.rise(3)) { Section("Up next") { UpNextCard(nav, next, testType) } } }
     item { Box(Modifier.rise(4)) { Section("Study tools") { ToolsGrid(nav, d.due) } } }
     item {
@@ -463,10 +471,19 @@ private fun ToolTile(t: Tool, modifier: Modifier) {
 
 @Composable
 private fun GuestToday(nav: Nav) {
-    val api = LocalGraph.current.api
+    val graph = LocalGraph.current
+    val api = graph.api
     val session by api.signedIn.collectAsState()
-    val loader = rememberLoad(session) { if (session) loadRecent(api, 5) else emptyList() }
+    val streakStore = graph.streak
+    // A guest session has a streak too; signed out there is none (and no other account's left over).
+    val loader = rememberLoad(session) {
+        if (session) coroutineScope {
+            launch { streakStore.refresh() }
+            loadRecent(api, 5)
+        } else emptyList<HistoryItem>().also { streakStore.clear() }
+    }
     val recent = loader.value.orEmpty()
+    val streak by streakStore.value.collectAsState()
 
     TabScreen(
         title = greeting(hourNow(), null),
@@ -490,6 +507,7 @@ private fun GuestToday(nav: Nav) {
                 NbButton("Start full mock", { nav.requireAccount("Create a free account to take a full mock") { nav.go(MockStart) } }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
             }
         }
+        streak?.let { s -> item { StreakCard(s, nav) } }
         item {
             Section("Or practise one test") {
                 RowGroup {

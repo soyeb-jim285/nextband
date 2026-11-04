@@ -68,6 +68,7 @@ import com.soyeb.ieltspractice.feature.study.studyGraph
 import com.soyeb.ieltspractice.feature.today.todayGraph
 import com.soyeb.ieltspractice.feature.writing.writingGraph
 import com.soyeb.ieltspractice.feature.you.youGraph
+import com.soyeb.ieltspractice.feature.streak.streakGraph
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -226,9 +227,11 @@ private fun AppShell(graph: AppGraph, start: Any) {
                 studyGraph(nav)
                 historyGraph(nav)
                 youGraph(nav)
+                streakGraph(nav)
             }
             } }
         }
         GateHost(nav)
+        com.soyeb.ieltspractice.feature.streak.StreakCelebrationHost()
     }
 }

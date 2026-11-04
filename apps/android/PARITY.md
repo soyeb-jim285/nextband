@@ -8,7 +8,7 @@ Status: done / partial / missing. Verified by unit tests (models against the sha
 | Plan and buying Pro | done | Build channel `nextband.channel` (play default, web). play: consumption-only per Play Payments policy; Plan and the quota sheet show `GateText.STORE_UPGRADE` as plain text, no checkout. web (APK from the site, never bundleRelease): PayStation checkout as on the web. `/api/me` re-read on foreground so a site purchase unlocks without restart |
 | Bearer token storage | done | Keystore-encrypted DataStore; 401 on a non-auth call signs out |
 | Guest home | done | |
-| Home dashboard (next up, predicted bands, band trend, streak, criteria) | done | |
+| Home dashboard (next up, predicted bands, band trend, streak card, criteria) | done | |
 | Speaking hub (full test, live examiner, parts, pending uploads) | done | pending uploads survive failures and relaunch |
 | Speaking session (mic check, Part 1/3 questions, Part 2 prep + long turn, auto stop 2:00, 15 min cap) | done | needs a device to verify recording; states are screenshotted via demo mode |
 | Background upload, retry, resume across steps | done | `PendingStore` |
@@ -40,5 +40,6 @@ Status: done / partial / missing. Verified by unit tests (models against the sha
 | Accessibility (content descriptions, 48dp targets, reduced motion) | partial | no TalkBack pass on a device |
 | Offline use | partial | pending recordings queue; screens need the network |
 | In-app updates (bell on every tab) | done | results, failed markings, cards due, open mock, exam countdown; refreshes on resume and while marking; read state per account (`UpdatesLogicTest`) |
+| Streaks (local-day streak, freezes, repair, 6-month heatmap, daily celebration) | done | `feature/streak/`; Today card, streak screen, celebration sheet (once per local day, prefs `streak:celebrated`); rules unit-tested (`StreakLogicTest`); milestone confetti and share card not built yet |
 | Push notifications / reminders | missing | not in web or iOS either; planned: one opt-in daily "Study reminders" channel, POST_NOTIFICATIONS asked on API 33+ from a settings toggle, skipped on days already practised |
 | Tablet / landscape layouts | partial | phone layouts scale; Listening & Reading reading and results go two-pane from 600 dp; tab and pushed lists cap at 720 dp centred; no navigation rail yet |

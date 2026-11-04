@@ -13,6 +13,7 @@ import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.demo.DemoFixtures
 import com.soyeb.ieltspractice.data.demo.DemoInterceptor
 import com.soyeb.ieltspractice.data.net.Api
+import com.soyeb.ieltspractice.feature.streak.StreakStore
 import com.soyeb.ieltspractice.media.MediaCache
 import com.soyeb.ieltspractice.media.Tts
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -54,6 +55,9 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
     val pending = PendingStore(File(app.filesDir, if (demo == null) "PendingRecordings" else "DemoPendingRecordings"), scope)
 
     val tts: Tts by lazy { Tts(app) }
+
+    /** The last loaded streak and the daily celebration (feature/streak). */
+    val streak = StreakStore(api, prefs)
 
     init {
         api.onGuestLinked = { guest, account -> scope.launch { pending.reassign(guest, account) } }
