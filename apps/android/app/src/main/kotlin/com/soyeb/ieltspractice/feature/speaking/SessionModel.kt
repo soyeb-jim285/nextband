@@ -15,6 +15,7 @@ import com.soyeb.ieltspractice.AppGraph
 import com.soyeb.ieltspractice.data.AnswerWindow
 import com.soyeb.ieltspractice.data.PendingRecording
 import com.soyeb.ieltspractice.data.UploadState
+import com.soyeb.ieltspractice.data.currentUserId
 import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.logic.newSessionId
 import com.soyeb.ieltspractice.data.model.AudioLine
@@ -345,8 +346,8 @@ class SessionModel(
             createdAt = System.currentTimeMillis(), durationMs = r.durationMs, energy = r.energy.take(20000),
             marks = windows.map { it.startMs }.take(200), segments = windows.take(200),
             sessionId = if (isFull) sessionId else null, parentAttemptId = parent, mockId = route.mockId,
-            // No network call here: the m4a needs its metadata on disk now. Unknown owner is stamped at upload (PendingStore.upload).
-            ownerId = api.me.value?.user?.id,
+            // Owner from memory, else a short /api/me lookup; still unknown (offline) is stamped at upload and dropped on sign-out.
+            ownerId = api.me.value?.user?.id ?: withTimeoutOrNull(3000) { currentUserId(api) },
         )
         withContext(Dispatchers.IO) { store.add(rec) }
         uploads = uploads + UploadItem(rec.id, rec.label)

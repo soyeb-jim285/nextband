@@ -16,6 +16,7 @@ import com.soyeb.ieltspractice.media.Tts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.io.File
@@ -53,6 +54,7 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
 
     init {
         api.onGuestLinked = { guest, account -> scope.launch { pending.reassign(guest, account) } }
+        if (demo == null) scope.launch { api.signedIn.drop(1).filter { !it }.collect { pending.dropUnowned() } }
         // A goal picked in onboarding before there was a session (prefs "goal:*") goes to the account once one exists,
         // then the device copy is dropped. A failed save stays queued for the next sign-in or launch.
         if (demo == null) scope.launch {

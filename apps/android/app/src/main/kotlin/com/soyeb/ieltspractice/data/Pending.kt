@@ -52,8 +52,8 @@ import java.io.IOException
 
 /**
  * Listed and uploaded only for the account that made it (a guest's recordings are re-owned by the account it signs into: [PendingStore.reassign]).
- * No owner (recorded before /api/me answered, e.g. offline): any signed-in user, and the upload stamps that user as the owner.
- * ponytail: an unowned recording could follow a later account switch on this device; rare (needs /api/me to have failed all session).
+ * No owner (recorded before /api/me answered, e.g. offline): the signed-in user, and the upload stamps that user as the owner.
+ * Unowned recordings are deleted on sign-out ([PendingStore.dropUnowned]), so they never reach a different account.
  */
 fun PendingRecording.belongsTo(userId: String?): Boolean =
     if (ownerId == null) userId != null else ownerId == userId
@@ -128,6 +128,12 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
     fun reassign(from: String, to: String) {
         reload() // the hub may not have read the disk yet this launch
         _items.value.filter { it.ownerId == from }.forEach { add(it.copy(ownerId = to)) }
+    }
+
+    /** Signed out: a recording whose owner was never learned must not be claimable by the next account on this device. */
+    fun dropUnowned() {
+        reload()
+        _items.value.filter { it.ownerId == null }.forEach { remove(it.id) }
     }
 
     fun remove(id: String) {
