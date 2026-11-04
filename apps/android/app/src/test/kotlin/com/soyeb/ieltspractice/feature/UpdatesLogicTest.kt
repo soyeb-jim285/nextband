@@ -24,12 +24,12 @@ class UpdatesLogicTest {
 
     @Test fun resultFinishedAfterTheSheetWasOpenedStillLightsTheDot() {
         // Opened while marking: nothing alerts, so nothing is stored as read.
-        val marking = build(item("w1", HStatus.Analysing))
+        val marking = build(item("w1", HStatus.Analysing, at = "2026-10-03T17:40:00Z"))
         assertEquals(0, freshCount(marking, emptyList()))
         val seen = markSeen(marking, emptyList())
         assertEquals(emptyList(), seen)
         // The band lands; the row keeps the attempt's createdAt but is still new.
-        val done = build(item("w1", HStatus.Done))
+        val done = build(item("w1", HStatus.Done, at = "2026-10-03T17:40:00Z"))
         assertEquals(1, freshCount(done, seen))
         assertEquals(0, freshCount(done, markSeen(done, seen)))
     }
