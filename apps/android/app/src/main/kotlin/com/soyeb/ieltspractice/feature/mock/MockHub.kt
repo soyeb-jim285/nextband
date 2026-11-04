@@ -14,7 +14,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +55,7 @@ import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.NbListRow
 import com.soyeb.ieltspractice.design.components.NbSheet
 import com.soyeb.ieltspractice.design.components.Overline
+import com.soyeb.ieltspractice.design.components.PollWhileVisible
 import com.soyeb.ieltspractice.design.components.PushedList
 import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.RowDivider
@@ -77,7 +77,6 @@ import com.soyeb.ieltspractice.nav.SpeakingSession
 import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -105,9 +104,7 @@ fun MockHubScreen(nav: Nav, route: MockHub) {
 
     // Marking runs in the background: look again every 5 s until it is done. (Not in screenshots.)
     val marking = m?.marking == true
-    LaunchedEffect(marking) {
-        if (marking && demo == null) while (true) { delay(5_000); loader.reload() }
-    }
+    PollWhileVisible(marking && demo == null) { loader.reload() }
 
     fun act(skill: String, block: suspend () -> Unit) {
         busy = true
@@ -130,7 +127,7 @@ fun MockHubScreen(nav: Nav, route: MockHub) {
     fun start(mock: Mock, skill: String) {
         when (skill) {
             "listening", "reading" -> act(skill) { nav.go(LrRun(api.mockStartSection(mock.id, skill), mock.id)) }
-            "writing" -> act(skill) { api.mockWritingStart(mock.id); nav.go(WritingTask("full", mockId = mock.id)) }
+            "writing" -> nav.go(WritingTask("full", mockId = mock.id)) // the editor starts the section (mockWritingStart) itself
             else -> choose = true
         }
     }

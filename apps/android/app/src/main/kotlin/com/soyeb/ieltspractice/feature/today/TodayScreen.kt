@@ -6,7 +6,6 @@ import com.soyeb.ieltspractice.design.rise
 import com.soyeb.ieltspractice.design.sharedBox
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -263,7 +262,7 @@ private fun MockHero(nav: Nav, mock: Mock?, last: Mock?, target: Double) {
         Spacer(Modifier.height(6.dp))
         Text(
             if (mock != null) "Pick up where you left off" else "See your real band in one sitting",
-            style = NB.type.headline.copy(fontSize = 26.sp, lineHeight = 32.sp), color = ink.fg, modifier = Modifier.semantics { heading() },
+            style = NB.type.heroTitle, color = ink.fg, modifier = Modifier.semantics { heading() },
         )
         Spacer(Modifier.height(6.dp))
         Text(
@@ -345,10 +344,12 @@ private fun BandsCard(nav: Nav, bands: SkillBands, target: Double) {
             }
         }
         Spacer(Modifier.height(16.dp))
+        // Reserve the trend strip in every cell once any skill has one, so the cells in a row stay the same height.
+        val trends = Skill.entries.any { bands.series[it].orEmpty().size >= 2 }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Skill.entries.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    pair.forEach { s -> BandCell(s, bands.of(s), bands.series[s].orEmpty(), target, Modifier.weight(1f)) { nav.openTab(skillTab(s)) } }
+                    pair.forEach { s -> BandCell(s, bands.of(s), bands.series[s].orEmpty(), target, trends, Modifier.weight(1f)) { nav.openTab(skillTab(s)) } }
                 }
             }
         }
@@ -356,7 +357,7 @@ private fun BandsCard(nav: Nav, bands: SkillBands, target: Double) {
 }
 
 @Composable
-private fun BandCell(skill: Skill, band: Double?, series: List<Double>, target: Double, modifier: Modifier, onClick: () -> Unit) {
+private fun BandCell(skill: Skill, band: Double?, series: List<Double>, target: Double, trends: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val tone = bandTone(band, target)
     NbCard(modifier, tone = CardTone.Inset, onClick = onClick, padding = PaddingValues(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -367,11 +368,12 @@ private fun BandCell(skill: Skill, band: Double?, series: List<Double>, target: 
                 if (band != null) Text(fmtBand(band), style = NB.type.title2.copy(fontFeatureSettings = "tnum"), color = tone.fg())
                 else Text("Take a test", style = NB.type.label, color = NB.colors.brandText)
             }
-            Sparkline(
-                series, target, tone.fill(), "${skill.label}: last ${series.size} bands, latest ${series.lastOrNull()?.let(::fmtBand).orEmpty()}",
-                Modifier.size(width = 44.dp, height = 28.dp),
-            )
         }
+        // The trend sits under the label, not beside it: beside it, a 360 dp phone left the label about 29 dp.
+        val strip = Modifier.padding(top = 6.dp).fillMaxWidth().height(24.dp)
+        if (trends && series.size >= 2) Sparkline(
+            series, target, tone.fill(), "${skill.label}: last ${series.size} bands, latest ${fmtBand(series.last())}", strip,
+        ) else if (trends) Spacer(strip)
         Spacer(Modifier.height(8.dp))
         Meter(band, target = target, color = tone.fill(), height = 4.dp)
     }
@@ -473,9 +475,9 @@ private fun GuestToday(nav: Nav) {
     ) {
         item {
             BrandHero { ink ->
-                Text("Free, no account needed", style = NB.type.label, color = ink.muted)
+                Text("Full mock tests", style = NB.type.label, color = ink.muted)
                 Spacer(Modifier.height(6.dp))
-                Text("Practise all four IELTS tests", style = NB.type.headline.copy(fontSize = 26.sp, lineHeight = 32.sp), color = ink.fg, modifier = Modifier.semantics { heading() })
+                Text("Practise all four IELTS tests", style = NB.type.heroTitle, color = ink.fg, modifier = Modifier.semantics { heading() })
                 Spacer(Modifier.height(6.dp))
                 Text("Timed like the real exam, with an honest band score on each test.", style = NB.type.bodySmall, color = ink.muted)
                 Spacer(Modifier.height(18.dp))

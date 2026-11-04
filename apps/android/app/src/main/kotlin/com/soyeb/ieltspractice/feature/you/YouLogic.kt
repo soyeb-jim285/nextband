@@ -42,12 +42,12 @@ const val ENDING_DAYS = 7
 
 fun leftText(days: Int) = if (days <= 1) "Ends within a day" else "$days days left"
 
-/** One line on where the plan stands (web planLine). */
-fun planLine(tier: String?, subscribedUntil: String?, now: Instant = Clocks.now(), zone: ZoneId = Clocks.zone()): String = when (tier) {
+/** One line on where the plan stands (web planLine). [canBuy] false (the Play build) drops the buying hint. */
+fun planLine(tier: String?, subscribedUntil: String?, now: Instant = Clocks.now(), zone: ZoneId = Clocks.zone(), canBuy: Boolean = true): String = when (tier) {
     "unlimited" -> "You have unlimited access. There is nothing to buy."
     "guest" -> "You are using NextBand as a guest. Create a free account to keep your results."
     else -> paidUntil(tier, subscribedUntil, now)?.let {
-        "Your paid plan runs until ${it.atZone(zone).format(longDate)} (${leftText(daysLeft(it, now)).lowercase()}). Buying again adds the time to the end."
+        "Your paid plan runs until ${it.atZone(zone).format(longDate)} (${leftText(daysLeft(it, now)).lowercase()})." + if (canBuy) " Buying again adds the time to the end." else ""
     } ?: "You are on the free plan."
 }
 
@@ -73,7 +73,7 @@ fun cleanPhone(raw: String) = raw.replace(Regex("[\\s-]"), "")
 fun phoneOk(raw: String) = PHONE.matches(cleanPhone(raw))
 
 val freeFeatures = listOf("5 Writing tests a week", "10 recorded Speaking tests a month", "5 live examiner sessions a month", "Most Listening and Reading tests")
-val paidFeatures = listOf("Unlimited Writing tests", "Unlimited recorded Speaking tests", "Live examiner: 5 a day, 40 a month", "Every Listening and Reading test")
+val paidFeatures = listOf("Unlimited Writing tests", "Unlimited recorded Speaking tests", "Live examiner: 5 a day, 40 a month", "Every original Listening and Reading practice test (Cambridge tests are not part of the plan)")
 
 /** The Help & legal pages (title to path on the site). */
 val legalPages = listOf("Terms and conditions" to "/terms", "Privacy policy" to "/privacy", "Refund policy" to "/refunds", "Contact us" to "/contact", "About NextBand" to "/about")

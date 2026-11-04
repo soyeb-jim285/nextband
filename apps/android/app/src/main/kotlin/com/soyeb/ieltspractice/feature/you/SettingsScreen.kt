@@ -39,10 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.feature.writing.DraftStore
 import com.soyeb.ieltspractice.data.net.ApiError
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
+import com.soyeb.ieltspractice.design.components.ConfirmDialog
 import com.soyeb.ieltspractice.design.components.LocalSnack
 import com.soyeb.ieltspractice.design.components.NbSheet
 import com.soyeb.ieltspractice.design.components.NbButton
@@ -79,6 +81,24 @@ fun SettingsScreen(nav: Nav) {
     val s = me?.settings
     val demoTab = LocalDemo.current?.tab
     var deleting by remember { mutableStateOf(demoTab == "Delete") }
+    var deletingGuest by remember { mutableStateOf(false) }
+
+    /** Delete the account (a guest needs no password) and this device's copies of its essays and unsent recordings. Null on success, else the error. */
+    suspend fun deleteEverything(password: String?): String? = try {
+        val uid = api.me.value?.user?.id
+        api.deleteAccount(password)
+        if (uid != null) {
+            runCatching { DraftStore(graph.prefs) { uid }.clearAll() }
+            graph.pending.items.value.filter { it.ownerId == uid }.forEach { graph.pending.remove(it.id) }
+        }
+        null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: ApiError) {
+        e.message
+    } catch (e: Exception) {
+        "Couldn't delete. Try again."
+    }
 
     /** Save one setting; false (and a snackbar) when the server refused. */
     suspend fun save(block: suspend () -> Unit): Boolean = try {
@@ -138,25 +158,33 @@ fun SettingsScreen(nav: Nav) {
                     }
                 }
             }
+            if (!hasAccount && me?.user?.isAnonymous == true) item {
+                Block("Guest data") {
+                    RowGroup {
+                        NbListRow(
+                            "Delete my guest data",
+                            subtitle = "Removes this guest's recordings, essays and results now. Guest data is also deleted automatically after 30 days.",
+                            titleColor = NB.colors.badText, onClick = { deletingGuest = true }, chevron = false,
+                        )
+                    }
+                }
+            }
         }
     }
 
     if (deleting) DeleteSheet(
         onDismiss = { deleting = false },
         onDelete = { password ->
-            try {
-                api.deleteAccount(password)
-                deleting = false
-                nav.reset(Welcome)
-                null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ApiError) {
-                e.message
-            } catch (e: Exception) {
-                "Couldn't delete the account. Try again."
-            }
+            deleteEverything(password).also { if (it == null) { deleting = false; nav.reset(Welcome) } }
         },
+    )
+    if (deletingGuest) ConfirmDialog(
+        "Delete guest data?", "Your recordings, essays and results from this guest session are deleted now. This can't be undone.", "Delete",
+        onConfirm = {
+            deletingGuest = false
+            scope.launch { val err = deleteEverything(null); if (err == null) nav.reset(Welcome) else snack.showSnackbar(err) }
+        },
+        onDismiss = { deletingGuest = false }, destructive = true,
     )
 }
 

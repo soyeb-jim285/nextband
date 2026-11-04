@@ -9,6 +9,7 @@ import com.soyeb.ieltspractice.data.model.LrAttempt
 import com.soyeb.ieltspractice.data.model.LrAudioState
 import com.soyeb.ieltspractice.data.model.LrStats
 import com.soyeb.ieltspractice.data.net.Api
+import com.soyeb.ieltspractice.data.net.ApiError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -97,7 +98,10 @@ class LrSession(
 
     private var dirty = false
     private var done = false
+    /** The server already has this attempt as submitted (seen as a 409). */
+    private var submitted = false
     private var debounce: Job? = null
+    private var failures = 0
     private val lock = Mutex()
 
     fun answer(n: Int, v: String) = change(responses.withAnswer(n, v))
@@ -121,7 +125,7 @@ class LrSession(
 
     private fun stats() = LrStats(partS.toMap(), changes.filterValues { it > 0 }, late.toList(), audio?.cleaned())
 
-    /** Persist now when something changed (or [force], for the clock). Failures retry every 5 s. */
+    /** Persist now when something changed (or [force], for the clock). Transient failures retry on a backoff ([saveRetryMs]). */
     suspend fun flush(force: Boolean = false) {
         if (!live || done || (!dirty && !force)) return
         lock.withLock {
@@ -131,13 +135,17 @@ class LrSession(
             try {
                 api.lrSave(attempt.id, responses, elapsed.toInt(), stats())
                 state = if (dirty) SaveState.Dirty else SaveState.Saved
+                failures = 0
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                // 409: already submitted (a submit whose response was lost); there is nothing left to save.
+                if ((e as? ApiError)?.status == 409) { done = true; submitted = true; state = SaveState.Saved; return }
                 dirty = true
                 state = SaveState.Error
                 debounce?.cancel()
-                debounce = scope.launch { delay(5000); flush() }
+                // The next change, the 15 s clock save or leaving the screen tries again even after the retries stop.
+                saveRetryMs(++failures, e)?.let { ms -> debounce = scope.launch { delay(ms); flush() } }
             }
         }
     }
@@ -145,14 +153,22 @@ class LrSession(
     /** Fire-and-forget [flush] for lifecycle callbacks (stop, leaving the screen). */
     fun flushLater(force: Boolean = false) { scope.launch { flush(force) } }
 
-    /** Scores the attempt. Throws the ApiError on failure (the answers stay saved and the caller may try again). */
-    suspend fun submit(): LrAttempt {
+    /**
+     * Scores the attempt. Throws the ApiError on failure (the answers stay saved and the caller may try again). A 409 (already
+     * submitted: an earlier submit went in and only its response was lost) counts as success, so a retry lands on the result.
+     */
+    suspend fun submit() {
+        if (submitted) return
         check(!done) { "already submitting" }
         done = true
         debounce?.cancel()
         submitting = true
         try {
-            return lock.withLock { api.lrSubmit(attempt.id, responses, elapsed.toInt(), stats()) }
+            lock.withLock { api.lrSubmit(attempt.id, responses, elapsed.toInt(), stats()) }
+        } catch (e: ApiError) {
+            if (e.status == 409) { submitted = true; return }
+            done = false
+            throw e
         } catch (e: Throwable) {
             done = false
             throw e
@@ -160,4 +176,14 @@ class LrSession(
             submitting = false
         }
     }
+}
+
+/**
+ * Autosave retry delay after [failures] consecutive failures (5 s doubling to 60 s), or null to stop: after 8 tries, or on a 4xx such as a
+ * deleted (404) or already-submitted (409) attempt, which retrying never fixes.
+ */
+fun saveRetryMs(failures: Int, e: Exception): Long? {
+    val status = (e as? ApiError)?.status ?: 0
+    if ((status in 400..499 && status != 408 && status != 429) || failures > 8) return null
+    return minOf(5_000L shl (failures - 1).coerceIn(0, 4), 60_000L)
 }

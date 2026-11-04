@@ -42,7 +42,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 sealed interface Load<out T> {
     data object Loading : Load<Nothing>
@@ -88,6 +92,32 @@ fun <T> rememberLoad(vararg keys: Any?, block: suspend () -> T): Loader<T> {
     return Loader(state, refreshing) { attempt++ }
 }
 
+/** Suspends until the screen is visible again (returns at once when it already is). */
+suspend fun Lifecycle.awaitStarted() { currentStateFlow.first { it.isAtLeast(Lifecycle.State.STARTED) } }
+
+/** Poll backoff: 5 s, then x1.5 up to 30 s, so a stuck job costs two requests a minute, not twelve. */
+fun nextPollMs(ms: Long): Long = minOf(ms * 3 / 2, 30_000L)
+
+/**
+ * While [active], calls [refresh] after 5 s and then on the [nextPollMs] backoff. A hidden app sends nothing: the next poll waits for the
+ * screen to come back and then runs at once.
+ */
+@Composable
+fun PollWhileVisible(active: Boolean, refresh: () -> Unit) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val current by rememberUpdatedState(refresh)
+    LaunchedEffect(active, lifecycle) {
+        if (!active) return@LaunchedEffect
+        var wait = 5_000L
+        while (true) {
+            delay(wait)
+            lifecycle.awaitStarted()
+            current()
+            wait = nextPollMs(wait)
+        }
+    }
+}
+
 /** Last loaded values for one back-stack entry (see [rememberLoad]). */
 class LoadCache : ViewModel() { val values = HashMap<String, Load<*>>() }
 
@@ -125,7 +155,7 @@ fun SkeletonList(modifier: Modifier = Modifier, rows: Int = 4) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Skeleton(Modifier.fillMaxWidth(), height = 140.dp, corner = 20.dp)
-        repeat(rows) { Skeleton(Modifier.fillMaxWidth(), height = 64.dp, corner = 16.dp) }
+        repeat(rows) { Skeleton(Modifier.fillMaxWidth(), height = 64.dp, corner = 12.dp) }
     }
 }
 

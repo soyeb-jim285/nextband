@@ -9,8 +9,6 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaRecorder
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.File
@@ -57,6 +55,8 @@ fun estimateWpm(energy: List<Int>): Int {
 class PcmCapture(val rate: Int) {
     @Volatile var onPcm: ((ShortArray, Int) -> Unit)? = null
     @Volatile private var running = false
+    /** The capture loop died (a read or [onPcm] threw, e.g. the encoder or muxer failed); the microphone is already released. */
+    @Volatile var failed = false; private set
     private var thread: Thread? = null
 
     @SuppressLint("MissingPermission")
@@ -71,16 +71,23 @@ class PcmCapture(val rate: Int) {
         if (rec.state != AudioRecord.STATE_INITIALIZED) { rec.release(); return false }
         try { rec.startRecording() } catch (e: Exception) { rec.release(); return false }
         running = true
+        failed = false
         thread = Thread({
             val buf = ShortArray(chunk)
-            while (running) {
-                val n = rec.read(buf, 0, buf.size)
-                if (n < 0) break
-                if (n > 0) onPcm?.invoke(buf, n)
+            // A raw thread: an exception here would crash the app and skip the release below.
+            try {
+                while (running) {
+                    val n = rec.read(buf, 0, buf.size)
+                    if (n < 0) break
+                    if (n > 0) onPcm?.invoke(buf, n)
+                }
+            } catch (e: Exception) {
+                failed = true
+            } finally {
+                running = false
+                runCatching { rec.stop() }
+                rec.release()
             }
-            running = false
-            runCatching { rec.stop() }
-            rec.release()
         }, "mic-capture").apply { start() }
         return true
     }
@@ -94,7 +101,7 @@ class PcmCapture(val rate: Int) {
 }
 
 /** PCM16 mono -> AAC-LC in an MPEG-4 container (.m4a, `audio/mp4`). Thread-safe; call [finish] once. */
-class AacWriter(private val file: File, private val rate: Int) {
+class AacWriter(val file: File, private val rate: Int) {
     private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
     private val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
     private val info = MediaCodec.BufferInfo()
@@ -195,6 +202,7 @@ class Meter(private val rate: Int) {
     private val frame = max(1, rate / 20)
     private var acc = 0.0
     private var cnt = 0
+    private var chunks = 0
 
     fun feed(pcm: ShortArray, n: Int) {
         var chunk = 0.0
@@ -210,15 +218,16 @@ class Meter(private val rate: Int) {
         }
         samples += n
         level = levelOf(sqrt(chunk / max(n, 1)))
-        liveWpm = estimateWpm(energy)
+        if (chunks++ % 5 == 0) liveWpm = estimateWpm(energy) // ~5 Hz is plenty for a pacing hint
     }
 }
 
 class RecordResult(val durationMs: Int, val energy: List<Int>)
 
 /**
- * The practice recorder (iOS Recorder): 16 kHz mono AAC m4a to [start]'s file, plus the observable state the UI shows. With a null file it
- * only meters (the mic check). Observable fields are Compose state, updated from the capture thread. Main thread starts and stops it.
+ * The practice recorder (iOS Recorder): 16 kHz mono AAC m4a to [start]'s file, plus meter values. With a null file it only meters (the mic check).
+ * The meters are plain volatile fields written by the capture thread; the screen copies them on its own 10 Hz tick, so a chunk never invalidates
+ * Compose. [stop] joins the capture thread and flushes the encoder (up to ~2 s): call it off the main thread when recording to a file.
  */
 class MicRecorder {
     private val rate = 16_000
@@ -228,27 +237,34 @@ class MicRecorder {
     private var onLevel: ((Double, Double) -> Unit)? = null
     /** While true the microphone stays open but nothing is written or measured, so the recording clock ([elapsed]) stands still (the examiner is talking). */
     @Volatile var paused = false
+    /** The app is in the background: Android hands it silence, so nothing is written and the clock stands still until it returns. */
+    @Volatile var away = false
 
     var isRecording by mutableStateOf(false); private set
-    var elapsed by mutableDoubleStateOf(0.0); private set
-    var level by mutableDoubleStateOf(0.0); private set
-    var silence by mutableDoubleStateOf(0.0); private set
-    var levels by mutableStateOf(List(48) { 0.0 }); private set
-    var liveWpm by mutableIntStateOf(0); private set
-    var loud by mutableIntStateOf(0); private set
-    var soft by mutableIntStateOf(0); private set
+    /** The capture or the encoder failed mid-recording: [stop] it (what was written is kept when the file closes cleanly). */
+    val failed: Boolean get() = capture.failed
+    @Volatile var elapsed = 0.0; private set
+    @Volatile var level = 0.0; private set
+    @Volatile var silence = 0.0; private set
+    @Volatile var liveWpm = 0; private set
+    @Volatile var loud = 0; private set
+    @Volatile var soft = 0; private set
+    private val ring = DoubleArray(48)
+    @Volatile private var head = 0
+    /** The last 48 chunk levels, oldest first (a fresh list per call: read it at the screen's tick rate, not per chunk). */
+    val levels: List<Double> get() = List(ring.size) { ring[(head + it) % ring.size] }
 
     /** Start metering (and recording into [file] when given). False when the microphone could not start. [dt] callback gets (level, seconds). */
-    fun start(file: File? = null, startPaused: Boolean = false, onLevel: ((Double, Double) -> Unit)? = null): Boolean {
+    @Synchronized fun start(file: File? = null, startPaused: Boolean = false, onLevel: ((Double, Double) -> Unit)? = null): Boolean {
         stop()
         paused = startPaused
         meter = Meter(rate)
         writer = file?.let { runCatching { AacWriter(it, rate) }.getOrNull() ?: return false }
         this.onLevel = onLevel
         elapsed = 0.0; silence = 0.0; liveWpm = 0; loud = 0; soft = 0; level = 0.0
-        levels = List(48) { 0.0 }
+        ring.fill(0.0); head = 0
         capture.onPcm = { pcm, n ->
-            if (!paused) {
+            if (!paused && !away) {
                 writer?.write(pcm, n)
                 meter.feed(pcm, n)
                 val dt = n.toDouble() / rate
@@ -256,7 +272,7 @@ class MicRecorder {
                 level = l
                 elapsed = meter.samples.toDouble() / rate
                 silence = if (l < 0.3) silence + dt else 0.0
-                levels = levels.drop(1) + l
+                ring[head] = l; head = (head + 1) % ring.size
                 liveWpm = meter.liveWpm
                 loud = meter.loud; soft = meter.soft
                 this.onLevel?.invoke(l, dt)
@@ -267,14 +283,15 @@ class MicRecorder {
         return true
     }
 
-    /** Stops; the duration and energy timeline (the file, if any, is closed and complete). */
-    fun stop(): RecordResult {
+    /** Stops; the duration and energy timeline (the file, if any, is closed and complete). Blocking, and synchronized so a background stop and a main-thread start never interleave. */
+    @Synchronized fun stop(): RecordResult {
         if (!isRecording) return RecordResult(0, emptyList())
         capture.stop()
         capture.onPcm = null
         isRecording = false
         level = 0.0
-        writer?.finish()
+        // An encoder that already failed can throw on flush: drop the unreadable file rather than upload it.
+        writer?.let { w -> if (runCatching { w.finish() }.isFailure) w.file.delete() }
         writer = null
         return RecordResult((meter.samples * 1000 / rate).toInt(), meter.energy)
     }
@@ -286,6 +303,7 @@ class MicRecorder {
         liveWpm = wpm
         this.loud = loud; this.soft = soft
         level = 0.5
-        levels = List(48) { i -> 0.15 + 0.7 * kotlin.math.abs(kotlin.math.sin(i * 0.7)) }
+        for (i in ring.indices) ring[i] = 0.15 + 0.7 * kotlin.math.abs(kotlin.math.sin(i * 0.7))
+        head = 0
     }
 }

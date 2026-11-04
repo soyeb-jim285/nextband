@@ -26,11 +26,13 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.logic.Clocks
@@ -49,6 +52,7 @@ import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.CardTone
+import com.soyeb.ieltspractice.design.components.LocalSnack
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbSheet
@@ -60,6 +64,7 @@ import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.nav.Nav
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 
@@ -73,11 +78,20 @@ fun PlanScreen(nav: Nav) {
     val hasAccount by api.hasAccount.collectAsState()
     var plan by remember { mutableStateOf(paidPlans.last()) }
     val demoTab = LocalDemo.current?.tab
-    var checkout by remember { mutableStateOf(demoTab == "Checkout") }
+    // The Play build sells nothing (no Play Billing yet): status and what each plan includes only.
+    val canBuy = BuildConfig.WEB_CHECKOUT
+    var checkout by remember { mutableStateOf(canBuy && demoTab == "Checkout") }
+    var checking by remember { mutableStateOf(false) }
+    var checkFailed by remember { mutableStateOf(false) }
+    suspend fun recheck() {
+        checking = true
+        checkFailed = runCatching { api.refreshQuota(); api.loadMe() }.isFailure
+        checking = false
+    }
 
     // Back from the payment page: the plan may have changed.
     LifecycleResumeEffect(hasAccount) {
-        if (hasAccount) scope.launch { runCatching { api.refreshQuota(); api.loadMe() } }
+        if (hasAccount) scope.launch { recheck() }
         onPauseOrDispose { }
     }
 
@@ -88,10 +102,28 @@ fun PlanScreen(nav: Nav) {
     val unlimited = tier == "unlimited"
     val ending = paid != null && daysLeft(paid) <= ENDING_DAYS
 
+    // No app link back from the payment page (it lands on the website): when the refresh on return shows a new end date,
+    // say so here. [awaiting] is the end date before paying ("" = none). ponytail: an App Link return needs server + assetlinks.
+    val snack = LocalSnack.current
+    var awaiting by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(until, awaiting) {
+        val before = awaiting ?: return@LaunchedEffect
+        if (paid != null && until != before) {
+            awaiting = null
+            checkout = false
+            snack.showSnackbar("Payment received. ${tierLabel(tier, until)}.")
+        }
+    }
+    // The gateway can confirm a minute or two late: keep checking while we wait. ponytail: bounded at 2 minutes, then "Check again".
+    LaunchedEffect(awaiting != null) {
+        if (awaiting == null) return@LaunchedEffect
+        repeat(24) { delay(5_000); if (awaiting == null) return@LaunchedEffect; recheck() }
+    }
+
     PushedScreen(
         "Plan", nav::back,
         bottomBar = {
-            if (!unlimited) StickyActionBar {
+            if (!unlimited && canBuy) StickyActionBar {
                 if (hasAccount) NbButton(
                     (if (paid != null) "Extend" else "Continue") + " · ${bdt(plan.bdt)}", { checkout = true },
                     fill = true, size = BtnSize.Large, icon = Icons.Rounded.Lock, haptic = true,
@@ -100,9 +132,17 @@ fun PlanScreen(nav: Nav) {
         },
     ) { pad ->
         PushedList(pad) {
-            item { StatusCard(tier, until) }
-            if (ending && paid != null) item { Banner("Your plan ends soon. Buying again adds the time to the end, so nothing you paid for is lost.", Icons.Rounded.Info, tone = com.soyeb.ieltspractice.design.Tone.Warn) }
-            if (!unlimited) item {
+            item { StatusCard(tier, until, canBuy) }
+            if (awaiting != null) item {
+                Banner(
+                    if (checkFailed) "Couldn't check your payment. Check your connection, then try again."
+                    else "If you paid, PayStation is still confirming it. This can take a few minutes, so please don't pay again.",
+                    Icons.Rounded.Info, tone = if (checkFailed) com.soyeb.ieltspractice.design.Tone.Bad else com.soyeb.ieltspractice.design.Tone.Neutral,
+                    action = if (checking) "Checking…" else "Check again", onAction = { if (!checking) scope.launch { recheck() } },
+                )
+            }
+            if (canBuy && ending && paid != null) item { Banner("Your plan ends soon. Buying again adds the time to the end, so nothing you paid for is lost.", Icons.Rounded.Info, tone = com.soyeb.ieltspractice.design.Tone.Warn) }
+            if (!unlimited && canBuy) item {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionHeader("Choose a plan")
                     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -129,22 +169,22 @@ fun PlanScreen(nav: Nav) {
         }
     }
 
-    if (checkout) CheckoutSheet(
+    if (checkout && canBuy) CheckoutSheet(
         plan = plan, email = me?.user?.email.orEmpty(), current = paid,
         onDismiss = { checkout = false },
-        onPay = { phone -> api.checkout(plan.key, cleanPhone(phone), true) },
+        onPay = { phone -> awaiting = until.orEmpty(); api.checkout(plan.key, cleanPhone(phone), true) },
     )
 }
 
 @Composable
-private fun StatusCard(tier: String?, until: String?) {
+private fun StatusCard(tier: String?, until: String?, canBuy: Boolean) {
     NbCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Your plan", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.weight(1f))
             Tag(tierLabel(tier, until), fg = NB.colors.brandText, bg = NB.colors.brandSoft)
         }
         Spacer(Modifier.height(6.dp))
-        Text(planLine(tier, until), style = NB.type.bodySmall, color = NB.colors.muted)
+        Text(planLine(tier, until, canBuy = canBuy), style = NB.type.bodySmall, color = NB.colors.muted)
     }
 }
 
@@ -222,7 +262,7 @@ private fun CheckoutSheet(plan: PaidPlan, email: String, current: Instant?, onDi
     }
 
     NbSheet(
-        onDismiss, title = "Checkout", subtitle = "You pay on PayStation's secure page and come straight back.",
+        onDismiss, title = "Checkout", subtitle = "You pay on PayStation's secure page. Close it when you're done and your plan updates here.",
         actions = {
             NbButton("Pay ${bdt(plan.bdt)}", ::pay, fill = true, size = BtnSize.Large, icon = Icons.Rounded.Lock, enabled = ok && agree, loading = busy, haptic = true)
         },

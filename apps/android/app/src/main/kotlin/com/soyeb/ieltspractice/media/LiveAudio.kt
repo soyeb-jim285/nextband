@@ -18,7 +18,10 @@ class LiveAudio {
     /** True while the examiner's voice plays (the worker's `speaking` events). */
     @Volatile var examinerSpeaking = false
 
-    private class PartSink(val writer: AacWriter, val meter: Meter, val file: File, val rate: Int)
+    private class PartSink(val writer: AacWriter, val meter: Meter, val file: File, val rate: Int) {
+        /** The encoder threw: stop feeding it (WebRTC's audio thread must never see the exception); what was written is kept if it closes. */
+        var broken = false
+    }
 
     private val lock = Any()
     private var part: PartSink? = null
@@ -34,16 +37,20 @@ class LiveAudio {
         rate = sampleRate
         onLevel?.invoke(levelOf(rmsOf(pcm, n)))
         if (!capturing || examinerSpeaking) return
-        synchronized(lock) { part?.takeIf { it.rate == sampleRate }?.let { it.writer.write(pcm, n); it.meter.feed(pcm, n) } }
+        synchronized(lock) {
+            part?.takeIf { it.rate == sampleRate && !it.broken }?.let {
+                try { it.writer.write(pcm, n); it.meter.feed(pcm, n) } catch (e: Exception) { it.broken = true }
+            }
+        }
     }
 
-    fun beginPart(file: File) { synchronized(lock) { part?.writer?.finish(); part = PartSink(AacWriter(file, rate), Meter(rate), file, rate) } }
+    fun beginPart(file: File) { synchronized(lock) { part?.let { p -> runCatching { p.writer.finish() } }; part = PartSink(AacWriter(file, rate), Meter(rate), file, rate) } }
 
     fun endPart(): PartRecording? = synchronized(lock) {
         val p = part
         part = null
-        if (p != null && p.writer.finish()) PartRecording(p.file, (p.meter.samples * 1000 / p.rate).toInt(), p.meter.energy) else null
+        if (p != null && runCatching { p.writer.finish() }.getOrDefault(false)) PartRecording(p.file, (p.meter.samples * 1000 / p.rate).toInt(), p.meter.energy) else null
     }
 
-    fun stop() { synchronized(lock) { part?.writer?.finish(); part = null } }
+    fun stop() { synchronized(lock) { part?.let { p -> runCatching { p.writer.finish() } }; part = null } }
 }

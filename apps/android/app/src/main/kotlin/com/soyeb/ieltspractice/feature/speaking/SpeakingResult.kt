@@ -22,6 +22,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -149,6 +151,7 @@ fun SpeakingResult(attempts: List<Attempt>, nav: Nav) {
     }
     val conversation = remember(attempt.id) { ResultPlayer() }
     DisposableEffect(conversation) { onDispose { conversation.release() } }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (demo == null) { player.pause(); conversation.pause() } }
     LaunchedEffect(listen, attempt.conversationUrl) {
         val url = attempt.conversationUrl
         if (listen == 1 && url != null && demo == null) { conversation.load(ctx, url); conversation.poll() }

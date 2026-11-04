@@ -31,6 +31,8 @@ private fun serif(size: Int, line: Int, weight: Int = 400, tracking: Double = -0
 @Immutable
 object NbType {
     val display = sans(48, 52, 700, -0.02, tnum = true)
+    /** The one big title on a BrandHero / welcome / auth header. */
+    val heroTitle = sans(30, 36, 600, -0.015)
     val headline = sans(28, 34, 600, -0.012)
     val title1 = sans(22, 28, 600, -0.008)
     val title2 = sans(18, 24, 600, -0.004)

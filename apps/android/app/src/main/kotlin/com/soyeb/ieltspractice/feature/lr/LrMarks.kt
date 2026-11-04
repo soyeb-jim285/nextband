@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
@@ -162,6 +164,19 @@ fun MarkedText(hl: Marks?, region: String, text: String, style: TextStyle, color
     Text(
         str,
         modifier
+            // TalkBack / switch access cannot long-press-drag: select the whole stretch (then the bar offers Highlight / Add note),
+            // and open each existing mark without a precise tap. ponytail: whole-paragraph only; per-sentence picker if asked for.
+            .semantics {
+                customActions = buildList {
+                    if (text.isNotEmpty()) add(CustomAccessibilityAction("Select this text to highlight or add a note") {
+                        hl.draft = Sel(region, 0, text.length); hl.pending = true; true
+                    })
+                    marks.forEach { m ->
+                        val snippet = text.substring(m.s.coerceIn(0, text.length), m.e.coerceIn(m.s.coerceIn(0, text.length), text.length)).take(40)
+                        add(CustomAccessibilityAction((if (m.note != null) "Open note: " else "Open highlight: ") + snippet) { hl.menu = m.id; true })
+                    }
+                }
+            }
             .pointerInput(text, marks) {
                 detectTapGestures { pos ->
                     val l = layout
@@ -238,19 +253,18 @@ fun MarkSheets(hl: Marks) {
     }
     hl.editor?.let { d ->
         var text by remember(d) { mutableStateOf(d.text) }
-        AlertDialog(
-            onDismissRequest = { hl.editor = null },
-            title = { Text("Note", style = NB.type.title1) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    NbTextField(text, { text = it.take(NOTE_MAX) }, "Your note", singleLine = false)
-                    Text("${text.length} of $NOTE_MAX. Kept on this device only.", style = NB.type.caption, color = NB.colors.muted)
-                }
+        NbSheet(
+            onDismiss = { hl.editor = null },
+            title = "Note",
+            subtitle = "Kept on this device only.",
+            actions = {
+                NbButton("Save", { hl.save(d, text); hl.editor = null }, fill = true)
+                NbButton("Cancel", { hl.editor = null }, kind = BtnKind.Text, fill = true)
             },
-            confirmButton = { NbButton("Save", { hl.save(d, text); hl.editor = null }, size = BtnSize.Small) },
-            dismissButton = { NbButton("Cancel", { hl.editor = null }, kind = BtnKind.Text, size = BtnSize.Small) },
-            containerColor = NB.colors.surface, shape = NB.shape.card,
-        )
+        ) {
+            NbTextField(text, { text = it.take(NOTE_MAX) }, "Your note", singleLine = false)
+            Text("${text.length} of $NOTE_MAX", style = NB.type.caption, color = NB.colors.muted)
+        }
     }
 }
 

@@ -3,7 +3,6 @@ package com.soyeb.ieltspractice.feature.auth
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import com.soyeb.ieltspractice.design.rise
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -62,45 +62,52 @@ fun WelcomeScreen(nav: Nav) {
     val hero = if (c.isDark) c.brandSoft else c.brandText
     val onHero = if (c.isDark) c.ink else Color.White
     val onHeroMuted = if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f)
-    Box(Modifier.fillMaxSize().background(hero)) {
-        BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 110.dp, y = (-30).dp).size(340.dp))
-        Column(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.statusBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 20.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Logo(height = 28.dp, dark = true, modifier = Modifier.rise(0))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f).rise(1), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            "Know your band before exam day",
-                            style = NB.type.headline.copy(fontSize = 34.sp, lineHeight = 40.sp),
-                            color = onHero, modifier = Modifier.semantics { heading() },
-                        )
-                        Text("Timed practice for all four IELTS tests, scored the way an examiner would.", style = NB.type.body, color = onHeroMuted)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    // Decorative: a sample band, so the first screen shows what the app gives back.
-                    Box(
-                        Modifier.rise(2).clearAndSetSemantics { }.size(100.dp).clip(CircleShape).background(c.surface),
-                        contentAlignment = Alignment.Center,
-                    ) { BandRing(7.5, 7.0, size = 88.dp, stroke = 8.dp) }
-                }
-            }
-            Column(Modifier.weight(1f).fillMaxWidth().clip(NB.shape.sheet).background(c.surface)) {
+    // At large text sizes the sample band would squeeze the headline; it is decorative, so drop it.
+    val showBand = LocalDensity.current.fontScale < 1.3f
+    Column(Modifier.fillMaxSize().background(c.surface)) {
+        // Header and value lines scroll together; the two ways in stay pinned below, whatever the font scale.
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Box(Modifier.fillMaxWidth().background(hero)) {
+                BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 110.dp, y = (-30).dp).size(340.dp))
                 Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter).padding(top = 28.dp, bottom = 12.dp),
+                    // 56 = 32 of air + the 24 the sheet below rises over.
+                    Modifier.statusBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 20.dp, bottom = 56.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    ValueLine(Skill.Speaking, "Speak out loud, get a real band", "Fluency, vocabulary, grammar and pronunciation scored one by one.", Modifier.rise(3))
-                    ValueLine(Skill.Writing, "Essays marked, mistakes shown", "Every error underlined where you made it, with the fix.", Modifier.rise(4))
-                    ValueLine(Skill.Reading, "Full Listening and Reading tests", "Timed like the exam, free, with every answer explained.", Modifier.rise(5))
-                }
-                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp)) {
-                    NbButton("Start practising free", { nav.go(Onboarding) }, fill = true, size = BtnSize.Large, haptic = true)
-                    NbButton("I have an account", { nav.go(Auth("signin")) }, kind = BtnKind.Text, fill = true)
+                    Logo(height = 28.dp, dark = true, modifier = Modifier.rise(0))
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Column(Modifier.weight(1f).rise(1), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "Know your band before exam day",
+                                style = NB.type.heroTitle,
+                                color = onHero, modifier = Modifier.semantics { heading() },
+                            )
+                            Text("Timed practice for all four IELTS tests, scored the way an examiner would.", style = NB.type.body, color = onHeroMuted)
+                        }
+                        if (showBand) {
+                            Spacer(Modifier.width(12.dp))
+                            // Decorative: a sample band, so the first screen shows what the app gives back.
+                            Box(
+                                Modifier.rise(2).clearAndSetSemantics { }.size(100.dp).clip(CircleShape).background(c.surface),
+                                contentAlignment = Alignment.Center,
+                            ) { BandRing(7.5, 7.0, size = 88.dp, stroke = 8.dp) }
+                        }
+                    }
                 }
             }
+            Column(
+                Modifier.fillMaxWidth().offset(y = (-24).dp).clip(NB.shape.sheet).background(c.surface)
+                    .padding(horizontal = NB.space.gutter).padding(top = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                ValueLine(Skill.Speaking, "Speak out loud, get a real band", "Fluency, vocabulary, grammar and pronunciation scored one by one.", Modifier.rise(3))
+                ValueLine(Skill.Writing, "Essays marked, mistakes shown", "Every error underlined where you made it, with the fix.", Modifier.rise(4))
+                ValueLine(Skill.Reading, "Full Listening and Reading tests", "Timed like the exam, free, with every answer explained.", Modifier.rise(5))
+            }
+        }
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp)) {
+            NbButton("Start practising free", { nav.go(Onboarding) }, fill = true, size = BtnSize.Large, haptic = true)
+            NbButton("I have an account", { nav.go(Auth("signin")) }, kind = BtnKind.Text, fill = true)
         }
     }
 }

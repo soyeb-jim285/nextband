@@ -45,6 +45,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,6 +58,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -76,7 +80,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
@@ -137,6 +140,19 @@ private class AuthForm(email: String) {
     var address by mutableStateOf(email.trim())
     /** Proof of the request that sent the code, for the delivery status. */
     var token by mutableStateOf<String?>(null)
+
+    companion object {
+        /** Rotation / process death mid-flow keeps the step's context (who the code went to). Passwords are left out on purpose. */
+        val Saver = listSaver<AuthForm, Any?>(
+            save = { listOf(it.name, it.email, it.code, it.fromSignUp, it.address, it.token) },
+            restore = {
+                AuthForm(it[1] as String).apply {
+                    name = it[0] as String; code = it[2] as String; fromSignUp = it[3] as Boolean
+                    address = it[4] as String; token = it[5] as String?
+                }
+            },
+        )
+    }
 }
 
 /**
@@ -156,12 +172,12 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     val demoTab = LocalDemo.current?.tab
     val demoMail = demoTab in listOf("Verify", "Forgot", "Reset")
     val demoStatus = if (demoTab == "Verify" || demoTab == "Reset") EmailStatus("sent", "2026-10-03T17:59:20Z", "m•••@example.com") else null
-    var step by remember {
+    var step by rememberSaveable {
         mutableStateOf(
             when (demoTab) { "SignIn" -> AuthStep.SignIn; "Signup" -> AuthStep.SignUp; "Verify" -> AuthStep.Verify; "Forgot" -> AuthStep.Forgot; "Reset" -> AuthStep.Reset; else -> stepOf(mode) },
         )
     }
-    val f = remember { AuthForm(if (demoMail) "maya@example.com" else "") }
+    val f = rememberSaveable(saver = AuthForm.Saver) { AuthForm(if (demoMail) "maya@example.com" else "") }
 
     fun go(s: AuthStep) {
         step = s
@@ -178,9 +194,13 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     }
 
     /** Run a code step. [codeOnly] puts every failure under the boxes (verify); otherwise only code problems go there. */
+    // One request at a time: the IME Done action and the 6th-digit auto-verify bypass the disabled button. busy is set before
+    // launch so a second call in the same frame sees it.
     fun attempt(codeOnly: Boolean, block: suspend () -> Unit) {
+        if (f.busy) return
+        f.busy = true
         scope.launch {
-            f.busy = true; f.banner = null; f.codeIssue = null
+            f.banner = null; f.codeIssue = null
             try {
                 block()
             } catch (x: CancellationException) {
@@ -196,11 +216,13 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     }
 
     fun submit() {
+        if (f.busy) return
         f.tried = true
         val signUp = step == AuthStep.SignUp
         if (!(if (signUp) signUpErrors(f.name, f.email, f.password, f.confirm) else signInErrors(f.email, f.password)).ok) return
+        f.busy = true
         scope.launch {
-            f.busy = true; f.banner = null; f.info = null; f.exists = false
+            f.banner = null; f.info = null; f.exists = false
             val a = f.email.trim()
             try {
                 if (signUp) {
@@ -213,7 +235,7 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
             } catch (x: CancellationException) {
                 throw x
             } catch (x: ApiError) {
-                if (!signUp && (x.code == "EMAIL_NOT_VERIFIED" || x.status == 403)) {
+                if (!signUp && x.code == "EMAIL_NOT_VERIFIED") { // other 403s show the server's message
                     f.token = runCatching { api.sendOtp(a, "email-verification") }.getOrNull()
                     f.address = a; f.fromSignUp = false; go(AuthStep.Verify)
                 } else if (signUp) {
@@ -265,6 +287,8 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     val onHero = if (c.isDark) c.ink else Color.White
     val onHeroMuted = if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f)
     val keyboard = WindowInsets.isImeVisible
+    // Landscape phone or very large text: the full hero would leave the form no room, so use the compact header.
+    val compact = keyboard || LocalConfiguration.current.screenHeightDp < 480 || LocalDensity.current.fontScale > 1.5f
 
     Box(Modifier.fillMaxSize().background(hero)) {
         BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 96.dp, y = (-40).dp).size(300.dp))
@@ -285,14 +309,14 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
             ) { s ->
                 val (title, lede) = stepCopy(s, f)
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = NB.space.gutter).padding(top = if (keyboard) 4.dp else 20.dp, bottom = if (keyboard) 20.dp else 36.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = NB.space.gutter).padding(top = if (compact) 4.dp else 20.dp, bottom = if (compact) 20.dp else 36.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        title, style = if (keyboard) NB.type.title1 else NB.type.headline.copy(fontSize = 32.sp, lineHeight = 38.sp),
+                        title, style = if (compact) NB.type.title1 else NB.type.heroTitle,
                         color = onHero, modifier = Modifier.semantics { heading() },
                     )
-                    if (!keyboard) Text(lede, style = NB.type.body, color = onHeroMuted, modifier = Modifier.widthIn(max = 420.dp))
+                    if (!compact) Text(lede, style = NB.type.body, color = onHeroMuted, modifier = Modifier.widthIn(max = 420.dp))
                 }
             }
             // The form rises over the header as a sheet; the primary action and the switch sit at its foot, in thumb reach.
@@ -311,7 +335,7 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
                             if (s == AuthStep.SignIn) f.info?.let { Banner(it, Icons.Rounded.CheckCircle, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, tone = Tone.Good) }
                             when (s) {
                                 AuthStep.SignIn, AuthStep.SignUp -> CredentialsStep(s == AuthStep.SignUp, f, reason, primary) { go(it) }
-                                AuthStep.Verify -> VerifyStep(f, demoStatus, ::verify)
+                                AuthStep.Verify -> VerifyStep(f, demoStatus, ::verify) { go(it) }
                                 AuthStep.Forgot -> ForgotStep(f, primary) { go(AuthStep.SignIn) }
                                 AuthStep.Reset -> ResetStep(f, demoStatus, primary) { go(it) }
                             }
@@ -401,7 +425,7 @@ private fun PasswordPair(f: AuthForm, label: String, errs: FieldErrors, onDone: 
 }
 
 @Composable
-private fun VerifyStep(f: AuthForm, demo: EmailStatus?, onComplete: () -> Unit) {
+private fun VerifyStep(f: AuthForm, demo: EmailStatus?, onComplete: () -> Unit, go: (AuthStep) -> Unit) {
     val api = LocalGraph.current.api
     val errs = if (f.tried) codeError(f.code) else null
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -415,6 +439,17 @@ private fun VerifyStep(f: AuthForm, demo: EmailStatus?, onComplete: () -> Unit) 
         )
         CodeField(f.code, errs ?: f.codeIssue) { f.code = it; f.codeIssue = null; if (it.length == 6) onComplete() }
         CodeDelivery(f.token, demo) { api.sendOtp(f.address, "email-verification") }
+        // The server answers a sign-up for a taken address like a new one (no account enumeration) and emails a note instead of a code.
+        if (f.fromSignUp) Column {
+            Text(
+                "Already have an account with this email? We emailed you a note instead of a code. Sign in, or reset your password.",
+                style = NB.type.bodySmall, color = NB.colors.muted,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                NbButton("Sign in", { go(AuthStep.SignIn); f.confirm = "" }, kind = BtnKind.Text, size = BtnSize.Small)
+                NbButton("Forgot password?", { f.email = f.address; go(AuthStep.Forgot) }, kind = BtnKind.Text, size = BtnSize.Small)
+            }
+        }
     }
 }
 
@@ -507,7 +542,7 @@ private fun CodeField(code: String, error: String?, onChange: (String) -> Unit) 
                         repeat(6) { i ->
                             val active = focused && i == minOf(code.length, 5)
                             Box(
-                                Modifier.weight(1f).height(56.dp).background(c.surface, NB.shape.tile)
+                                Modifier.weight(1f).heightIn(min = 56.dp).background(c.surface, NB.shape.tile)
                                     .border(if (active || error != null) 2.dp else 1.dp, if (error != null) c.bad else if (active) c.brand else c.faint, NB.shape.tile),
                                 contentAlignment = Alignment.Center,
                             ) { Text(code.getOrNull(i)?.toString() ?: "", style = NB.type.title1.copy(fontFeatureSettings = "tnum"), color = c.ink) }

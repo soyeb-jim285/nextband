@@ -8,6 +8,11 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+// Release signing: the Play upload key comes from CI secrets. Without them the release APK is a test build, debug-signed with
+// demo mode on (device-video CI drives it), and bundleRelease (the Play artifact) refuses to run.
+val releaseKeystore: File? = System.getenv("NEXTBAND_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+val storeSigned = releaseKeystore != null
+
 android {
     namespace = "com.soyeb.ieltspractice"
     compileSdk = 36
@@ -20,13 +25,30 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) create("release") {
+            storeFile = releaseKeystore
+            storePassword = System.getenv("NEXTBAND_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("NEXTBAND_KEY_ALIAS")
+            keyPassword = System.getenv("NEXTBAND_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
-        debug { isMinifyEnabled = false }
+        debug {
+            isMinifyEnabled = false
+            buildConfigField("boolean", "DEMO", "true")
+            buildConfigField("boolean", "WEB_CHECKOUT", "true")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // ponytail: debug keystore so CI's release APK installs for testing; real upload key when we ship to Play.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (storeSigned) "release" else "debug")
+            // Demo mode (intent extras on the exported launcher) never ships in a store-signed build.
+            buildConfigField("boolean", "DEMO", (!storeSigned).toString())
+            // Play's Payments policy: digital features bought in the app need Play Billing. Until that ships, the store-signed (Play)
+            // build sells nothing: no prices, no PayStation checkout, only the plan status the server reports.
+            buildConfigField("boolean", "WEB_CHECKOUT", (!storeSigned).toString())
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -35,7 +57,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 
     testOptions {
         unitTests {
@@ -70,6 +92,11 @@ abstract class CopyDemoFixtures : DefaultTask() {
 val copyDemoFixtures by tasks.registering(CopyDemoFixtures::class) {
     source.set(rootProject.layout.projectDirectory.file("../ios/IELTS/Demo/fixtures.json"))
     map.set(rootProject.layout.projectDirectory.file("../ios/IELTS/Demo/demo-map.png"))
+}
+
+tasks.matching { it.name == "bundleRelease" }.configureEach {
+    val signed = storeSigned
+    doFirst { if (!signed) throw GradleException("bundleRelease needs the upload key: set NEXTBAND_KEYSTORE, NEXTBAND_KEYSTORE_PASSWORD, NEXTBAND_KEY_ALIAS, NEXTBAND_KEY_PASSWORD.") }
 }
 
 androidComponents {

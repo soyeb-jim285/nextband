@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -105,7 +107,7 @@ fun TabScreen(
     ) { pad ->
         val body: @Composable () -> Unit = {
             LazyColumn(
-                Modifier.fillMaxSize(), state = listState,
+                Modifier.fillMaxSize().readable(), state = listState,
                 contentPadding = PaddingValues(start = NB.space.gutter, end = NB.space.gutter, top = pad.calculateTopPadding() + 4.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(NB.space.lg),
                 content = content,
@@ -147,11 +149,14 @@ fun PushedScreen(
     )
 }
 
+/** Tablets and unfolded foldables: keep lists to a readable column, centred, instead of running edge to edge. */
+private fun Modifier.readable() = wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth()
+
 /** Standard scrolling body for a [PushedScreen]. */
 @Composable
 fun PushedList(pad: PaddingValues, modifier: Modifier = Modifier, state: LazyListState = rememberLazyListState(), content: LazyListScope.() -> Unit) {
     LazyColumn(
-        modifier.fillMaxSize(), state = state,
+        modifier.fillMaxSize().readable(), state = state,
         contentPadding = PaddingValues(
             start = NB.space.gutter, end = NB.space.gutter,
             top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 32.dp,

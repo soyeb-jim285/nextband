@@ -1,6 +1,7 @@
 package com.soyeb.ieltspractice.feature.lr
 
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,7 +40,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -54,6 +57,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -71,8 +75,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.soyeb.ieltspractice.data.logic.Block
 import com.soyeb.ieltspractice.data.logic.Inline
 import com.soyeb.ieltspractice.data.logic.gapPart
@@ -87,6 +95,8 @@ import com.soyeb.ieltspractice.data.model.LrGroup
 import com.soyeb.ieltspractice.data.model.LrOption
 import com.soyeb.ieltspractice.data.model.LrQuestion
 import com.soyeb.ieltspractice.data.net.Api
+import com.soyeb.ieltspractice.design.LightColors
+import com.soyeb.ieltspractice.design.LocalNbColors
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
@@ -164,7 +174,7 @@ private fun GapField(n: Int, ctx: QCtx, wordLimit: String?, part: Int, of: Int) 
     BasicTextField(
         value = value,
         onValueChange = { ctx.set(n, if (of > 1) setGapPart(ctx.value(n), part, of, it) else it) },
-        modifier = Modifier.width(w).heightIn(min = 44.dp)
+        modifier = Modifier.width(w).heightIn(min = 48.dp)
             // Only the first blank of a multi-blank question is the jump target: a requester can sit on one node.
             .let { if (part == 0) it.focusRequester(ctx.focuser(n)).bringIntoViewRequester(ctx.requester(n)) else it }
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) ctx.onFocus(n); ctx.onText(n, it.isFocused) }
@@ -175,7 +185,7 @@ private fun GapField(n: Int, ctx: QCtx, wordLimit: String?, part: Int, of: Int) 
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next),
         decorationBox = { inner ->
             Box(
-                Modifier.fillMaxWidth().heightIn(min = 44.dp).background(c.surface, NB.shape.tile).border(if (focused || ctx.active == n) 2.dp else 1.dp, ring, NB.shape.tile).padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).background(c.surface, NB.shape.tile).border(if (focused || ctx.active == n) 2.dp else 1.dp, ring, NB.shape.tile).padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 if (value.isEmpty()) Text("$n", style = NB.type.num, color = c.muted)
@@ -194,11 +204,11 @@ private fun WordSlot(n: Int, opts: List<LrOption>, ctx: QCtx, selected: Boolean,
     Surface(
         onClick = onSelect, shape = NB.shape.tile, color = if (selected) c.brandSoft else c.surface, contentColor = c.ink,
         border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) c.brand else c.faint),
-        modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 44.dp)
+        modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp)
             .bringIntoViewRequester(ctx.requester(n))
             .semantics { contentDescription = "Question $n, ${if (value.isEmpty()) "empty blank" else "word $label"}"; stateDescription = if (selected) "Selected" else "" },
     ) {
-        Row(Modifier.heightIn(min = 44.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             if (value.isEmpty()) Text("$n", style = NB.type.num, color = c.muted) else Text(label, style = NB.type.body.copy(fontWeight = FontWeight.Medium), color = c.ink)
         }
     }
@@ -265,7 +275,8 @@ private fun RichInline(inline: List<Inline>, ctx: QCtx, g: LrGroup, wb: WordBoxS
         )
         return
     }
-    FlowRow(
+    // English sentence split into word tokens: FlowRow follows layout direction, so pin LTR or RTL would reverse the words.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { FlowRow(
         modifier, horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
@@ -279,7 +290,7 @@ private fun RichInline(inline: List<Inline>, ctx: QCtx, g: LrGroup, wb: WordBoxS
                 }
             }
         }
-    }
+    } }
 }
 
 @Composable
@@ -428,27 +439,67 @@ private fun MatchItem(q: LrQuestion, g: LrGroup, ctx: QCtx) {
 
 // ---------------------------------------------------------------- figure
 
+/** Decoded figures by URL. ponytail: ~24 MB of bitmaps, enough for a test's few maps; a size-aware image loader if figures multiply. */
+private val figures by lazy {
+    object : LruCache<String, ImageBitmap>(24 shl 20) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.asAndroidBitmap().byteCount
+    }
+}
+
+/** Largest figure side kept in memory: sharp enough for the 6x zoom on a phone, far smaller than a print-resolution scan. */
+private const val FIGURE_MAX_PX = 2048
+
+/** Power-of-two BitmapFactory sample size that brings a [w] x [h] image within [max] px on its longer side. */
+fun figureSampleSize(w: Int, h: Int, max: Int): Int {
+    var n = 1
+    while (maxOf(w, h) / n > max) n *= 2
+    return n
+}
+
+private fun decodeFigure(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    val opts = BitmapFactory.Options().apply { inSampleSize = figureSampleSize(bounds.outWidth, bounds.outHeight, FIGURE_MAX_PX) }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)?.asImageBitmap()
+}
+
 /** A map / plan / diagram on white, as printed (fixed paper colours on purpose: figures are drawn for white). Tap to zoom (pinch, drag). */
 @Composable
 private fun Figure(url: String, title: String?, ctx: QCtx) {
     val c = NB.colors
-    val image by produceState<ImageBitmap?>(null, url) {
-        value = try {
-            ctx.api.download(url).let { BitmapFactory.decodeByteArray(it, 0, it.size) }?.asImageBitmap()
-        } catch (e: Exception) { null }
+    var attempt by remember { mutableIntStateOf(0) }
+    // null = loading; a failed download or decode is a failure, not an endless "Loading".
+    val image by produceState<Result<ImageBitmap>?>(figures.get(url)?.let { Result.success(it) }, url, attempt) {
+        if (value?.isSuccess == true) return@produceState // cached: revisiting a part doesn't download and decode again
+        value = null
+        value = runCatching {
+            val bytes = ctx.api.download(url)
+            withContext(Dispatchers.Default) { decodeFigure(bytes) }?.also { figures.put(url, it) } ?: error("undecodable figure")
+        }.onFailure { if (it is kotlin.coroutines.cancellation.CancellationException) throw it }
     }
     var zoom by remember { mutableStateOf(false) }
     val desc = title ?: "Figure for the questions below"
-    val img = image
+    val img = image?.getOrNull()
+    // ponytail: figures are drawn for white paper, so the frame always uses the light tokens.
+    val paperMuted = LightColors.muted
     Box(
-        Modifier.fillMaxWidth().clip(NB.shape.tile).background(Color.White).border(1.dp, c.line, NB.shape.tile)
+        Modifier.fillMaxWidth().clip(NB.shape.tile).background(LightColors.surface).border(1.dp, c.line, NB.shape.tile)
             .then(if (img != null) Modifier.clickable(onClickLabel = "Zoom in") { zoom = true } else Modifier).padding(8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (img != null) {
-            Image(img, desc, Modifier.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit)
-            Icon(Icons.Rounded.ZoomIn, null, Modifier.align(Alignment.BottomEnd).padding(4.dp).size(24.dp), tint = Color(0xFF536175))
-        } else Text("Loading the figure…", Modifier.padding(24.dp), style = NB.type.bodySmall, color = Color(0xFF536175))
+        when {
+            img != null -> {
+                Image(img, desc, Modifier.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit)
+                Icon(Icons.Rounded.ZoomIn, null, Modifier.align(Alignment.BottomEnd).padding(4.dp).size(24.dp), tint = paperMuted)
+            }
+            image == null -> Text("Loading the figure…", Modifier.padding(24.dp), style = NB.type.bodySmall, color = paperMuted)
+            else -> Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("The figure didn't load.", style = NB.type.bodySmall, color = LightColors.ink)
+                CompositionLocalProvider(LocalNbColors provides LightColors) {
+                    NbButton("Try again", { attempt++ }, kind = BtnKind.Secondary, size = BtnSize.Small)
+                }
+            }
+        }
     }
     if (zoom && img != null) Dialog({ zoom = false }, DialogProperties(usePlatformDefaultWidth = false)) {
         var scale by remember { mutableFloatStateOf(1f) }
@@ -460,7 +511,7 @@ private fun Figure(url: String, title: String?, ctx: QCtx) {
                 Modifier.fillMaxSize().transformable(state).graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y },
                 contentScale = ContentScale.Fit,
             )
-            NbIconButton(Icons.Rounded.Close, "Close figure", { zoom = false }, Modifier.align(Alignment.TopEnd).padding(8.dp), tonal = true, tint = Color(0xFF0F172A))
+            NbIconButton(Icons.Rounded.Close, "Close figure", { zoom = false }, Modifier.align(Alignment.TopEnd).padding(8.dp), tonal = true)
         }
     }
 }

@@ -16,7 +16,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +48,7 @@ import com.soyeb.ieltspractice.design.components.LoadContent
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.Overline
+import com.soyeb.ieltspractice.design.components.PollWhileVisible
 import com.soyeb.ieltspractice.design.components.PushedList
 import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.SectionHeader
@@ -56,11 +56,9 @@ import com.soyeb.ieltspractice.design.components.SkillTile
 import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.rememberLoad
-import com.soyeb.ieltspractice.nav.MockHub
 import com.soyeb.ieltspractice.nav.MockResult
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Tab
-import kotlinx.coroutines.delay
 
 /** The finished mock: the overall band, the four section bands (tap one for its full result) and where to work next. */
 @Composable
@@ -77,9 +75,7 @@ fun MockResultScreen(nav: Nav, route: MockResult) {
     val m = loader.value
     // Sections may still be marking: look again every 5 s. (Not in screenshots.)
     val marking = m?.marking == true
-    LaunchedEffect(marking) {
-        if (marking && demo == null) while (true) { delay(5_000); loader.reload() }
-    }
+    PollWhileVisible(marking && demo == null) { loader.reload() }
 
     fun share(overall: Double) {
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -94,12 +90,12 @@ fun MockResultScreen(nav: Nav, route: MockResult) {
         bottomBar = {
             if (m != null) StickyActionBar {
                 if (m.open && m.overall == null) {
-                    NbButton("Back to your mock", { nav.replace(MockHub(m.id)) }, fill = true, size = BtnSize.Large)
+                    NbButton("Back to your mock", { nav.toMock(m.id) }, fill = true, size = BtnSize.Large)
                 } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     m.overall?.let { o ->
                         NbButton("Share", { share(o) }, Modifier.weight(1f), kind = BtnKind.Outline, size = BtnSize.Large, icon = Icons.Rounded.Share)
                     }
-                    NbButton("Back to Today", { nav.openTab(Tab.Today) }, Modifier.weight(1f), size = BtnSize.Large)
+                    NbButton("Back to Today", { nav.home() }, Modifier.weight(1f), size = BtnSize.Large)
                 }
             }
         },

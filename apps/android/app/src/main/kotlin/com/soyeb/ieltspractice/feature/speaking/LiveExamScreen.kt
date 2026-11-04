@@ -46,7 +46,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.soyeb.ieltspractice.LocalDemo
@@ -59,6 +61,7 @@ import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.CardTone
 import com.soyeb.ieltspractice.design.components.ConfirmDialog
 import com.soyeb.ieltspractice.design.components.IconTile
+import com.soyeb.ieltspractice.design.components.LocalSnack
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbIconButton
@@ -76,6 +79,7 @@ import com.soyeb.ieltspractice.nav.LiveExam
 import com.soyeb.ieltspractice.nav.Nav
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import com.soyeb.ieltspractice.media.LiveExam as LiveModel
 
 // The live examiner (LiveKit): pre-screen with the mic check, then a voice orb stage. State comes from media/LiveExam.
@@ -110,8 +114,14 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     KeepScreenOn()
 
     fun checkMic() = access.ask { ok -> if (ok) exam.beginMicCheck() else exam.micDenied = true }
-    // Ask for the microphone on entry so the level meter is already running.
-    LaunchedEffect(Unit) { if (demo == null) checkMic() }
+    // Already allowed: start the level meter on entry. Otherwise the system prompt waits for "Test microphone", after the pre-screen says where the audio goes.
+    LaunchedEffect(Unit) { if (demo == null && access.granted()) exam.beginMicCheck() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        exam.parkMicCheck(true)
+        // Rotation also stops the activity; only really leaving the app ends a running test.
+        if (ctx.findActivity()?.isChangingConfigurations != true) exam.leftApp()
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { exam.parkMicCheck(false) }
 
     // Screenshots: Connecting and Ended are drawn over the model's pre-screen state.
     val demoTab = demo?.tab
@@ -126,7 +136,14 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     LaunchedEffect(stage) { (stage as? LiveStage.Failed)?.error?.let { nav.reportBlocked(it, "speaking") } }
 
     val running = stage == LiveStage.Running
-    BackHandler(enabled = running || stage == LiveStage.Uploading) { if (running) confirmEnd = true }
+    val snack = LocalSnack.current
+    // One exit rule for the gesture and the close button: confirm while running, hold (and say why) while uploading.
+    fun leave() {
+        if (running) confirmEnd = true
+        else if (stage == LiveStage.Uploading) graph.scope.launch { snack.showSnackbar("Saving your recording… one moment.") }
+        else nav.back()
+    }
+    BackHandler(enabled = running || stage == LiveStage.Uploading) { leave() }
     val now by produceState(SystemClock.elapsedRealtime(), running, demo) {
         value = SystemClock.elapsedRealtime()
         while (running && demo == null) { delay(1000); value = SystemClock.elapsedRealtime() }
@@ -134,7 +151,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     val elapsed = if (running) clockText(((now - exam.testStartedAt) / 1000).coerceAtLeast(0)) else null
 
     PushedScreen(
-        "Live examiner", onBack = { if (running) confirmEnd = true else nav.back() }, close = true, scrollBehavior = null,
+        "Live examiner", onBack = ::leave, close = true, scrollBehavior = null,
         actions = {
             if (elapsed != null) Text(
                 elapsed, Modifier.padding(end = 16.dp).semantics { contentDescription = "Elapsed $elapsed" },
@@ -168,6 +185,10 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
                     else if (stage.error == null) NbButton("Reconnect examiner", exam::start, fill = true, size = BtnSize.Large)
                     NbButton("Back to speaking", nav::back, kind = BtnKind.Text, fill = true)
                 }
+                is LiveStage.Unattached -> StickyActionBar {
+                    NbButton("Try again", exam::retryAttach, fill = true, size = BtnSize.Large)
+                    NbButton("Back to your mock", nav::back, kind = BtnKind.Text, fill = true)
+                }
                 is LiveStage.Finished -> StickyActionBar {
                     if (route.mockId != null) NbButton("Back to your mock", nav::back, fill = true, size = BtnSize.Large)
                     else NbButton("See my score", { nav.replace(AttemptResult(stage.ids)) }, fill = true, size = BtnSize.Large)
@@ -190,6 +211,10 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
                     Icons.Rounded.Warning, NB.colors.warnText, NB.colors.warnSoft, "The test stopped", stage.message,
                 )
                 is LiveStage.Finished -> Ended(stage.ids.size, route.mockId != null)
+                is LiveStage.Unattached -> Message(
+                    Icons.Rounded.Warning, NB.colors.warnText, NB.colors.warnSoft, "Not added to your mock yet",
+                    "Your answers were scored, but this test couldn't be linked to your mock. Check your connection and try again.",
+                )
             }
         }
     }
@@ -241,6 +266,11 @@ private fun PreScreen(exam: LiveModel, onCheck: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Text("Headphones work best, so the examiner's voice doesn't reach your microphone. Find a quiet room.", style = NB.type.bodySmall, color = c.ink)
             }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "The microphone check stays on this phone. During the test your voice is streamed to an AI voice examiner and recorded so your answers can be scored. Delete any result from History.",
+                style = NB.type.bodySmall, color = c.muted,
+            )
             Spacer(Modifier.height(14.dp))
             if (exam.micReady) {
                 MicMeter(exam.level.toFloat(), heard = exam.micHeard, quiet = false)

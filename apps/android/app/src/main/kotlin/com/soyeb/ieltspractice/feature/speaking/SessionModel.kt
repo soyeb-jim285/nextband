@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import com.soyeb.ieltspractice.AppGraph
 import com.soyeb.ieltspractice.data.AnswerWindow
 import com.soyeb.ieltspractice.data.PendingRecording
+import com.soyeb.ieltspractice.data.currentUserId
 import com.soyeb.ieltspractice.data.UploadState
 import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.logic.newSessionId
@@ -24,6 +25,8 @@ import com.soyeb.ieltspractice.media.MicRecorder
 import com.soyeb.ieltspractice.nav.SpeakingSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -32,7 +35,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -100,6 +105,7 @@ class SessionModel(
     private var parent: String? = null
     private var prepEnd = 0L
     private var starting = false
+    private var finishing = false // the recording is being closed off the main thread
 
     val current: Prompt? get() = items.getOrNull(index)
     val mockId: String? get() = route.mockId
@@ -275,6 +281,13 @@ class SessionModel(
         }
     }
 
+    /** The screen left the foreground (a call, another app): hold the recording so it doesn't fill with silence; it continues on return. */
+    fun setAway(away: Boolean) {
+        recorder.away = away
+        // The mic check holds the microphone for nothing while the screen is hidden: close it, and open it again on return.
+        if (phase == Phase.MicCheck) { if (away) micCheck.stop() else retryMicCheck() }
+    }
+
     /** True when the recording must stop now: P2 hard stop at 2:00, the 15 min cap for any part. */
     fun hitLimit(elapsed: Double): Boolean {
         val p = current ?: return false
@@ -291,15 +304,22 @@ class SessionModel(
 
     /** Stops, keeps the recording on disk, uploads it in the background and moves on. */
     fun finishPart(force: Boolean = false) {
-        if (phase != Phase.Recording) return
+        if (phase != Phase.Recording || finishing) return
         val p = current ?: return
         if (examiner == Examiner.Asking && !force) return
+        finishing = true
         windows.add(AnswerWindow(question, (questionStart * 1000).toInt(), (recorder.elapsed * 1000).toInt()))
         askJob?.cancel()
         runCatching { player.pause() }
         graph.tts.stop()
         examiner = Examiner.Idle
-        val r = recorder.stop()
+        // Joining the capture thread and flushing the encoder can take a second or two: keep it off the main thread. NonCancellable so a
+        // screen closing meanwhile still keeps and queues the recording.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) { try { savePart(p) } finally { finishing = false } } }
+    }
+
+    private suspend fun savePart(p: Prompt) {
+        val r = withContext(Dispatchers.IO) { recorder.stop() }
         level = 0.0
         if (!store.audioFile(recId).exists()) {
             startError = "Nothing was recorded. Check your microphone and try again."
@@ -311,8 +331,9 @@ class SessionModel(
             createdAt = System.currentTimeMillis(), durationMs = r.durationMs, energy = r.energy.take(20000),
             marks = windows.map { it.startMs }.take(200), segments = windows.take(200),
             sessionId = if (isFull) sessionId else null, parentAttemptId = parent, mockId = route.mockId,
+            ownerId = currentUserId(api),
         )
-        store.add(rec)
+        withContext(Dispatchers.IO) { store.add(rec) }
         uploads = uploads + UploadItem(rec.id, rec.label)
         store.start(rec, api)
         if (index + 1 < items.size) {
@@ -353,9 +374,9 @@ class SessionModel(
         runCatching { player.pause() }
         graph.tts.stop()
         examiner = Examiner.Idle
-        if (recorder.isRecording) {
-            recorder.stop()
-            store.audioFile(recId).delete()
+        if (recorder.isRecording && !finishing) {
+            val f = store.audioFile(recId)
+            thread(name = "mic-discard") { recorder.stop(); f.delete() } // the encoder flush blocks; never on the main thread
         }
         micCheck.stop()
     }
@@ -374,7 +395,7 @@ class SessionModel(
             } else if (phase == Phase.Recording) {
                 elapsed = recorder.elapsed; level = recorder.level; levels = recorder.levels
                 liveWpm = recorder.liveWpm; silence = recorder.silence
-                if (examiner != Examiner.Asking && hitLimit(elapsed)) finishPart(force = true)
+                if ((examiner != Examiner.Asking && hitLimit(elapsed)) || recorder.failed) finishPart(force = true)
             }
             delay(100)
         }

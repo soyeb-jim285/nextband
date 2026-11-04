@@ -27,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -66,6 +65,7 @@ import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.NbListRow
 import com.soyeb.ieltspractice.design.components.Overline
+import com.soyeb.ieltspractice.design.components.PollWhileVisible
 import com.soyeb.ieltspractice.design.components.PushedList
 import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.RowDivider
@@ -87,7 +87,6 @@ import com.soyeb.ieltspractice.nav.Tab
 import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.intOrNull
@@ -104,9 +103,7 @@ fun CoachScreen(nav: Nav) {
 
     // A fresh report is being written: look again every 5 s until it lands. (Not in screenshots.)
     val updating = coach?.updating == true
-    LaunchedEffect(updating) {
-        if (updating && !demo) while (true) { delay(5_000); loader.reload() }
-    }
+    PollWhileVisible(updating && !demo) { loader.reload() }
 
     PushedScreen(
         "Your plan", nav::back,

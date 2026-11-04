@@ -1,5 +1,6 @@
 package com.soyeb.ieltspractice.data.demo
 
+import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.data.logic.flat
 import com.soyeb.ieltspractice.data.model.*
 import com.soyeb.ieltspractice.data.net.AppJson
@@ -28,9 +29,9 @@ data class DemoConfig(val screen: String? = null, val tab: String? = null, val t
     val dark: Boolean? get() = when (theme) { "dark" -> true; "light" -> false; else -> null }
 
     companion object {
-        /** Null unless the intent carries `--ez demo true`. */
+        /** Null unless the intent carries `--ez demo true`, and always null in a store-signed release ([BuildConfig.DEMO] false). */
         fun from(intent: Intent?): DemoConfig? {
-            if (intent?.getBooleanExtra("demo", false) != true) return null
+            if (!BuildConfig.DEMO || intent?.getBooleanExtra("demo", false) != true) return null
             return DemoConfig(intent.getStringExtra("screen"), intent.getStringExtra("tab"), intent.getStringExtra("theme"))
         }
     }

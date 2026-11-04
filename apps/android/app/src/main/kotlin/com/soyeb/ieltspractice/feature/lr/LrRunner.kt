@@ -63,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -93,7 +94,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.logic.FlatQ
@@ -127,12 +131,12 @@ import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.TimerPill
+import com.soyeb.ieltspractice.design.components.awaitStarted
 import com.soyeb.ieltspractice.design.components.clockText
 import com.soyeb.ieltspractice.design.components.rememberLoad
 import com.soyeb.ieltspractice.design.schemeFor
 import com.soyeb.ieltspractice.nav.LrResult
 import com.soyeb.ieltspractice.nav.LrRun
-import com.soyeb.ieltspractice.nav.MockHub
 import com.soyeb.ieltspractice.nav.Nav
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -158,7 +162,7 @@ fun LrRunScreen(route: LrRun, nav: Nav) {
         is Load.Ready -> {
             val (attempt, local) = s.value
             if (attempt.submitted) {
-                LaunchedEffect(attempt.id) { if (route.mockId != null) nav.replace(MockHub(route.mockId)) else nav.replace(LrResult(attempt.id)) }
+                LaunchedEffect(attempt.id) { if (route.mockId != null) nav.toMock(route.mockId) else nav.replace(LrResult(attempt.id)) }
                 PushedScreen("Test", nav::back, close = true) { pad -> SkeletonList(Modifier.padding(pad)) }
             } else if (attempt.test.sections.isEmpty() || attempt.test.flat().isEmpty()) {
                 PushedScreen("Test", nav::back, close = true) { pad -> ErrorState("This test has no questions.", load.reload, Modifier.padding(pad)) }
@@ -166,6 +170,25 @@ fun LrRunScreen(route: LrRun, nav: Nav) {
         }
     }
 }
+
+/**
+ * The live run, held by the LrRun back-stack entry so a configuration change (rotation, dark mode, font size) keeps it. Built with
+ * `remember`, it was rebuilt from the attempt as loaded when the screen opened (rememberLoad's cached copy), and the 15 s clock save
+ * then wrote those stale answers and that clock back over the server's. Keyed per attempt (see [runHolder]).
+ */
+class LrRunHolder : ViewModel() {
+    var session: LrSession? = null
+    var marks: Marks? = null
+    var clock: RunClock? = null
+    var playlist: ExamPlaylist? = null
+    var flagged: MutableState<Set<Int>>? = null
+    var settings: MutableState<LrSettings>? = null
+    // The exam player lives as long as the run (built on the application context), so rotating never restarts the recording.
+    override fun onCleared() { playlist?.release() }
+}
+
+@Composable
+private fun runHolder(attemptId: String): LrRunHolder = viewModel<LrRunHolder>(key = "lr-run:$attemptId")
 
 /** The run's clock in seconds, kept out of the runner's own recomposition: only the timer reads it. */
 @Stable
@@ -199,7 +222,8 @@ private fun LrRunner(attempt: LrAttempt, local: RunLocal, mockId: String?, nav: 
     val demo = LocalDemo.current
     val isDemo = demo != null
     val dv = demo?.tab.orEmpty()
-    var settings by remember(attempt.id) { mutableStateOf(local.settings) }
+    val held = runHolder(attempt.id)
+    var settings by (held.settings ?: mutableStateOf(local.settings).also { held.settings = it })
     val pal = lrPalette(settings.scheme)
     val body: @Composable () -> Unit = {
         RunnerBody(attempt, local, mockId, nav, isDemo, dv, settings) { next ->
@@ -245,17 +269,15 @@ private fun RunnerBody(
     val view = LocalView.current
     DisposableEffect(view) { view.keepScreenOn = true; onDispose { view.keepScreenOn = false } }
 
-    val session = remember(attempt.id) {
-        LrSession(
-            attempt, graph.api, graph.scope, live = !isDemo, localAudio = local.audio,
-            saveLocalAudio = { v -> graph.scope.launch { graph.prefs.setString("audio:${attempt.id}", v) } },
-        )
-    }
+    val held = runHolder(attempt.id)
+    val session = held.session ?: LrSession(
+        attempt, graph.api, graph.scope, live = !isDemo, localAudio = local.audio,
+        saveLocalAudio = { v -> graph.scope.launch { graph.prefs.setString("audio:${attempt.id}", v) } },
+    ).also { held.session = it }
     val reg = remember { QRegistry() }
-    val hl = remember(attempt.id) {
-        Marks(if (isDemo) demoMarks(dv) else local.marks) { list -> if (!isDemo) graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", marksJson(list)) } }
-            .also { if (isDemo && dv == "Highlight") { it.draft = Sel("passage:1:2", 8, 44); it.pending = true } }
-    }
+    val hl = held.marks ?: Marks(if (isDemo) demoMarks(dv) else local.marks) { list -> if (!isDemo) graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", marksJson(list)) } }
+        .also { if (isDemo && dv == "Highlight") { it.draft = Sel("passage:1:2", 8, 44); it.pending = true } }
+        .also { held.marks = it }
 
     // ---- where we are ----
     val demoStart: Pair<Int, Int>? = when (dv) {
@@ -267,7 +289,7 @@ private fun RunnerBody(
     var partIdx by rememberSaveable { mutableIntStateOf(demoStart?.first ?: local.position?.first?.coerceIn(0, sections.lastIndex) ?: 0) }
     var current by rememberSaveable { mutableIntStateOf(demoStart?.second ?: local.position?.second?.takeIf { n -> flat.any { it.n == n } } ?: flat.first().n) }
     var active by remember { mutableStateOf<Int?>(null) }
-    var flagged by remember(attempt.id) { mutableStateOf(if (isDemo) (if (dv == "Navigator") setOf(4, 9) else emptySet()) else local.flags) }
+    var flagged by (held.flagged ?: mutableStateOf<Set<Int>>(if (isDemo) (if (dv == "Navigator") setOf(4, 9) else emptySet()) else local.flags).also { held.flagged = it })
     val section = sections[partIdx.coerceIn(0, sections.lastIndex)]
     val responses = session.responses
 
@@ -283,14 +305,16 @@ private fun RunnerBody(
     var submitError by remember { mutableStateOf<String?>(null) }
 
     // ---- clocks ----
-    val clock = remember(attempt.id) { RunClock(attempt.elapsedS.toDouble()) }
-    val playlist = remember(attempt.id) {
+    val clock = held.clock ?: RunClock(attempt.elapsedS.toDouble()).also { held.clock = it }
+    val playlist = held.playlist ?: run {
         val urls = if (examListening) sections.map { attempt.assets[it.audio.orEmpty()].orEmpty() } else emptyList()
         val demoPhase = if (isDemo && examListening) when (dv) { "Gate" -> ExamPhase.Idle; "Review" -> ExamPhase.Review; else -> ExamPhase.Audio } else null
         ExamPlaylist(urls, attempt.elapsedS.toDouble(), demoPhase, test.checkEndsAt)
-    }
-    DisposableEffect(playlist) { if (examListening) playlist.attach(context); onDispose { playlist.release() } }
+    }.also { held.playlist = it }
+    // attach is a no-op once the player exists; LrRunHolder.onCleared releases it when the run's screen goes.
+    LaunchedEffect(playlist) { if (examListening) playlist.attach(context) }
     LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.tick { session.elapsed = it } }
+    LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.loadDurations() }
     LaunchedEffect(examListening) {
         if (examListening || isDemo) return@LaunchedEffect
         val t0 = System.nanoTime()
@@ -313,7 +337,9 @@ private fun RunnerBody(
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { foreground = false }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (!isDemo) session.flushLater(true) }
     DisposableEffect(session) { onDispose { if (!isDemo) session.flushLater(true) } }
-    LaunchedEffect(session) { if (!isDemo) while (true) { delay(15_000); session.flush(true) } }
+    // The clock save: only while the screen is visible (ON_STOP already saved once), so a test left open in the background never wakes the radio.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(session) { if (!isDemo) while (true) { delay(15_000); lifecycle.awaitStarted(); session.flush(true) } }
     val partNo = section.part
     LaunchedEffect(started, partNo) { if (started && !isDemo) while (true) { delay(1000); if (foreground) session.tickPart(partNo) } }
     LaunchedEffect(partIdx, current, flagged) {
@@ -332,7 +358,7 @@ private fun RunnerBody(
                 session.submit()
                 leaving = true
                 graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", null) } // notes are not kept past the attempt
-                if (mockId != null) nav.replace(MockHub(mockId)) else nav.replace(LrResult(attempt.id))
+                if (mockId != null) nav.toMock(mockId) else nav.replace(LrResult(attempt.id))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -351,7 +377,8 @@ private fun RunnerBody(
     LaunchedEffect(session) {
         if (isDemo || !exam) return@LaunchedEffect
         snapshotFlow { if (listening) playlist.phase == ExamPhase.Review && playlist.reviewLeft == 0 else limit - clock.seconds.toInt() <= 0 }.first { it }
-        submit()
+        // Keep trying while offline: time is up, so the attempt must still go in once the connection is back.
+        while (!leaving) { submit(); delay(10_000) }
     }
     LaunchedEffect(session) {
         if (isDemo || !exam || listening) return@LaunchedEffect
@@ -383,7 +410,9 @@ private fun RunnerBody(
         reg = reg, hl = hl, tick = ::tick,
     )
 
-    fun canGo(n: Int): Boolean = !examListening || flat.firstOrNull { it.n == n }?.part == section.part
+    // Listening exam: only the part playing is open; once the recording ends every part opens for the checking time.
+    val freeNav = !examListening || playlist.phase == ExamPhase.Review
+    fun canGo(n: Int): Boolean = freeNav || flat.firstOrNull { it.n == n }?.part == section.part
     fun goPart(i: Int) {
         partIdx = i
         current = sections[i].groups.firstOrNull()?.from ?: current
@@ -485,7 +514,7 @@ private fun RunnerBody(
                     if (started && sections.size > 1) PartTabs(
                         labels = navParts.map { it.label },
                         counts = navParts.map { p -> p.questions.count(answered) to p.questions.size },
-                        selected = partIdx.coerceIn(0, sections.lastIndex), enabled = !examListening, onSelect = ::goPart,
+                        selected = partIdx.coerceIn(0, sections.lastIndex), enabled = freeNav, onSelect = ::goPart,
                     )
                     when {
                         !started -> Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {

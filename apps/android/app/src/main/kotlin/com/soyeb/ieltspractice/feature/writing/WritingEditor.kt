@@ -45,7 +45,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -167,13 +169,18 @@ private suspend fun loadSession(g: AppGraph, r: WritingTask): ExamSession {
 private fun ExamScreen(session: ExamSession, nav: Nav) {
     val graph = LocalGraph.current
     val demo = LocalDemo.current
-    val store = remember { DraftStore(graph.prefs) }
+    val store = remember { DraftStore(graph.prefs) { if (demo != null) "demo" else draftOwner(graph.api) } }
     val drafts by produceState<Map<String, Draft>?>(null, session) {
         value = session.prompts.mapIndexed { i, p -> p.id to (if (demo != null) demoDraft(demo.screen, demo.tab, i) else store.load(p.id)) }.toMap()
     }
     val d = drafts
     if (d == null) LoadingEditor(nav, null) {} else ExamBody(session, d, store, nav)
 }
+
+private val TextMapSaver = Saver<SnapshotStateMap<String, String>, HashMap<String, String>>(
+    save = { HashMap(it) },
+    restore = { mutableStateMapOf<String, String>().apply { putAll(it) } },
+)
 
 @Composable
 private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: DraftStore, nav: Nav) {
@@ -193,8 +200,9 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     val total = examSeconds(prompts)
     val flags = remember { Flags() }
     val created = remember { mutableMapOf<String, String>() } // promptId to attemptId, so a retried submit never duplicates attempts
-    val texts = remember { mutableStateMapOf<String, String>().apply { prompts.forEach { put(it.id, initial[it.id]?.text.orEmpty()) } } }
-    val plans = remember { mutableStateMapOf<String, String>().apply { prompts.forEach { put(it.id, initial[it.id]?.plan.orEmpty()) } } }
+    // Saveable: rotation or fold/unfold keeps what was typed, even the last moments before the debounced autosave.
+    val texts = rememberSaveable(saver = TextMapSaver) { mutableStateMapOf<String, String>().apply { prompts.forEach { put(it.id, initial[it.id]?.text.orEmpty()) } } }
+    val plans = rememberSaveable(saver = TextMapSaver) { mutableStateMapOf<String, String>().apply { prompts.forEach { put(it.id, initial[it.id]?.plan.orEmpty()) } } }
 
     var task by rememberSaveable { mutableIntStateOf(0) }
     val p = prompts[task.coerceIn(prompts.indices)]
@@ -254,14 +262,22 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
         // Editor time, split across the tasks of a full test so weekly minutes don't count it twice.
         val durationMs = (maxOf(0, total - left.value) * 1000L / prompts.size).toInt()
         val items = prompts.map { q -> Triple(q, texts[q.id].orEmpty(), plans[q.id].orEmpty()) }
+        // The attempt ids also live in prefs, so a retry after rotation, process death or reopening the mock never creates a second attempt.
+        val createdKey = "wcreated:${session.sessionId}"
         scope.launch {
             try {
+                if (created.isEmpty()) graph.prefs.getString(createdKey)?.split(",")?.forEach { kv ->
+                    kv.split("=").takeIf { it.size == 2 }?.let { created[it[0]] = it[1] }
+                }
                 val ids = mutableListOf<String>()
                 for ((q, text, plan) in items) {
                     val id = created[q.id] ?: api.createAttempt(
                         q.id, "writing", q.part, mode = if (multi) "exam" else "practice", sessionId = if (multi) session.sessionId else null,
                         mockId = session.mockId, parentAttemptId = session.parentId, text = text,
-                    ).id.also { created[q.id] = it }
+                    ).id.also { id ->
+                        created[q.id] = id
+                        graph.prefs.setString(createdKey, created.entries.joinToString(",") { (k, v) -> "$k=$v" })
+                    }
                     try {
                         api.submitWriting(id, text, plan.takeIf { q.part == 2 && it.isNotBlank() }, durationMs, overtime)
                     } catch (e: ApiError) {
@@ -271,6 +287,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
                 }
                 flags.submitted = true
                 store.clear(prompts.map { it.id })
+                graph.scope.launch { graph.prefs.setString(createdKey, null) }
                 hf.performHapticFeedback(HapticFeedbackType.LongPress)
                 if (session.mockId != null) nav.back() else nav.replace(AttemptResult(ids)) // a mock test goes back to its hub
             } catch (e: CancellationException) {
@@ -287,7 +304,8 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
 
     // Time notices: haptics come from TimerPill; this adds the words.
     LaunchedEffect(session) {
-        var prev = left.value
+        // Start just above zero so a session reopened after its time ran out (a mock resumed late) still gets its time-up.
+        var prev = maxOf(left.value, 1)
         snapshotFlow { left.value }.collect { cur ->
             when (timeEvent(prev, cur)) {
                 TimeEvent.Warn5 -> toast("5 minutes left")
@@ -451,7 +469,14 @@ private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean,
     Surface(color = c.surface, contentColor = c.ink, modifier = Modifier.fillMaxWidth()) {
         Column {
             HorizontalDivider(color = c.line)
-            Row(Modifier.padding(horizontal = NB.space.gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Large text: the buttons would squeeze the count and clock to nothing, so they move to a row of their own.
+            val stack = LocalDensity.current.fontScale > 1.3f
+            val buttons: @Composable () -> Unit = {
+                if (plan) NbButton("Plan", onPlan, kind = BtnKind.Secondary)
+                NbButton("Submit", onSubmit, enabled = !submitting)
+            }
+            Column(Modifier.padding(horizontal = NB.space.gutter, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(
                     Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "$words of $need words" + if (reached) ", minimum reached" else "" },
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -471,8 +496,9 @@ private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean,
                     }
                     Meter(words.toDouble(), max = need.toDouble(), color = if (reached) c.good else c.brand, height = 4.dp)
                 }
-                if (plan) NbButton("Plan", onPlan, kind = BtnKind.Secondary)
-                NbButton("Submit", onSubmit, enabled = !submitting)
+                if (!stack) buttons()
+            }
+            if (stack) Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) { buttons() }
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -50,6 +51,7 @@ import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.components.BandPill
 import com.soyeb.ieltspractice.design.components.CardTone
+import com.soyeb.ieltspractice.design.components.IconTile
 import com.soyeb.ieltspractice.design.components.ChipRow
 import com.soyeb.ieltspractice.design.components.EmptyState
 import com.soyeb.ieltspractice.design.components.ErrorState
@@ -64,8 +66,9 @@ import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.LrResult
 import com.soyeb.ieltspractice.nav.LrRun
+import com.soyeb.ieltspractice.nav.MockHub
+import com.soyeb.ieltspractice.nav.MockResult
 import com.soyeb.ieltspractice.nav.Nav
-import com.soyeb.ieltspractice.nav.Tab
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -83,6 +86,7 @@ private class Feed(private val api: Api, private val skill: Skill?) {
     private var page = 1
     private var sp = emptyList<HistoryItem>()
     private var lr = emptyList<HistoryItem>()
+    private var mocks = emptyList<HistoryItem>()
     private val wantsSp = skill == null || skill == Skill.Writing || skill == Skill.Speaking
     private val wantsLr = skill == null || skill == Skill.Listening || skill == Skill.Reading
 
@@ -91,11 +95,12 @@ private class Feed(private val api: Api, private val skill: Skill?) {
         try {
             val l = if (wantsLr) api.lrAttempts().map { it.toItem() }.filter { skill == null || it.skill == skill } else emptyList()
             val first = if (wantsSp) api.attempts(skill?.key, 1) else null
+            mocks = if (skill == null) api.mockList().map { it.toItem() } else emptyList()
             lr = l
             sp = first?.items?.map { it.toItem() }.orEmpty()
             page = 1
             hasMore = first != null && sp.isNotEmpty() && sp.size < first.total
-            items = mergeItems(lr, sp)
+            items = mergeItems(lr, sp, mocks)
             phase = Phase.Ready
         } catch (e: CancellationException) {
             throw e
@@ -118,7 +123,7 @@ private class Feed(private val api: Api, private val skill: Skill?) {
             page += 1
             sp = sp + fresh
             hasMore = fresh.isNotEmpty() && sp.size < p.total
-            items = mergeItems(lr, sp)
+            items = mergeItems(lr, sp, mocks)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -131,13 +136,14 @@ private class Feed(private val api: Api, private val skill: Skill?) {
     fun remove(id: String) {
         sp = sp.filter { it.id != id }
         lr = lr.filter { it.id != id }
-        items = mergeItems(lr, sp)
+        items = mergeItems(lr, sp, mocks)
     }
 }
 
 /** Open the result (or, for something unfinished, where it was left). */
 fun openItem(nav: Nav, item: HistoryItem) {
-    if (item.lr) nav.go(if (item.status == HStatus.Open) LrRun(item.id) else LrResult(item.id)) else nav.go(AttemptResult.of(item.id))
+    if (item.mock) nav.go(if (item.status == HStatus.Open) MockHub(item.id) else MockResult(item.id))
+    else if (item.lr) nav.go(if (item.status == HStatus.Open) LrRun(item.id) else LrResult(item.id)) else nav.go(AttemptResult.of(item.id))
 }
 
 /** One finished or unfinished result: skill tile, title, "Part 2 · 30 Sep · 12 min", and the band or what is going on. Used by History and Today. */
@@ -146,13 +152,13 @@ fun ResultRow(item: HistoryItem, target: Double?, onClick: () -> Unit) {
     NbListRow(
         title = item.title,
         subtitle = metaLine(item),
-        leading = { SkillTile(item.skill, 40.dp) },
+        leading = { if (item.mock) IconTile(Icons.Rounded.Flag, NB.colors.brandText, NB.colors.brandSoft, 40.dp) else SkillTile(item.skill, 40.dp) },
         trailing = {
             when (item.status) {
                 HStatus.Done -> if (item.band != null) BandPill(item.band, target)
                 HStatus.Analysing -> Tag("Analysing", fg = NB.colors.brandText, bg = NB.colors.brandSoft)
                 HStatus.Failed -> Tag("Failed", fg = NB.colors.badText, bg = NB.colors.badSoft)
-                HStatus.Open -> Tag(if (item.lr) "In progress" else "Not submitted", fg = NB.colors.warnText, bg = NB.colors.warnSoft)
+                HStatus.Open -> Tag(if (item.lr || item.mock) "In progress" else "Not submitted", fg = NB.colors.warnText, bg = NB.colors.warnSoft)
             }
         },
         onClick = onClick,
@@ -236,7 +242,7 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
                                 if (skill == null) "No results yet" else "No ${skill.label} results yet",
                                 "Finish a test and its result shows up here.",
                                 action = if (skill == null) "Start practising" else "Take a ${skill.label.lowercase()} test",
-                                onAction = { nav.openTab(if (skill == null) Tab.Today else skillTab(skill)) },
+                                onAction = { if (skill == null) nav.home() else nav.openTab(skillTab(skill)) },
                             )
                         } else {
                             val groups = visible.groupBy { bucketOf(it.instant) }
@@ -252,7 +258,8 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
                                         }
                                     }
                                     items(rows, key = { it.id }) { item ->
-                                        SwipeRow(item, target, onOpen = { openItem(nav, item) }, onDelete = { delete(item) })
+                                        if (item.mock) NbCard(tone = CardTone.Default, padding = PaddingValues(0.dp)) { ResultRow(item, target) { openItem(nav, item) } }
+                                        else SwipeRow(item, target, onOpen = { openItem(nav, item) }, onDelete = { delete(item) })
                                     }
                                 }
                                 if (feed.loadingMore) item(key = "more") {

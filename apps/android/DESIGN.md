@@ -59,6 +59,7 @@ indicator tint and small accents — never for text meaning. Band colours (good 
 | good / goodText / goodSoft | #15803D / #166534 / #DCFCE7 | #4ADE80 / #4ADE80 / #0B2E1A | at/above target |
 | warn / warnText / warnSoft | #B45309 / #92400E / #FEF3C7 | #FBBF24 / #FBBF24 / #33240A | 0.5–1.0 below |
 | bad / badText / badSoft | #BE123C / #BE123C / #FFE4EA | #FB7185 / #FB7185 / #3B0A18 | ≥1.5 below, errors |
+| onBad | #FFFFFF | #3B0613 | content on a bad fill (badges, destructive buttons) |
 | listening / listeningSoft | #0369A1 / #E0F2FE | #38BDF8 / #0B2536 | skill identity |
 | reading / readingSoft | #4338CA / #E0E7FF | #A5B4FC / #1E1B4B | skill identity |
 | writing / writingSoft | #A21CAF / #FAE8FF | #E879F9 / #3A0D3F | skill identity |
@@ -75,6 +76,7 @@ cards, essays, transcripts, model answers). Numbers that change use tabular figu
 | Style | Size/line | Weight | Use |
 |---|---|---|---|
 | display | 48/52 | Bold, -1% tracking | band hero numbers |
+| heroTitle | 30/36 | SemiBold, -1.5% | the one title on a BrandHero, welcome or sign-in header |
 | headline | 28/34 | SemiBold, -0.5% | large top-bar titles |
 | title1 | 22/28 | SemiBold | section heroes, sheet titles |
 | title2 | 18/24 | SemiBold | card titles |
@@ -88,9 +90,9 @@ cards, essays, transcripts, model answers). Numbers that change use tabular figu
 
 ### Shape, space, elevation, motion
 
-- Radii: 8 (chips, small tiles), 12 (inputs, inner tiles), 20 (cards), 28 (sheets top corners), full (buttons, FABs, pills, avatars).
+- Radii: 8 (chips, small tiles), 12 (inputs, inner tiles), 20 (cards), 28 (sheets top corners), full (FABs, pills, avatars). Buttons: 18 (Large), 14 (Medium), 11 (Small).
 - Space: 4-pt grid. Screen gutter 20 dp. Card padding 16–20. Between sections 28. Between list rows 0 (hairline dividers inside a card).
-- Touch targets ≥ 48 dp. Primary buttons 56 dp tall in sticky bottom bars, 48 elsewhere.
+- Touch targets ≥ 48 dp (Small buttons draw at 36 dp but reserve 48 via `minimumInteractiveComponentSize`). Primary buttons 56 dp tall in sticky bottom bars, 48 elsewhere.
 - Elevation: cards are flat surface + 1 dp `line` border in light, no border in dark. Floating things (bottom bar, sheets, mini player) use tonal surface + subtle shadow.
 - Motion: 120 / 220 / 350 ms, emphasized-decelerate easing. Shared-axis X for push, fade-through for tab switches, container-transform feel for hero → screen (scale+fade). Respect "remove animations" (`LocalReducedMotion`).
 - Haptics: `LongPress`/`TextHandleMove`-style confirm tick on answer select, flag, submit, timer warnings.
@@ -204,5 +206,5 @@ com.soyeb.ieltspractice
 - Every destructive action: confirm dialog or undo snackbar.
 - TalkBack: content descriptions on icon buttons, `semantics { heading() }` on section titles, merged rows.
 - Font scale 200 % must not clip primary actions (use `heightIn(min=)`, not fixed heights, for text containers).
-- Landscape / ≥ 600 dp: runners go two-pane; hubs use a 2-column grid.
+- Landscape / ≥ 600 dp: the Listening & Reading runner goes two-pane; tab and pushed lists cap at 720 dp, centred. Content stays clear of side cutouts and nav bars (root horizontal safe-drawing insets).
 - No hard-coded colours or sizes in features: tokens only.

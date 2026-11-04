@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,11 +64,12 @@ fun BankScreen(nav: Nav, route: Bank) {
     val demoSheet = LocalDemo.current?.screen == "bank-sheet"
     val fixedSkill = route.skill.isNotBlank()
 
-    var skill by remember { mutableStateOf(route.skill.ifBlank { "speaking" }) }
-    var part by remember { mutableStateOf(route.part) }
-    var topic by remember { mutableStateOf<String?>(null) }
-    var query by remember { mutableStateOf("") }
-    var q by remember { mutableStateOf("") } // the debounced query the list uses
+    // Saveable: practising a prompt and coming back keeps the learner's search and filters.
+    var skill by rememberSaveable { mutableStateOf(route.skill.ifBlank { "speaking" }) }
+    var part by rememberSaveable { mutableStateOf(route.part) }
+    var topic by rememberSaveable { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var q by rememberSaveable { mutableStateOf("") } // the debounced query the list uses
     var pickedId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(query) {

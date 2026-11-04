@@ -6,7 +6,12 @@ import com.soyeb.ieltspractice.data.model.*
 import com.soyeb.ieltspractice.data.net.*
 import com.soyeb.ieltspractice.data.logic.*
 
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import okhttp3.Interceptor
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import kotlinx.serialization.KSerializer
 import java.io.File
 import kotlin.test.Test
@@ -78,6 +83,40 @@ class CoreTest {
             """{"kind":"table","title":"T","columns":["a","b"],"rows":[["x",3],["y",4.5]]}""",
         )
         assertEquals(listOf(listOf("x", "3"), listOf("y", "4.5")), c.rowsText)
+    }
+
+    @Test fun late401ForAnOlderTokenKeepsTheNewSession() = runBlocking {
+        val demo = DemoInterceptor(fixtures)
+        lateinit var api: Api
+        api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->
+            val r = chain.request()
+            if (r.url.encodedPath != "/api/slow") return@Interceptor demo.intercept(chain)
+            runBlocking { api.signIn("maya@example.com", "password1") } // a sign-in lands while the old-token request is in flight
+            Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(401).message("Unauthorized").body("{}".toResponseBody()).build()
+        }, initialToken = "old")
+        assertEquals(401, assertFailsWith<ApiError> { api.raw("GET", "/api/slow") }.status)
+        assertEquals("demo", api.token.value)
+        assertTrue(api.isSignedIn)
+    }
+
+    @Test fun expiredAccountSessionIsReportedNotTurnedIntoAGuest() = runBlocking {
+        val api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401).message("Unauthorized").body("{}".toResponseBody()).build()
+        }, initialToken = "expired")
+        assertEquals(401, assertFailsWith<ApiError> { api.refreshQuota() }.status)
+        assertTrue(!api.isSignedIn)
+        assertEquals(true, api.sessionEnded.first())
+    }
+
+    @Test fun signInSucceedsWhenTheProfileFailsToLoad() = runBlocking {
+        val demo = DemoInterceptor(fixtures)
+        val api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->
+            if (chain.request().url.encodedPath != "/api/me") return@Interceptor demo.intercept(chain)
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(503).message("Unavailable").body("{}".toResponseBody()).build()
+        })
+        api.signIn("maya@example.com", "password1")
+        assertTrue(api.isSignedIn)
+        assertNull(api.me.value)
     }
 
     @Test fun demoClientSignsInAndReads() = runBlocking {

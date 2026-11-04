@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.logic.notAssessed
@@ -34,6 +35,8 @@ import com.soyeb.ieltspractice.design.components.ErrorState
 import com.soyeb.ieltspractice.design.components.LocalSnack
 import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.SkeletonList
+import com.soyeb.ieltspractice.design.components.awaitStarted
+import com.soyeb.ieltspractice.design.components.nextPollMs
 import com.soyeb.ieltspractice.feature.speaking.SpeakingResult
 import com.soyeb.ieltspractice.feature.writing.WritingResult
 import com.soyeb.ieltspractice.nav.Nav
@@ -54,6 +57,7 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
     val guest by api.isGuest.collectAsState()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val attempts = remember(ids) { mutableStateMapOf<String, Attempt>() }
     var error by remember(ids) { mutableStateOf<String?>(null) }
     var round by remember(ids) { mutableIntStateOf(0) }
@@ -69,9 +73,13 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
                 if (attempts[id] == null) error = e.message ?: "Something went wrong. Check your connection and try again."
             }
         }
-        // A screenshot test must go idle, so demo mode fetches once instead of polling.
+        // A screenshot test must go idle, so demo mode fetches once instead of polling. A hidden app polls nothing (the next poll runs on
+        // return), and the interval backs off so a stuck analysis doesn't keep the radio busy.
+        var wait = 2500L
         while (demo == null && error == null && ids.any { attempts[it]?.finished != true }) {
-            delay(2500)
+            delay(wait)
+            lifecycle.awaitStarted()
+            wait = nextPollMs(wait)
             for (id in ids) {
                 val cur = attempts[id] ?: continue
                 if (cur.finished) continue
@@ -112,7 +120,8 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
             val first = list.firstOrNull()
             when {
                 ids.isEmpty() -> Shell(nav) { EmptyState(Icons.Rounded.Warning, "Nothing to show", "There's no answer to mark here.") }
-                error != null && list.isEmpty() -> Shell(nav) { ErrorState(error.orEmpty(), onRetry = { round++ }) }
+                // Any part missing after a failed load: retry fetches only what's missing (loaded parts are kept).
+                error != null && list.size < ids.size -> Shell(nav) { ErrorState(error.orEmpty(), onRetry = { round++ }) }
                 list.size < ids.size || first == null -> Shell(nav) { SkeletonList() }
                 unsent != null -> Shell(nav) {
                     FailedState("This recording never finished uploading. Record it again from the Speaking tab.", retryable = false, onRetry = {})

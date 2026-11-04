@@ -56,6 +56,8 @@ import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.media.AudioPlayer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -82,7 +84,7 @@ class ResultPlayer(private val demoDuration: Double? = null) {
         engine = AudioPlayer(context).also { it.load(url) }
     }
 
-    /** Mirror the engine into the observable state until the screen leaves (about 25 times a second while playing). */
+    /** Mirror the engine into the observable state until the screen leaves (about 25 times a second while playing; asleep while paused). */
     suspend fun poll() {
         val e = engine ?: return
         var waited = 0
@@ -91,7 +93,7 @@ class ResultPlayer(private val demoDuration: Double? = null) {
             currentTime = e.positionMs / 1000.0
             val d = e.durationMs / 1000.0
             if (d > 0) { duration = d; isLoaded = true } else if (!isLoaded && ++waited > 60) failed = true
-            delay(if (isPlaying) 40 else 250) // the transcript highlight reads currentTime
+            if (!isPlaying && isLoaded) withTimeoutOrNull(5_000) { e.playing.first { it } } else delay(if (isPlaying) 40 else 250) // the transcript highlight reads currentTime
         }
     }
 

@@ -1,16 +1,20 @@
 package com.soyeb.ieltspractice.feature
 
+import com.soyeb.ieltspractice.data.model.Mock
+import com.soyeb.ieltspractice.data.model.MockSection
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.feature.history.HStatus
 import com.soyeb.ieltspractice.feature.history.HistoryItem
 import com.soyeb.ieltspractice.feature.history.bucketOf
 import com.soyeb.ieltspractice.feature.history.durationText
 import com.soyeb.ieltspractice.feature.history.mergeItems
+import com.soyeb.ieltspractice.feature.history.toItem
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class HistoryLogicTest {
     private val now = Instant.parse("2026-10-03T18:00:00Z")
@@ -38,5 +42,16 @@ class HistoryLogicTest {
         assertNull(durationText(item("a", "", 30_000)))
         assertEquals("12 min", durationText(item("a", "", 12 * 60_000)))
         assertEquals("30 s", durationText(item("a", "", 30_000, Skill.Speaking)))
+    }
+
+    @Test fun mockRows() {
+        val done = Mock("m1", ref = "C19 T2", status = "completed", startedAt = "2026-10-01T09:00:00Z", completedAt = "2026-10-01T12:00:00Z", overall = 6.5).toItem()
+        assertTrue(done.mock)
+        assertEquals(HStatus.Done, done.status)
+        assertEquals("Cambridge C19 T2", done.detail)
+        assertEquals("2026-10-01T12:00:00Z", done.at)
+        assertEquals(6.5, done.band)
+        assertEquals(HStatus.Open, Mock("m2", startedAt = "2026-10-02T09:00:00Z").toItem().status)
+        assertEquals(HStatus.Analysing, Mock("m3", status = "completed", sections = listOf(MockSection("speaking", state = "marking"))).toItem().status)
     }
 }

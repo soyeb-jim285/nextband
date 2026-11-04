@@ -4,10 +4,12 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -61,10 +63,18 @@ class KeystoreTokenStore(context: Context) : TokenStore {
         String(cipher.doFinal(raw, IV_BYTES, raw.size - IV_BYTES), Charsets.UTF_8)
     }.getOrNull() // a lost key (restore, reinstall) reads as signed out
 
+    // Keystore throws ProviderException/KeyStoreException on some OEM devices. The session in memory still works, so a failed
+    // save must not fail the sign-in (an emailed code is already used by then); the user signs in again after the next cold start.
     override suspend fun save(token: String, guest: Boolean) {
-        val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.ENCRYPT_MODE, secret()) }
-        val sealed = cipher.iv + cipher.doFinal(token.toByteArray(Charsets.UTF_8))
-        store.edit { it[key] = Base64.encodeToString(sealed, Base64.NO_WRAP); it[guestKey] = guest }
+        try {
+            val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.ENCRYPT_MODE, secret()) }
+            val sealed = cipher.iv + cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+            store.edit { it[key] = Base64.encodeToString(sealed, Base64.NO_WRAP); it[guestKey] = guest }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("TokenStore", "Couldn't store the session token", e)
+        }
     }
 
     override suspend fun loadGuest(): Boolean = runCatching { store.data.first()[guestKey] == true }.getOrDefault(false)

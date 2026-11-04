@@ -7,7 +7,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -114,6 +117,11 @@ class Api(
         _account.value = token != null && !isGuest
     }
 
+    // A channel, not a SharedFlow: a 401 at launch (restoreSession) comes before AppShell collects, and must still be told once.
+    private val _sessionEnded = Channel<Boolean>(Channel.CONFLATED)
+    /** The server dropped the session (401: expired or purged). True when it was an account, false for a guest. AppShell tells the user. */
+    val sessionEnded: Flow<Boolean> = _sessionEnded.receiveAsFlow()
+
     private val _quota = MutableStateFlow<Quota?>(null)
     /** Tests left per skill and whether the live examiner is set up. Null until first loaded. */
     val quota: StateFlow<Quota?> = _quota.asStateFlow()
@@ -145,16 +153,22 @@ class Api(
             method == "GET" || method == "HEAD" || method == "DELETE" -> null
             else -> "{}".toRequestBody(JSON_MEDIA)
         }
+        // The token this request carries: a late 401/403 for an older session must not end the one adopted since.
+        val sent = _token.value
         val req = Request.Builder().url(baseUrl + path).method(method, payload)
-            .apply { _token.value?.let { header("Authorization", "Bearer $it") } }
+            .apply { sent?.let { header("Authorization", "Bearer $it") } }
             .build()
         val (status, text, headers) = execute(req, "Can't reach NextBand. Check your internet connection and try again.")
         if (status !in 200..299) {
             val err = runCatching { AppJson.parseToJsonElement(text) as? JsonObject }.getOrNull()
             fun field(k: String) = (err?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull
-            if (status == 401 && _token.value != null && !path.startsWith("/api/auth/")) signOutLocal()
+            if (status == 401 && sent != null && _token.value == sent && !path.startsWith("/api/auth/")) {
+                val wasAccount = _account.value
+                signOutLocal()
+                _sessionEnded.trySend(wasAccount)
+            }
             // A guest on an account-only endpoint is not an expired session: flip the UI to its "Create an account" gates.
-            if (status == 403 && field("code") == Codes.ACCOUNT && _token.value != null && _account.value) { _account.value = false; _isGuest.value = true; guest = true }
+            if (status == 403 && field("code") == Codes.ACCOUNT && sent != null && _token.value == sent && _account.value) { _account.value = false; _isGuest.value = true; guest = true }
             throw ApiError(status, field("error") ?: field("message") ?: httpReason(status), field("code"), field("resetAt"), field("skill"), field("tier"))
         }
         // A submitted test is now used: the "tests left" labels must not keep the old numbers for up to a minute.
@@ -212,7 +226,11 @@ class Api(
         try {
             return withContext(Dispatchers.IO) {
                 try {
-                    http.newCall(Request.Builder().url(url).build()).await().use { it.body?.bytes() ?: ByteArray(0) }
+                    http.newCall(Request.Builder().url(url).build()).await().use {
+                        // An expired or missing presigned URL answers with an XML error body: not the file.
+                        if (!it.isSuccessful) throw ApiError(it.code, "Couldn't download the file.")
+                        it.body?.bytes() ?: ByteArray(0)
+                    }
                 } catch (e: IOException) {
                     throw ApiError(0, "Couldn't download the audio.")
                 }
@@ -292,10 +310,19 @@ class Api(
     private suspend fun adopt(r: ApiResponse) {
         val t = r.headers["set-auth-token"]
         if (t.isNullOrEmpty()) throw ApiError(0, "Sign-in didn't complete. Please try again.")
+        val fromGuest = _me.value?.user?.takeIf { guest && it.isAnonymous }?.id
         setSession(t, false)
         store.save(t, false)
-        loadMe()
+        fromGuest?.let { formerGuests += it }
+        // Signed in from here on: a failed /api/me must not read as a wrong password or used code. `me` loads again where it's needed.
+        loadMeQuietly()
     }
+
+    /**
+     * Guest user ids this launch signed in or up from: the server links a guest's data to the account, so its unsent recordings may follow.
+     * ponytail: in memory only; after a relaunch a former guest's unsent recording shows as another account's (it can still be deleted).
+     */
+    val formerGuests: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /** Start an anonymous guest session (the first test start, never a page view). The bearer token is the `set-auth-token` header, not the JSON `token`. */
     suspend fun signInAnonymously() {
@@ -304,7 +331,11 @@ class Api(
         if (t.isNullOrEmpty()) throw ApiError(0, "Couldn't start a guest session. Please try again.")
         setSession(t, true)
         store.save(t, true)
-        loadMe()
+        loadMeQuietly()
+    }
+
+    private suspend fun loadMeQuietly() {
+        try { loadMe() } catch (e: ApiError) { /* offline or a server hiccup: the session itself is fine */ }
     }
 
     /** A session for the test about to start: the guest session is created here when there is none. */
@@ -322,12 +353,16 @@ class Api(
         return m
     }
 
-    /** GET /api/quota: works without a session (answers for a guest by IP). A stale token is dropped and asked again as a guest. */
+    /**
+     * GET /api/quota: works without a session (answers for a guest by IP). A stale guest token is dropped and asked again as a guest.
+     * An expired account session throws the 401 instead, so a test start doesn't quietly continue as a new guest (Nav.check).
+     */
     suspend fun refreshQuota(): Quota {
+        val wasAccount = _account.value
         val q = try {
             get<Quota>("/api/quota")
         } catch (e: ApiError) {
-            if (e.status == 401) get<Quota>("/api/quota") else throw e
+            if (e.status == 401 && !wasAccount) get<Quota>("/api/quota") else throw e
         }
         _quota.value = q
         quotaAt = System.currentTimeMillis()

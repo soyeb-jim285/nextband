@@ -47,6 +47,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
@@ -92,7 +93,7 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
         Row(Modifier.fillMaxWidth().selectableGroup()) {
             options.forEachIndexed { i, label ->
                 Box(
-                    Modifier.weight(1f).heightIn(min = 36.dp).clip(NB.shape.pill)
+                    Modifier.weight(1f).minimumInteractiveComponentSize().heightIn(min = 36.dp).clip(NB.shape.pill)
                         .selectable(i == selected, role = Role.Tab) { if (i != selected) { hf.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(i) } },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -132,7 +133,7 @@ fun NbChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modi
     val edge by animateColorAsState(if (selected) c.brand.copy(alpha = 0.45f) else c.line, spec, label = "chipEdge")
     val src = remember { MutableInteractionSource() }
     Row(
-        modifier.heightIn(min = 36.dp).pressScale(src).clip(NB.shape.pill).background(bg).border(1.dp, edge, NB.shape.pill)
+        modifier.minimumInteractiveComponentSize().heightIn(min = 36.dp).pressScale(src).clip(NB.shape.pill).background(bg).border(1.dp, edge, NB.shape.pill)
             .selectable(selected, interactionSource = src, indication = PressWash, role = Role.Checkbox, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

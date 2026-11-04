@@ -34,6 +34,7 @@ class ContrastTest {
         need("ink/surface2", c.ink, c.surface2, 4.5)
         need("muted/surface2", c.muted, c.surface2, 4.5)
         need("onBrand/brand", c.onBrand, c.brand, 4.5)
+        need("onBad/bad", c.onBad, c.bad, 4.5)
         need("brandText/brandSoft", c.brandText, c.brandSoft, 4.5)
         need("ink/brandSoft", c.ink, c.brandSoft, 4.5)
         need("goodText/goodSoft", c.goodText, c.goodSoft, 4.5)

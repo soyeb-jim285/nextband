@@ -1,42 +1,55 @@
 package com.soyeb.ieltspractice.feature.writing
 
 import com.soyeb.ieltspractice.data.Prefs
+import com.soyeb.ieltspractice.data.net.Api
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Essay + plan per prompt on this device (`draft:{promptId}`, the old key names), so leaving or being killed mid-test loses nothing.
- * A small index (`draft-index`) lists the drafts for the hub's "Drafts in progress" rows.
+ * Whose drafts: the signed-in user's id, "" while /api/me has not loaded yet, null when signed out (nothing is shown or kept).
+ * ponytail: the "" bucket only fills if /api/me never loaded in a signed-in launch; it is still hidden from signed-out viewers.
  */
-class DraftStore(private val prefs: Prefs) {
+fun draftOwner(api: Api): String? = if (!api.isSignedIn) null else api.me.value?.user?.id.orEmpty()
+
+/**
+ * Essay + plan per prompt on this device (`draft:{owner}:{promptId}`), so leaving or being killed mid-test loses nothing.
+ * A small index per owner (`draft-index:{owner}`) lists the drafts for the hub's "Drafts in progress" rows.
+ * Keyed by [owner] (see [draftOwner]) so the next person on the device never sees someone else's essay.
+ */
+class DraftStore(private val prefs: Prefs, private val owner: () -> String?) {
     private val lock = Mutex()
 
-    suspend fun load(promptId: String): Draft = decodeDraft(prefs.getString("draft:$promptId"))
+    suspend fun load(promptId: String): Draft = owner()?.let { decodeDraft(prefs.getString(key(it, promptId))) } ?: Draft()
 
     /** An empty draft is removed rather than stored (a test that was opened and never written in leaves nothing behind). [meta] adds it to the hub list. */
     suspend fun save(promptId: String, draft: Draft, meta: DraftMeta? = null) = lock.withLock {
+        val o = owner() ?: return@withLock
         if (draft == Draft()) {
-            prefs.setString("draft:$promptId", null)
-            writeIndex(readIndex().filter { it.promptId != promptId })
+            prefs.setString(key(o, promptId), null)
+            writeIndex(o, readIndex(o).filter { it.promptId != promptId })
         } else {
-            prefs.setString("draft:$promptId", encodeDraft(draft))
+            prefs.setString(key(o, promptId), encodeDraft(draft))
             if (meta != null) {
                 val m = meta.copy(words = wordCount(draft.text), updatedAt = System.currentTimeMillis())
-                writeIndex(listOf(m) + readIndex().filter { it.promptId != promptId })
+                writeIndex(o, listOf(m) + readIndex(o).filter { it.promptId != promptId })
             }
         }
     }
 
     suspend fun clear(promptIds: List<String>) = lock.withLock {
-        promptIds.forEach { prefs.setString("draft:$it", null) }
-        writeIndex(readIndex().filter { it.promptId !in promptIds })
+        val o = owner() ?: return@withLock
+        promptIds.forEach { prefs.setString(key(o, it), null) }
+        writeIndex(o, readIndex(o).filter { it.promptId !in promptIds })
     }
 
+    /** Every listed draft of the owner (account deletion). */
+    suspend fun clearAll() = clear(index().map { it.promptId })
+
     /** Newest first. */
-    suspend fun index(): List<DraftMeta> = lock.withLock { readIndex() }
+    suspend fun index(): List<DraftMeta> = lock.withLock { owner()?.let { readIndex(it) }.orEmpty() }
 
-    private suspend fun readIndex() = decodeIndex(prefs.getString(INDEX))
-    private suspend fun writeIndex(items: List<DraftMeta>) = prefs.setString(INDEX, if (items.isEmpty()) null else encodeIndex(items))
-
-    private companion object { const val INDEX = "draft-index" }
+    private fun key(owner: String, promptId: String) = "draft:$owner:$promptId"
+    private suspend fun readIndex(owner: String) = decodeIndex(prefs.getString("draft-index:$owner"))
+    private suspend fun writeIndex(owner: String, items: List<DraftMeta>) =
+        prefs.setString("draft-index:$owner", if (items.isEmpty()) null else encodeIndex(items))
 }

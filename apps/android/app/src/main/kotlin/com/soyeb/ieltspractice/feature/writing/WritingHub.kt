@@ -100,7 +100,7 @@ fun WritingHub(nav: Nav) {
     val quota by api.quota.collectAsState()
     val testType by graph.prefs.testType.collectAsState(initial = "academic")
     val target = me?.settings?.targetBand ?: 7.0
-    val store = remember { DraftStore(graph.prefs) }
+    val store = remember { DraftStore(graph.prefs) { if (demo != null) "demo" else draftOwner(api) } }
     val scope = rememberCoroutineScope()
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
     val variant = picked ?: testType

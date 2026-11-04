@@ -33,9 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -44,12 +41,14 @@ import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.PendingRecording
 import com.soyeb.ieltspractice.data.UploadState
+import com.soyeb.ieltspractice.data.belongsTo
 import com.soyeb.ieltspractice.data.logic.QuotaCopy
 import com.soyeb.ieltspractice.data.logic.formatDate
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.components.Avatar
 import com.soyeb.ieltspractice.design.components.BandPill
+import com.soyeb.ieltspractice.design.components.BrandHero
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.ChipRow
@@ -96,7 +95,9 @@ fun SpeakingTabScreen(nav: Nav) {
     val me by api.me.collectAsState()
     val quotaNow by api.quota.collectAsState()
     val account by api.hasAccount.collectAsState()
-    val pending by store.items.collectAsState()
+    val allPending by store.items.collectAsState()
+    // Only this account's recordings: another user of the device must not hear or retry them into their own results.
+    val pending = if (demo != null) allPending else allPending.filter { it.belongsTo(me?.user?.id, api.formerGuests) }
     val states by store.states.collectAsState()
     val source by graph.prefs.speakingSource.collectAsState("any")
     val quota = quotaNow ?: me?.quota()
@@ -236,23 +237,20 @@ fun SpeakingTabScreen(nav: Nav) {
     }
 }
 
-/** The live examiner: a dark brand card with the voice orb breathing beside the pitch. */
+/** The live examiner: the screen's brand hero, with the voice orb breathing beside the pitch. */
 @Composable
 private fun LiveHero(left: String?, checking: Boolean, onStart: () -> Unit) {
-    val c = NB.colors
-    val top = lerp(c.brand, Color.Black, 0.66f)
-    val bottom = lerp(c.brand, Color.Black, 0.82f)
-    Box(Modifier.fillMaxWidth().clip(NB.shape.card).background(Brush.linearGradient(listOf(top, bottom)))) {
-        Row(Modifier.padding(start = 20.dp, top = 20.dp, bottom = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    BrandHero { ink ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("LIVE EXAMINER", style = NB.type.overline, color = Color.White.copy(alpha = 0.8f))
-                Text("Talk to a live AI examiner", style = NB.type.title1, color = Color.White)
-                Text("11–14 min · real-time", style = NB.type.bodySmall, color = Color.White.copy(alpha = 0.82f))
+                Text("LIVE EXAMINER", style = NB.type.overline, color = ink.muted)
+                Text("Talk to a live AI examiner", style = NB.type.title1, color = ink.fg)
+                Text("11–14 min · real-time", style = NB.type.bodySmall, color = ink.muted)
                 Spacer(Modifier.height(6.dp))
-                NbButton("Start live test", onStart, icon = Icons.Rounded.Mic, loading = checking, haptic = true)
-                if (left != null) Text(left, style = NB.type.caption, color = Color.White.copy(alpha = 0.82f))
+                NbButton("Start live test", onStart, kind = BtnKind.Inverse, icon = Icons.Rounded.Mic, loading = checking, haptic = true)
+                if (left != null) Text(left, style = NB.type.caption, color = ink.muted)
             }
-            VoiceOrb(OrbMode.Speaking, 0.3f, orbSize = 112.dp)
+            VoiceOrb(OrbMode.Speaking, 0.3f, orbSize = 96.dp)
         }
     }
 }
@@ -280,7 +278,7 @@ private fun PartCard(p: PartInfo, modifier: Modifier, onStart: () -> Unit, onTop
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("Part ${p.n}", style = NB.type.title3, color = c.ink)
             Text(p.name, style = NB.type.bodySmall, color = c.muted)
-            Text(p.time, style = NB.type.caption, color = c.faint)
+            Text(p.time, style = NB.type.caption, color = c.muted)
             NbButton("Topics", onTopic, kind = BtnKind.Text, size = BtnSize.Small, modifier = Modifier.semantics { contentDescription = "Choose a topic for Part ${p.n}" })
         }
     }

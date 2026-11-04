@@ -1,6 +1,8 @@
 package com.soyeb.ieltspractice
 
+import android.app.UiModeManager
 import android.graphics.Color as AColor
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -22,10 +24,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -60,10 +68,13 @@ import com.soyeb.ieltspractice.feature.study.studyGraph
 import com.soyeb.ieltspractice.feature.today.todayGraph
 import com.soyeb.ieltspractice.feature.writing.writingGraph
 import com.soyeb.ieltspractice.feature.you.youGraph
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.BottomBar
 import com.soyeb.ieltspractice.nav.GateHost
 import com.soyeb.ieltspractice.nav.LocalNav
 import com.soyeb.ieltspractice.nav.Nav
+import com.soyeb.ieltspractice.nav.NavHolder
 import com.soyeb.ieltspractice.nav.Tab
 import com.soyeb.ieltspractice.nav.TodayTab
 import com.soyeb.ieltspractice.nav.Welcome
@@ -78,6 +89,16 @@ fun NbApp(graph: AppGraph, demo: DemoConfig? = null) {
 
     // System bar icons follow the app theme (Settings > Appearance can override the device).
     val activity = LocalContext.current as? ComponentActivity
+    // API 31+: hand the saved choice to the system, so the splash, window background and first frame (via
+    // isSystemInDarkTheme) already match it on the next launch instead of flipping when DataStore emits.
+    // Collects stored values only, never the "system" placeholder above. ponytail: API 26-30 keep the one-frame flip.
+    LaunchedEffect(activity) {
+        if (activity == null || demo != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@LaunchedEffect
+        val ui = activity.getSystemService(UiModeManager::class.java) ?: return@LaunchedEffect
+        graph.prefs.appearance.collect { a ->
+            ui.setApplicationNightMode(when (a) { "dark" -> UiModeManager.MODE_NIGHT_YES; "light" -> UiModeManager.MODE_NIGHT_NO; else -> UiModeManager.MODE_NIGHT_AUTO })
+        }
+    }
     LaunchedEffect(dark) {
         if (activity == null || demo != null) return@LaunchedEffect
         val style = if (dark) SystemBarStyle.dark(AColor.TRANSPARENT) else SystemBarStyle.light(AColor.TRANSPARENT, AColor.TRANSPARENT)
@@ -113,7 +134,8 @@ private fun isTab(e: NavBackStackEntry) = Tab.entries.any { e.destination.hasRou
 @Composable
 private fun AppShell(graph: AppGraph, start: Any) {
     val controller = rememberNavController()
-    val nav = remember(controller) { Nav(controller, graph.api, graph.prefs, graph.scope) }
+    val holder = viewModel<NavHolder>()
+    val nav = (holder.nav ?: Nav(controller, graph.api, graph.prefs, graph.scope).also { holder.nav = it }).also { it.controller = controller }
     val snack = remember { SnackbarHostState() }
     val entry by controller.currentBackStackEntryAsState()
     val current = Tab.entries.firstOrNull { t -> entry?.destination?.hasRoute(t.route::class) == true }
@@ -125,6 +147,17 @@ private fun AppShell(graph: AppGraph, start: Any) {
     LaunchedEffect(current, hasAccount) {
         if (current != null && hasAccount) due = runCatching { graph.api.dueCards().dueTotal }.getOrDefault(due)
         if (!hasAccount) due = 0
+    }
+
+    // The server ended the session (expired account, purged guest): say so instead of quietly flipping to the guest state.
+    LaunchedEffect(graph) {
+        graph.api.sessionEnded.collect { wasAccount ->
+            if (!wasAccount) snack.showSnackbar("Your guest session ended. Your next test starts a new one.")
+            else if (snack.showSnackbar(
+                    "You were signed out. Sign in again to see your results.", actionLabel = "Sign in", duration = SnackbarDuration.Long,
+                ) == SnackbarResult.ActionPerformed
+            ) nav.go(Auth("signin"))
+        }
     }
 
     val d = if (reduced) 0 else 1
@@ -150,6 +183,9 @@ private fun AppShell(graph: AppGraph, start: Any) {
 
     CompositionLocalProvider(LocalNav provides nav, LocalSnack provides snack) {
         Scaffold(
+            // Landscape side nav bar / display cutout: keep every screen (lists, runner, bars) clear of them here, once.
+            // windowInsetsPadding consumes the insets, so top bars below don't pad twice.
+            Modifier.background(NB.colors.bg).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
             containerColor = NB.colors.bg,
             contentWindowInsets = WindowInsets(0),
             bottomBar = { if (current != null) BottomBar(current, nav::openTab, todayBadge = due) },

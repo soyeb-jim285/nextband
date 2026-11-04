@@ -11,7 +11,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.logic.GateText
-import com.soyeb.ieltspractice.data.model.FinishResult
 import com.soyeb.ieltspractice.data.model.LiveKitJoin
 import com.soyeb.ieltspractice.data.model.LiveStart
 import com.soyeb.ieltspractice.data.model.Prompt
@@ -38,6 +37,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.io.File
+import kotlin.concurrent.thread
 import java.util.Calendar
 
 sealed interface LiveStage {
@@ -45,6 +45,8 @@ sealed interface LiveStage {
     data object Running : LiveStage
     data object Uploading : LiveStage
     data class Finished(val ids: List<String>) : LiveStage
+    /** Scored, but linking it to its mock failed: [LiveExam.retryAttach] tries again without rerunning the test. */
+    data class Unattached(val ids: List<String>) : LiveStage
     /** [error] is set when the server refused (no tests left): the screen shows the limit panel for it. */
     data class Failed(val message: String, val error: ApiError? = null) : LiveStage
 }
@@ -130,6 +132,15 @@ class LiveExam(
         if (ok) micReady = true else micError = "The microphone couldn't start. Close other apps that use it and try again."
     }
 
+    private var micParked = false
+
+    /** The screen left the foreground before the test: close the mic check (a hidden app only gets silence) and reopen it on return. */
+    fun parkMicCheck(away: Boolean) {
+        if (stage != LiveStage.Ready || demo != null) return
+        if (away && micReady) { mic.stop(); micReady = false; micParked = true }
+        else if (!away && micParked) { micParked = false; beginMicCheck() }
+    }
+
     private fun onMicCheckLevel(l: Double, dt: Double) {
         level = l
         if (stage == LiveStage.Ready && !micHeard) {
@@ -163,26 +174,31 @@ class LiveExam(
     override fun onCleared() {
         run?.cancel()
         examiner?.close()
-        audio.stop()
+        thread(name = "live-audio-stop") { audio.stop() } // may flush an encoder: never on the main thread
         mic.stop()
         scope.cancel()
     }
 
-    private fun enterPhase(p: String) {
+    private suspend fun enterPhase(p: String) {
         if (p != phase) phaseStartedAt = SystemClock.elapsedRealtime()
         phase = p
         val part = mapOf("p1" to 1, "p2-talk" to 2, "p2-follow" to 2, "p3" to 3)[p]
         if (part == currentPart) return
         closePart()
         if (part != null) {
-            runCatching { audio.beginPart(File(context.cacheDir, "live-$sessionId-p$part.m4a")) }
-            currentPart = part
+            val f = File(context.cacheDir, "live-$sessionId-p$part.m4a")
+            withContext(NonCancellable) { // the outer NonCancellable keeps the result when the test is cancelled mid-switch
+                withContext(Dispatchers.IO) { runCatching { audio.beginPart(f) } } // creating the encoder is slow-ish
+                currentPart = part
+            }
         }
     }
 
-    private fun closePart() {
-        currentPart?.let { p -> audio.endPart()?.let { recordings[p] = it; send(p) } }
+    /** Flushing the encoder blocks (up to ~2 s), so it runs on IO; NonCancellable so a dropped connection never loses the part. */
+    private suspend fun closePart() {
+        val p = currentPart ?: return
         currentPart = null
+        withContext(NonCancellable) { withContext(Dispatchers.IO) { audio.endPart() }?.let { recordings[p] = it; send(p) } }
     }
 
     /** Upload keys per part (an upload is never repeated), and the parts sent with /live/part while the test went on: true once its attempt exists. */
@@ -284,16 +300,30 @@ class LiveExam(
         finish()
     }
 
+    /**
+     * The app went to the background mid-test (home, a phone call): Android hands a hidden app silence, so the parts would fill with it
+     * and be scored. Stop the examiner and offer the same choice as a dropped connection.
+     */
+    fun leftApp() {
+        if (stage != LiveStage.Running || ending || demo != null) return
+        stopRunning("The test stopped when you left the app.")
+        examiner?.close()
+    }
+
     /** The room dropped or the worker failed. There is no other examiner to fall back to: score what was recorded, or reconnect. */
     private fun lost() {
         if (stage != LiveStage.Running || ending) return
+        stopRunning("The connection to the examiner dropped.")
+    }
+
+    private fun stopRunning(why: String) {
         run?.cancel()
         turnEnded = null
         listening = false
         thinking = false
         examinerTalking = false
         audio.examinerSpeaking = false
-        stage = LiveStage.Failed("The connection to the examiner dropped." + if (hasRecordings) " The parts you recorded are safe." else "")
+        stage = LiveStage.Failed(why + if (hasRecordings) " The parts you recorded are safe." else "")
     }
 
     /** The Part 2 long turn: ends at the time limit or on "I'm done", never on a pause. True if the time ran out. */
@@ -323,7 +353,7 @@ class LiveExam(
     private suspend fun finish() = withContext(NonCancellable) {
         closePart()
         examiner?.close()
-        audio.stop()
+        withContext(Dispatchers.IO) { audio.stop() }
         stage = LiveStage.Uploading
         try {
             if (recordings.isEmpty()) { stage = LiveStage.Failed("Nothing was recorded, so there's nothing to score."); return@withContext }
@@ -331,15 +361,29 @@ class LiveExam(
             val done = sent.filter { (_, job) -> runCatching { job.await() }.getOrDefault(false) }.keys
             val parts = ArrayList<JsonObject>()
             for ((part, r) in recordings) if (part !in done) parts += partBody(part, r)
-            val res: FinishResult = api.liveFinish(sessionId, parts)
-            // A mock test: link the finished session to it (a second try covers a dropped connection) before the screen returns to the hub.
-            if (mockId != null) {
-                var attached = false
-                repeat(2) { if (!attached) attached = runCatching { api.mockAttach(mockId, sessionId) }.isSuccess }
+            val ids = try {
+                api.liveFinish(sessionId, parts).attemptIds
+            } catch (e: ApiError) {
+                // 409: an earlier finish went through and only its response was lost. Its attempts carry this session id.
+                if (e.status != 409) throw e
+                api.attempts("speaking").items.filter { it.sessionId == sessionId }.sortedBy { it.part }.map { it.id }.ifEmpty { throw e }
             }
-            stage = LiveStage.Finished(res.attemptIds)
+            // A mock test: link the finished session to it (a second try covers a dropped connection) before the screen returns to the hub.
+            var attached = mockId == null
+            repeat(2) { if (!attached) attached = runCatching { api.mockAttach(mockId!!, sessionId) }.isSuccess }
+            stage = if (attached) LiveStage.Finished(ids) else LiveStage.Unattached(ids)
         } catch (e: Exception) {
             stage = failed(e)
+        }
+    }
+
+    /** Link the finished session to its mock again (the test itself is already scored). */
+    fun retryAttach() {
+        val ids = (stage as? LiveStage.Unattached)?.ids ?: return
+        val m = mockId ?: return
+        stage = LiveStage.Uploading
+        scope.launch {
+            stage = if (runCatching { api.mockAttach(m, sessionId) }.isSuccess) LiveStage.Finished(ids) else LiveStage.Unattached(ids)
         }
     }
 

@@ -1,6 +1,8 @@
 package com.soyeb.ieltspractice.media
 
 import android.content.Context
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -14,7 +16,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * Port of iOS Audio/Player.swift.
  */
 class AudioPlayer(context: Context) {
-    private val player = ExoPlayer.Builder(context.applicationContext).build()
+    // Audio focus: a call or another app's media pauses it; unplugged headphones pause it rather than switching to the speaker.
+    private val player = ExoPlayer.Builder(context.applicationContext)
+        .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
+        .setHandleAudioBecomingNoisy(true)
+        .build()
 
     private val _playing = MutableStateFlow(false)
     val playing: StateFlow<Boolean> = _playing.asStateFlow()

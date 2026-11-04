@@ -4,6 +4,7 @@ import com.soyeb.ieltspractice.data.logic.Clocks
 import com.soyeb.ieltspractice.data.logic.partsLabel
 import com.soyeb.ieltspractice.data.model.AttemptListItem
 import com.soyeb.ieltspractice.data.model.LrAttemptItem
+import com.soyeb.ieltspractice.data.model.Mock
 import com.soyeb.ieltspractice.design.Skill
 import java.time.Duration
 import java.time.Instant
@@ -28,6 +29,8 @@ data class HistoryItem(
     val band: Double?,
     /** Listening or Reading (opens LrResult / LrRun, deletes with lrDelete). */
     val lr: Boolean,
+    /** A full mock test: [id] is the mock id (opens MockHub while open, MockResult after; not deletable here). */
+    val mock: Boolean = false,
 ) {
     val instant: Instant? get() = runCatching { Instant.parse(at) }.getOrNull()
 }
@@ -43,6 +46,13 @@ fun LrAttemptItem.toItem() = HistoryItem(
     id = id, skill = Skill.of(skill) ?: Skill.Listening, title = title, detail = partsLabel(skill, parts),
     at = submittedAt ?: startedAt, durationMs = null,
     status = if (status == "submitted") HStatus.Done else HStatus.Open, band = band, lr = true,
+)
+
+fun Mock.toItem() = HistoryItem(
+    id = id, skill = Skill.Listening, title = "Full mock test",
+    detail = ref?.let { "Cambridge $it" } ?: if (variant == "general") "General Training" else "Academic",
+    at = completedAt ?: startedAt, durationMs = null,
+    status = if (open) HStatus.Open else if (marking) HStatus.Analysing else HStatus.Done, band = overall, lr = false, mock = true,
 )
 
 /** Newest first; an id seen twice (a paged fixture repeating itself) is kept once. */

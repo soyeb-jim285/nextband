@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
@@ -25,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import com.soyeb.ieltspractice.design.LocalReducedMotion
@@ -94,7 +98,8 @@ fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, todayBadge: Int = 0) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val w = maxWidth / Tab.entries.size
             val x by animateDpAsState(w * index, if (reduced) tween(0) else tween(NbMotion.SLOW, easing = NbMotion.EaseOut), label = "barRule")
-            Row(Modifier.fillMaxWidth().height(64.dp).selectableGroup()) {
+            // Grows with large text instead of clipping (DESIGN.md: no fixed heights on text containers).
+            Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).height(IntrinsicSize.Min).selectableGroup()) {
                 Tab.entries.forEach { tab ->
                     val selected = tab == current
                     val src = remember { MutableInteractionSource() }
@@ -112,14 +117,15 @@ fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, todayBadge: Int = 0) {
                         Box(Modifier.pressScale(src, 0.88f)) {
                             val ic: @Composable () -> Unit = { Icon(if (selected) tab.selectedIcon else tab.icon, null, Modifier.size(24.dp), tint = tint) }
                             if (tab == Tab.Today && todayBadge > 0) BadgedBox(badge = {
-                                Badge(containerColor = c.bad, contentColor = Color.White) { Text(if (todayBadge > 99) "99+" else "$todayBadge") }
+                                Badge(containerColor = c.bad, contentColor = c.onBad) { Text(if (todayBadge > 99) "99+" else "$todayBadge") }
                             }) { ic() } else ic()
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text(
+                        // One line that shrinks to fit a narrow tab at large font scales, never cut mid-word.
+                        BasicText(
                             tab.label, maxLines = 1,
-                            style = NB.type.caption.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
-                            color = if (selected) c.ink else c.muted,
+                            style = NB.type.caption.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) c.ink else c.muted),
+                            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = NB.type.caption.fontSize),
                         )
                     }
                 }

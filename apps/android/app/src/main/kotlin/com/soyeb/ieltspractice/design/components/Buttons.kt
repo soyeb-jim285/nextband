@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -76,7 +77,9 @@ fun NbButton(
         if (haptic) hf.performHapticFeedback(HapticFeedbackType.LongPress)
         onClick()
     }
-    val m = modifier.heightIn(min = size.height).let { if (fill) it.fillMaxWidth() else it }
+    // Small is 36 dp to look at but still reserves a 48 dp touch target (DESIGN.md: touch targets >= 48 dp).
+    val m = modifier.then(if (size == BtnSize.Small) Modifier.minimumInteractiveComponentSize() else Modifier)
+        .heightIn(min = size.height).let { if (fill) it.fillMaxWidth() else it }
     val pad = PaddingValues(horizontal = size.pad, vertical = 8.dp)
     val content: @Composable () -> Unit = {
         Box(contentAlignment = Alignment.Center) {
@@ -93,7 +96,7 @@ fun NbButton(
     val (bg, fg) = when {
         !enabled && !loading -> (if (kind == BtnKind.Text || kind == BtnKind.Outline) Color.Transparent else c.surface2) to c.faint
         kind == BtnKind.Primary -> c.brand to c.onBrand
-        kind == BtnKind.Destructive -> c.bad to (if (c.isDark) Color(0xFF3B0613) else Color.White)
+        kind == BtnKind.Destructive -> c.bad to c.onBad
         kind == BtnKind.Secondary -> c.surface2 to c.ink
         kind == BtnKind.Inverse -> (if (c.isDark) c.brand to c.onBrand else Color.White to c.brandText)
         kind == BtnKind.Outline -> Color.Transparent to c.ink

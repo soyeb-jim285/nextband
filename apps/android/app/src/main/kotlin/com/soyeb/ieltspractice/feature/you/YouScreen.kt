@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.logic.Clocks
@@ -152,7 +153,7 @@ fun YouScreen(nav: Nav) {
                 NbCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Plan & limits", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.weight(1f))
-                        if (q?.unlimited != true) NbButton(if (paidUntil(tier, until) != null) "Extend" else "Upgrade", { nav.go(Plan) }, kind = BtnKind.Secondary, size = BtnSize.Small)
+                        if (q?.unlimited != true) NbButton(if (!BuildConfig.WEB_CHECKOUT) "Details" else if (paidUntil(tier, until) != null) "Extend" else "Upgrade", { nav.go(Plan) }, kind = BtnKind.Secondary, size = BtnSize.Small)
                     }
                     Spacer(Modifier.height(12.dp))
                     if (q == null) Skeleton(Modifier.fillMaxWidth(), height = 88.dp, corner = 12.dp) else LimitRows(q)

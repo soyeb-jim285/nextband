@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,9 +99,9 @@ fun OnboardingScreen(nav: Nav) {
 
     val startPage = when (LocalDemo.current?.tab) { "Band" -> 1; "Date" -> 2; else -> 0 }
     val pager = rememberPagerState(initialPage = startPage, pageCount = { PAGES })
-    var type by remember { mutableStateOf("academic") }
-    var band by remember(me?.user?.id) { mutableStateOf(me?.settings?.targetBand ?: 7.0) }
-    var date by remember(me?.user?.id) { mutableStateOf(me?.settings?.examDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }) }
+    var type by rememberSaveable { mutableStateOf("academic") }
+    var band by rememberSaveable(me?.user?.id) { mutableStateOf(me?.settings?.targetBand ?: 7.0) }
+    var date by rememberSaveable(me?.user?.id) { mutableStateOf(me?.settings?.examDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }) }
     var picker by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val page = pager.currentPage
@@ -134,7 +135,8 @@ fun OnboardingScreen(nav: Nav) {
         }
     }
 
-    fun back() { if (page > 0) scrollTo(page - 1) else nav.back() }
+    // Reached by `reset(Onboarding)` after sign-in there's nothing beneath: leaving counts as Skip, not a silent jump to Today.
+    fun back() { if (page > 0) scrollTo(page - 1) else if (nav.canGoBack) nav.back() else finish(save = false) }
     BackHandler { back() }
 
     Column(Modifier.fillMaxSize().background(NB.colors.bg)) {

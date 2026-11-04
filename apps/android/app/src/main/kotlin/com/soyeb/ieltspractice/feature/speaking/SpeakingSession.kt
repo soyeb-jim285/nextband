@@ -110,6 +110,8 @@ fun SpeakingSessionScreen(route: SpeakingSession, nav: Nav) {
 
     KeepScreenOn()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.recheckPermission() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.setAway(true) }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { vm.setAway(false) }
 
     val states by graph.pending.states.collectAsState()
     fun stateOf(u: UploadItem): UploadState = vm.demoStates[u.id] ?: states[u.id] ?: UploadState.Uploading
@@ -286,7 +288,7 @@ private fun PermissionBody(denied: Boolean) {
         )
         Text(
             if (denied) "NextBand can't hear your answers. Turn the microphone on in settings, then come back; the test will carry on from here."
-            else "NextBand records your answers so you get a band and feedback on every sentence. The audio stays with your account and is used only for scoring.",
+            else "NextBand records your answers so you get a band and feedback on every sentence. Your audio is sent to our AI scoring services to mark it and is stored with your account.",
             style = NB.type.body, color = NB.colors.muted, textAlign = TextAlign.Center,
         )
         if (!denied) {

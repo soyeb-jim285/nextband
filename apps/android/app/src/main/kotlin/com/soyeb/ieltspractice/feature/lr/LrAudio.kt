@@ -1,6 +1,7 @@
 package com.soyeb.ieltspractice.feature.lr
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -61,7 +64,11 @@ import com.soyeb.ieltspractice.design.components.IconTile
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.media.AudioPlayer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -96,7 +103,7 @@ class LrPlayer(private val demo: Boolean, private val resume: LrResume? = null) 
         engine = AudioPlayer(context).also { it.load(url); if (speed != 1f) it.setSpeed(speed) }
     }
 
-    /** Keeps the state current (about 3 times a second) until the screen leaves. */
+    /** Keeps the state current (5 times a second while playing) until the screen leaves; while paused it sleeps until playback starts. */
     suspend fun poll() {
         val e = engine ?: return
         var waited = 0
@@ -116,7 +123,7 @@ class LrPlayer(private val demo: Boolean, private val resume: LrResume? = null) 
                     if (playing && (position - lastPersist >= 5 || position < lastPersist)) { lastPersist = position; resume.persist() }
                 }
             }
-            delay(if (playing) 200 else 400)
+            if (!playing && d > 0 && (resume == null || ready)) withTimeoutOrNull(5_000) { e.playing.first { it } } else delay(if (playing) 200 else 400)
         }
     }
 
@@ -172,6 +179,7 @@ fun rememberLrPlayer(src: String, resume: LrResume? = null, cue: AudioCue? = nul
     val player = remember(src) { LrPlayer(demo, resume) }
     LaunchedEffect(player) { if (src.isNotEmpty() && !demo) { player.load(context, src); player.poll() } }
     DisposableEffect(player) { onDispose { player.release() } }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (player.playing) player.toggle() } // never keeps playing behind another app
     LaunchedEffect(cue?.id) { if (cue != null) player.playWindow(cue.from, cue.to) }
     return player
 }
@@ -298,6 +306,29 @@ class ExamPlaylist(
         exo = p
     }
 
+    /**
+     * Each part's length read from its file. ExoPlayer prepares playlist items lazily, so the timeline only knows the
+     * durations of the parts it has buffered and the start gate would wait forever on a multi-part test.
+     */
+    suspend fun loadDurations() {
+        if (demoPhase != null || urls.isEmpty() || durations != null) return
+        val ds = withContext(Dispatchers.IO) {
+            urls.map { u ->
+                val r = MediaMetadataRetriever()
+                try {
+                    r.setDataSource(u, emptyMap())
+                    r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                } catch (e: Exception) {
+                    null
+                } finally {
+                    runCatching { r.release() }
+                }
+            }
+        }
+        if (durations != null) return
+        if (ds.all { it != null && it > 0 }) durations = ds.map { it!! / 1000.0 } else error = true
+    }
+
     fun start() {
         val d = durations ?: return
         val s = starts()
@@ -315,6 +346,9 @@ class ExamPlaylist(
     }
 
     fun resume() { stalled = false; exo?.playWhenReady = true }
+
+    /** The stream failed mid-exam (a network drop): prepare again where it stopped. The clock reads the player, so it resumes there too. */
+    fun retry() { error = false; stalled = false; exo?.apply { prepare(); playWhenReady = true } }
 
     /** Keeps [elapsed] current (4 times a second) until the screen leaves; [onElapsed] gets each new value. */
     suspend fun tick(onElapsed: (Double) -> Unit = {}) {
@@ -341,6 +375,7 @@ fun ExamAudioBar(p: ExamPlaylist, modifier: Modifier = Modifier, parts: List<Int
             Text(
                 when {
                     p.phase == ExamPhase.Review -> "Recording finished. Check your answers."
+                    p.error -> "The recording stopped. Check your connection and retry."
                     parts != null -> "Part ${parts.getOrNull(p.idx) ?: (p.idx + 1)} is playing"
                     else -> "Part ${p.idx + 1} of ${p.durations?.size ?: 4} is playing"
                 },
@@ -357,7 +392,8 @@ fun ExamAudioBar(p: ExamPlaylist, modifier: Modifier = Modifier, parts: List<Int
                 }
             }
         }
-        if (p.stalled && p.phase == ExamPhase.Audio) NbButton("Resume audio", p::resume, kind = BtnKind.Secondary, size = BtnSize.Small)
+        if (p.error && p.phase == ExamPhase.Audio) NbButton("Retry audio", p::retry, kind = BtnKind.Secondary, size = BtnSize.Small)
+        else if (p.stalled && p.phase == ExamPhase.Audio) NbButton("Resume audio", p::resume, kind = BtnKind.Secondary, size = BtnSize.Small)
     }
 }
 
