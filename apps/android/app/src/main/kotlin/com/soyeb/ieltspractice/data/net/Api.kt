@@ -425,18 +425,20 @@ class Api(
     }
 
     fun signOutLocal(accountExpired: Boolean = false) {
+        val lastUser = _me.value?.user?.id
         setSession(null, false)
         _me.value = null
         _quota.value = null
         scope.launch { store.clear() }
-        onSignedOut?.invoke(accountExpired)
+        onSignedOut?.invoke(accountExpired, lastUser)
     }
 
     /**
-     * After every sign-out: true when the server ended an account's session (401), false for one the user chose or a guest's.
-     * AppGraph keeps unowned recordings on an expired account session (the same learner usually signs back in) and drops them otherwise.
+     * After every sign-out: [accountExpired] is true when the server ended an account's session (401), false for one the user chose or a
+     * guest's; [lastUser] is the account that was signed in, when known. AppGraph gives unowned recordings to that account on expiry
+     * (so only it can upload them after signing back in) and drops them otherwise.
      */
-    @Volatile var onSignedOut: ((accountExpired: Boolean) -> Unit)? = null
+    @Volatile var onSignedOut: ((accountExpired: Boolean, lastUser: String?) -> Unit)? = null
 
     // MARK: Endpoints (one suspend function per route in apps/web/src/openapi.json; admin and replay are left out)
 

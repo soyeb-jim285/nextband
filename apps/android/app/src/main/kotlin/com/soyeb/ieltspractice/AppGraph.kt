@@ -57,11 +57,12 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
 
     init {
         api.onGuestLinked = { guest, account -> scope.launch { pending.reassign(guest, account) } }
-        // ponytail: after a 401 the next account to sign in here claims unowned recordings; persist the last account id if that matters.
-        if (demo == null) api.onSignedOut = { expired ->
+        if (demo == null) api.onSignedOut = { expired, lastUser ->
             // Cached audio includes this account's own recordings: gone on every sign-out (and account delete, which signs out).
             scope.launch(Dispatchers.IO) { MediaCache.clear(app) }
-            if (!expired) scope.launch { pending.dropUnowned() }
+            // Unowned recordings never pass to another account: an expired session hands them to the account that made them,
+            // anything else (or an unknown account) deletes them.
+            scope.launch { if (expired && lastUser != null) pending.claimUnowned(lastUser) else pending.dropUnowned() }
         }
         // A goal picked in onboarding before there was a session (prefs "goal:*") goes to the account once one exists,
         // then the device copy is dropped. A failed save stays queued for the next sign-in or launch.

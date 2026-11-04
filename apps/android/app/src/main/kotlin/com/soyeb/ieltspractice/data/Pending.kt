@@ -144,6 +144,12 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
         _items.value.filter { it.ownerId == null }.forEach { remove(it.id) }
     }
 
+    /** The session that made them expired: they belong to its account, which can upload them after signing back in. */
+    fun claimUnowned(owner: String) {
+        reload()
+        _items.value.filter { it.ownerId == null }.forEach { add(it.copy(ownerId = owner)) }
+    }
+
     fun remove(id: String) {
         audioFile(id).delete()
         metaFile(id).delete()
