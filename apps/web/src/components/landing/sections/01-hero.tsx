@@ -5,6 +5,7 @@ import { verb } from '../ContinueStrip';
 import { bdt, PAID_PLANS } from '@ielts/core';
 import { BandQ, Countdown, isPaused, PauseButton, StartFree, useOnScreen, vars, WireChip } from '../wire';
 import './01-hero.css';
+import { inPlayApp } from '@/lib/inApp';
 
 /*
  * Act 1, the marking desk. Copy left; on the right one big answer sheet, marked, with the other three skills fanned above
@@ -367,9 +368,11 @@ export function Hero() {
             ) : (
               <>
                 <StartFree className="lp-hero-btn" />
-                <a href="#pricing" className="lp-btn lp-btn--secondary lp-hero-btn">
-                  See pricing
-                </a>
+                {!inPlayApp() && (
+                  <a href="#pricing" className="lp-btn lp-btn--secondary lp-hero-btn">
+                    See pricing
+                  </a>
+                )}
               </>
             )}
           </div>

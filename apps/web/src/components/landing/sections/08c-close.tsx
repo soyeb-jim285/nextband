@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { Pen, StartFree, vars } from '../wire';
 import './08c-close.css';
+import { inPlayApp } from '@/lib/inApp';
 
 // A sample result (the owner asked for band values here); the overall is the mean rounded to the half band: 6.875 -> 7.0.
 const SKILLS = [
@@ -33,9 +34,11 @@ export function Close() {
           </p>
           <div className="lp-close-actions">
             <StartFree className="lp-close-btn" />
-            <a href="#pricing" className="lp-link lp-close-link">
-              See pricing
-            </a>
+            {!inPlayApp() && (
+              <a href="#pricing" className="lp-link lp-close-link">
+                See pricing
+              </a>
+            )}
           </div>
         </div>
 

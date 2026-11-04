@@ -18,6 +18,7 @@ import { Faq } from './sections/08b-faq';
 import { Close } from './sections/08c-close';
 import { Footer } from './sections/09-footer';
 import { usePaused, watchLive } from './wire';
+import { inPlayApp } from '@/lib/inApp';
 
 /**
  * Marks each act `data-live` while it is on screen (a screen of margin either side) and the tab is visible, so the
@@ -132,7 +133,7 @@ export function Landing() {
         <Result />
         <Habits />
         <Plan />
-        <Pricing />
+        {!inPlayApp() && <Pricing />}
         <Bank />
         <Faq />
         <Close />

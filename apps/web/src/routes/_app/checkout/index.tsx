@@ -5,6 +5,8 @@ import { useState, type FormEvent } from 'react';
 import { AccountGate } from '@/components/community/AccountGate';
 import { Alert, Button, Card, Input, PageContainer, PageHeader, Segmented } from '@/components/ui';
 import { call, client } from '@/lib/api';
+import { InAppNotice } from '@/components/legal/InAppNotice';
+import { inPlayApp } from '@/lib/inApp';
 import { useAccount } from '@/lib/query';
 import { fmtDate, leftText, usePlan } from '@/components/pricing/PlanStatus';
 
@@ -12,8 +14,10 @@ const isPlan = (v: unknown): v is PaidPlan => typeof v === 'string' && v in PAID
 
 export const Route = createFileRoute('/_app/checkout/')({
   validateSearch: (s: Record<string, unknown>): { plan?: PaidPlan } => (isPlan(s.plan) ? { plan: s.plan } : {}),
-  component: () => (useAccount() ? <Checkout /> : <AccountGate what="checkout" />),
+  component: () => (inPlayApp() ? <InAppNotice /> : <CheckoutOrGate />),
 });
+
+const CheckoutOrGate = () => (useAccount() ? <Checkout /> : <AccountGate what="checkout" />);
 
 const link = 'font-medium text-accent-text underline decoration-accent/40 underline-offset-[3px] hover:decoration-accent';
 const PHONE = /^(\+?88)?01[3-9]\d{8}$/;

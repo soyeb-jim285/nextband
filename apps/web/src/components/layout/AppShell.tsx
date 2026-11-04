@@ -28,6 +28,7 @@ import { actionLabel, leftText, usePlan } from '@/components/pricing/PlanStatus'
 import { openFeedback } from './FeedbackButton';
 import { Logo, LogoMark } from './Logo';
 import { SiteFooter } from './SiteFooter';
+import { inPlayApp } from '@/lib/inApp';
 
 type NavItem = { to: '/' | '/overview' | '/speaking' | '/writing' | '/listening' | '/reading' | '/bank' | '/improve' | '/history' | '/settings' | '/admin'; label: string; short?: string; icon: LucideIcon };
 
@@ -215,7 +216,7 @@ function PlanRow() {
   const plan = usePlan();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const label = plan && actionLabel(plan);
-  if (!plan || !label) return null;
+  if (!plan || !label || inPlayApp()) return null;
   const text = plan.state === 'ending' ? `${label} · ${leftText(plan.daysLeft)}` : label;
   return (
     <SidebarMenuItem>

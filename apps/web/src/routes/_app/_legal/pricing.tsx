@@ -3,9 +3,11 @@ import { LegalPage, Section } from '@/components/legal/Legal';
 import { FREE, PlanCards } from '@/components/pricing/Plans';
 import { planLine, usePlan } from '@/components/pricing/PlanStatus';
 import { Alert } from '@/components/ui';
+import { InAppNotice } from '@/components/legal/InAppNotice';
+import { inPlayApp } from '@/lib/inApp';
 import { useAccount } from '@/lib/query';
 
-export const Route = createFileRoute('/_app/_legal/pricing')({ component: Pricing });
+export const Route = createFileRoute('/_app/_legal/pricing')({ component: () => (inPlayApp() ? <InAppNotice /> : <Pricing />) });
 
 const link = 'font-medium text-accent-text underline decoration-accent/40 underline-offset-[3px] hover:decoration-accent';
 

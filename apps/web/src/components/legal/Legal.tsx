@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { Children, isValidElement, useEffect, useState, type ReactNode } from 'react';
 import { PageContainer } from '@/components/ui';
+import { inPlayApp } from '@/lib/inApp';
 import { cn } from '@/lib/utils';
 
 /** The business behind the site, as on its trade licence; shown on the legal pages and in the footer (payment gateways check these). */
@@ -15,7 +16,7 @@ export const COMPANY = {
   since: 2026,
 };
 
-export const PAGES = [
+const ALL_PAGES = [
   { to: '/about', label: 'About' },
   { to: '/pricing', label: 'Pricing' },
   { to: '/privacy', label: 'Privacy' },
@@ -24,6 +25,9 @@ export const PAGES = [
   { to: '/delivery', label: 'Delivery' },
   { to: '/contact', label: 'Contact' },
 ] as const;
+
+/** Footer/legal nav. No Pricing in a tab opened from the Play app (lib/inApp.ts). */
+export const PAGES = inPlayApp() ? ALL_PAGES.filter((p) => p.to !== '/pricing') : ALL_PAGES;
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 

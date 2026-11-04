@@ -3,6 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { buttonStyles } from '@/components/ui';
 import { useQuota, type Quota } from '@/lib/community';
 import { cn } from '@/lib/utils';
+import { inPlayApp } from '@/lib/inApp';
 
 const DAY = 86_400_000;
 /** A paid plan this close to its end is "ending": the renew prompts turn amber. */
@@ -37,7 +38,7 @@ export const actionLabel = (p: Plan) => (p.state === 'free' ? 'Upgrade' : p.stat
 
 export function PlanButton({ plan, size = 'sm', className }: { plan: Plan; size?: 'sm' | 'lg'; className?: string }) {
   const label = actionLabel(plan);
-  if (!label) return null;
+  if (!label || inPlayApp()) return null;
   const primary = plan.state === 'free' || plan.state === 'ending';
   return (
     <Link to="/checkout" className={buttonStyles({ variant: primary ? 'primary' : 'secondary', size, className })}>
