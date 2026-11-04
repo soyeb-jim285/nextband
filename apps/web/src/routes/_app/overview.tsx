@@ -2,7 +2,6 @@ import { queryOptions, useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { ArrowRight, Compass, Flame } from 'lucide-react';
 import { coachQuery } from '@/components/coach/data';
-import { FixNext } from '@/components/dashboard/FixNext';
 import { MockPanel } from '@/components/dashboard/MockPanel';
 import { NextUp } from '@/components/dashboard/NextUp';
 import { Onboarding } from '@/components/dashboard/Onboarding';
@@ -91,30 +90,35 @@ function Dashboard() {
           </Alert>
         )}
         <YourPicture p={p} target={target} />
-        <CoachCard />
+        <ImproveCard />
         {p.attempts === 0 ? <Onboarding /> : <NextUp p={p} target={target} due={due.total} lr={lr} />}
         <MockPanel continuedAbove={p.attempts > 0} />
         <PractiseList liveReady={me.live} />
         {hasProgress && <ProgressTabs p={p} lr={lr} target={target} />}
-        <FixNext mistakes={p.topMistakes} />
       </div>
     </PageContainer>
   );
 }
 
-/** The coach's summary sentence and a way in; nothing until the first report exists. */
-function CoachCard() {
+/** Improve in one line: the coach's summary and this week's first focus, and the way in; nothing until the first report exists. The drill link sits in Next up. */
+function ImproveCard() {
   const report = useQuery(coachQuery).data?.report;
   if (!report) return null;
+  const focus = report.words.focus[0];
   return (
     <Card className="flex items-start gap-4 max-sm:flex-col">
       <Compass className="mt-0.5 size-5 shrink-0 text-accent-text max-sm:hidden" aria-hidden />
       <div className="min-w-0 flex-1">
-        <h2 className="type-overline text-accent-text">Your coach</h2>
+        <h2 className="type-overline text-accent-text">Improve</h2>
         <p className="type-body mt-1 line-clamp-3 text-ink">{report.words.summary}</p>
+        {focus && (
+          <p className="type-caption mt-1.5">
+            This week: <span className="font-medium text-ink">{focus.title}</span>
+          </p>
+        )}
       </div>
-      <Link to="/coach" className={buttonStyles({ variant: 'outline', size: 'sm', className: 'shrink-0' })}>
-        Open your coach
+      <Link to="/improve" className={buttonStyles({ variant: 'outline', size: 'sm', className: 'shrink-0' })}>
+        Open Improve
         <ArrowRight aria-hidden />
       </Link>
     </Card>

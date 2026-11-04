@@ -21,6 +21,7 @@ import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppBankRouteImport } from './routes/_app/bank'
 import { Route as AppCoachRouteImport } from './routes/_app/coach'
 import { Route as AppHistoryRouteImport } from './routes/_app/history'
+import { Route as AppImproveRouteImport } from './routes/_app/improve'
 import { Route as AppMistakesRouteImport } from './routes/_app/mistakes'
 import { Route as AppOverviewRouteImport } from './routes/_app/overview'
 import { Route as AppReviewRouteImport } from './routes/_app/review'
@@ -47,6 +48,9 @@ import { Route as AppAdminPlaygroundRouteImport } from './routes/_app/admin/play
 import { Route as AppAdminTestsRouteImport } from './routes/_app/admin/tests'
 import { Route as AppCheckoutIndexRouteImport } from './routes/_app/checkout/index'
 import { Route as AppCheckoutDoneRouteImport } from './routes/_app/checkout/done'
+import { Route as AppImproveIndexRouteImport } from './routes/_app/improve/index'
+import { Route as AppImproveDrillRouteImport } from './routes/_app/improve/drill'
+import { Route as AppImprovePatternsRouteImport } from './routes/_app/improve/patterns'
 import { Route as AppListeningIndexRouteImport } from './routes/_app/listening/index'
 import { Route as AppMockIndexRouteImport } from './routes/_app/mock/index'
 import { Route as AppMockIdRouteImport } from './routes/_app/mock/$id'
@@ -122,6 +126,11 @@ const AppCoachRoute = AppCoachRouteImport.update({
 const AppHistoryRoute = AppHistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppImproveRoute = AppImproveRouteImport.update({
+  id: '/improve',
+  path: '/improve',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMistakesRoute = AppMistakesRouteImport.update({
@@ -254,6 +263,21 @@ const AppCheckoutDoneRoute = AppCheckoutDoneRouteImport.update({
   path: '/checkout/done',
   getParentRoute: () => AppRoute,
 } as any)
+const AppImproveIndexRoute = AppImproveIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppImproveRoute,
+} as any)
+const AppImproveDrillRoute = AppImproveDrillRouteImport.update({
+  id: '/drill',
+  path: '/drill',
+  getParentRoute: () => AppImproveRoute,
+} as any)
+const AppImprovePatternsRoute = AppImprovePatternsRouteImport.update({
+  id: '/patterns',
+  path: '/patterns',
+  getParentRoute: () => AppImproveRoute,
+} as any)
 const AppListeningIndexRoute = AppListeningIndexRouteImport.update({
   id: '/listening/',
   path: '/listening/',
@@ -359,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/bank': typeof AppBankRoute
   '/coach': typeof AppCoachRoute
   '/history': typeof AppHistoryRoute
+  '/improve': typeof AppImproveRouteWithChildren
   '/mistakes': typeof AppMistakesRoute
   '/overview': typeof AppOverviewRoute
   '/review': typeof AppReviewRoute
@@ -383,12 +408,15 @@ export interface FileRoutesByFullPath {
   '/admin/playground': typeof AppAdminPlaygroundRoute
   '/admin/tests': typeof AppAdminTestsRoute
   '/checkout/done': typeof AppCheckoutDoneRoute
+  '/improve/drill': typeof AppImproveDrillRoute
+  '/improve/patterns': typeof AppImprovePatternsRoute
   '/mock/$id': typeof AppMockIdRoute
   '/speaking/live': typeof AppSpeakingLiveRoute
   '/speaking/session': typeof AppSpeakingSessionRoute
   '/writing/full': typeof AppWritingFullRoute
   '/admin/': typeof AppAdminIndexRoute
   '/checkout/': typeof AppCheckoutIndexRoute
+  '/improve/': typeof AppImproveIndexRoute
   '/listening/': typeof AppListeningIndexRoute
   '/mock/': typeof AppMockIndexRoute
   '/reading/': typeof AppReadingIndexRoute
@@ -438,12 +466,15 @@ export interface FileRoutesByTo {
   '/admin/playground': typeof AppAdminPlaygroundRoute
   '/admin/tests': typeof AppAdminTestsRoute
   '/checkout/done': typeof AppCheckoutDoneRoute
+  '/improve/drill': typeof AppImproveDrillRoute
+  '/improve/patterns': typeof AppImprovePatternsRoute
   '/mock/$id': typeof AppMockIdRoute
   '/speaking/live': typeof AppSpeakingLiveRoute
   '/speaking/session': typeof AppSpeakingSessionRoute
   '/writing/full': typeof AppWritingFullRoute
   '/admin': typeof AppAdminIndexRoute
   '/checkout': typeof AppCheckoutIndexRoute
+  '/improve': typeof AppImproveIndexRoute
   '/listening': typeof AppListeningIndexRoute
   '/mock': typeof AppMockIndexRoute
   '/reading': typeof AppReadingIndexRoute
@@ -473,6 +504,7 @@ export interface FileRoutesById {
   '/_app/bank': typeof AppBankRoute
   '/_app/coach': typeof AppCoachRoute
   '/_app/history': typeof AppHistoryRoute
+  '/_app/improve': typeof AppImproveRouteWithChildren
   '/_app/mistakes': typeof AppMistakesRoute
   '/_app/overview': typeof AppOverviewRoute
   '/_app/review': typeof AppReviewRoute
@@ -497,12 +529,15 @@ export interface FileRoutesById {
   '/_app/admin/playground': typeof AppAdminPlaygroundRoute
   '/_app/admin/tests': typeof AppAdminTestsRoute
   '/_app/checkout/done': typeof AppCheckoutDoneRoute
+  '/_app/improve/drill': typeof AppImproveDrillRoute
+  '/_app/improve/patterns': typeof AppImprovePatternsRoute
   '/_app/mock/$id': typeof AppMockIdRoute
   '/_app/speaking/live': typeof AppSpeakingLiveRoute
   '/_app/speaking/session': typeof AppSpeakingSessionRoute
   '/_app/writing/full': typeof AppWritingFullRoute
   '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/checkout/': typeof AppCheckoutIndexRoute
+  '/_app/improve/': typeof AppImproveIndexRoute
   '/_app/listening/': typeof AppListeningIndexRoute
   '/_app/mock/': typeof AppMockIndexRoute
   '/_app/reading/': typeof AppReadingIndexRoute
@@ -531,6 +566,7 @@ export interface FileRouteTypes {
     | '/bank'
     | '/coach'
     | '/history'
+    | '/improve'
     | '/mistakes'
     | '/overview'
     | '/review'
@@ -555,12 +591,15 @@ export interface FileRouteTypes {
     | '/admin/playground'
     | '/admin/tests'
     | '/checkout/done'
+    | '/improve/drill'
+    | '/improve/patterns'
     | '/mock/$id'
     | '/speaking/live'
     | '/speaking/session'
     | '/writing/full'
     | '/admin/'
     | '/checkout/'
+    | '/improve/'
     | '/listening/'
     | '/mock/'
     | '/reading/'
@@ -610,12 +649,15 @@ export interface FileRouteTypes {
     | '/admin/playground'
     | '/admin/tests'
     | '/checkout/done'
+    | '/improve/drill'
+    | '/improve/patterns'
     | '/mock/$id'
     | '/speaking/live'
     | '/speaking/session'
     | '/writing/full'
     | '/admin'
     | '/checkout'
+    | '/improve'
     | '/listening'
     | '/mock'
     | '/reading'
@@ -644,6 +686,7 @@ export interface FileRouteTypes {
     | '/_app/bank'
     | '/_app/coach'
     | '/_app/history'
+    | '/_app/improve'
     | '/_app/mistakes'
     | '/_app/overview'
     | '/_app/review'
@@ -668,12 +711,15 @@ export interface FileRouteTypes {
     | '/_app/admin/playground'
     | '/_app/admin/tests'
     | '/_app/checkout/done'
+    | '/_app/improve/drill'
+    | '/_app/improve/patterns'
     | '/_app/mock/$id'
     | '/_app/speaking/live'
     | '/_app/speaking/session'
     | '/_app/writing/full'
     | '/_app/admin/'
     | '/_app/checkout/'
+    | '/_app/improve/'
     | '/_app/listening/'
     | '/_app/mock/'
     | '/_app/reading/'
@@ -784,6 +830,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof AppHistoryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/improve': {
+      id: '/_app/improve'
+      path: '/improve'
+      fullPath: '/improve'
+      preLoaderRoute: typeof AppImproveRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/mistakes': {
@@ -967,6 +1020,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/checkout/done'
       preLoaderRoute: typeof AppCheckoutDoneRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/improve/': {
+      id: '/_app/improve/'
+      path: '/'
+      fullPath: '/improve/'
+      preLoaderRoute: typeof AppImproveIndexRouteImport
+      parentRoute: typeof AppImproveRoute
+    }
+    '/_app/improve/drill': {
+      id: '/_app/improve/drill'
+      path: '/drill'
+      fullPath: '/improve/drill'
+      preLoaderRoute: typeof AppImproveDrillRouteImport
+      parentRoute: typeof AppImproveRoute
+    }
+    '/_app/improve/patterns': {
+      id: '/_app/improve/patterns'
+      path: '/patterns'
+      fullPath: '/improve/patterns'
+      preLoaderRoute: typeof AppImprovePatternsRouteImport
+      parentRoute: typeof AppImproveRoute
     }
     '/_app/listening/': {
       id: '/_app/listening/'
@@ -1163,12 +1237,29 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
   AppAdminRouteChildren,
 )
 
+interface AppImproveRouteChildren {
+  AppImproveDrillRoute: typeof AppImproveDrillRoute
+  AppImprovePatternsRoute: typeof AppImprovePatternsRoute
+  AppImproveIndexRoute: typeof AppImproveIndexRoute
+}
+
+const AppImproveRouteChildren: AppImproveRouteChildren = {
+  AppImproveDrillRoute: AppImproveDrillRoute,
+  AppImprovePatternsRoute: AppImprovePatternsRoute,
+  AppImproveIndexRoute: AppImproveIndexRoute,
+}
+
+const AppImproveRouteWithChildren = AppImproveRoute._addFileChildren(
+  AppImproveRouteChildren,
+)
+
 interface AppRouteChildren {
   AppLegalRoute: typeof AppLegalRouteWithChildren
   AppAdminRoute: typeof AppAdminRouteWithChildren
   AppBankRoute: typeof AppBankRoute
   AppCoachRoute: typeof AppCoachRoute
   AppHistoryRoute: typeof AppHistoryRoute
+  AppImproveRoute: typeof AppImproveRouteWithChildren
   AppMistakesRoute: typeof AppMistakesRoute
   AppOverviewRoute: typeof AppOverviewRoute
   AppReviewRoute: typeof AppReviewRoute
@@ -1198,6 +1289,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBankRoute: AppBankRoute,
   AppCoachRoute: AppCoachRoute,
   AppHistoryRoute: AppHistoryRoute,
+  AppImproveRoute: AppImproveRouteWithChildren,
   AppMistakesRoute: AppMistakesRoute,
   AppOverviewRoute: AppOverviewRoute,
   AppReviewRoute: AppReviewRoute,

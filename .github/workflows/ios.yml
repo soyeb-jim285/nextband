@@ -48,6 +48,7 @@ jobs:
         with:
           name: IELTS-simulator-app
           path: IELTS-simulator-app.zip
+          retention-days: 3
       - name: Unit tests
         run: |
           set -o pipefail

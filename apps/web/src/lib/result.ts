@@ -43,6 +43,8 @@ const CATEGORY_GROUP: Record<string, string> = {
   task: 'Task',
   pronunciation: 'Pronunciation',
   fluency: 'Fluency',
+  spelling: 'Spelling',
+  vocabulary: 'Vocabulary',
 };
 /** "grammar.article" → "Grammar: article" */
 export function categoryLabel(c: string) {
@@ -307,7 +309,8 @@ export function sessionOverall(parts: { result: AnalysisResult | null | undefine
 
 // ---- review deck ----
 
-export const errorCard = (e: AnalysisError) => ({ front: `Fix: "${e.original}"`, back: `${e.correction}\n\n${e.explanation}`, source: 'mistake' as const });
+/** Same shape as the server's mistakeCard, so a card the drill picker already made is not added twice. */
+export const errorCard = (e: AnalysisError) => ({ front: e.original, back: `${e.correction} — ${e.explanation}`, source: 'mistake' as const, category: e.category });
 export const fixCard = (f: Fix) => ({ front: `${f.title}\n\n${f.before}`, back: `${f.after}\n\n${f.why}`, source: 'fix' as const });
 
 export const addErrorToDeck = (e: AnalysisError) => api.post('/cards', errorCard(e));

@@ -2,7 +2,8 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight } from 'lucide-react';
 import { buttonStyles, Card } from '@/components/ui';
 import { plural } from '@/lib/format';
-import { ACTION, actionLink, type Candidate, type CoachWords, evidenceLink, type Feedback, itemKey, SKILL_LABEL } from './data';
+import type { DeckCategory, Pattern } from '@/components/improve/data';
+import { ACTION, actionLink, type Candidate, type CoachWords, evidenceLink, type Feedback, itemKey, kindCategory, SKILL_LABEL } from './data';
 import { Wrong } from './Wrong';
 
 /** "a -> b" from a candidate's facts.example1/2. */
@@ -17,8 +18,8 @@ export function Example({ pair: [was, fix] }: { pair: [string, string] }) {
   );
 }
 
-/** This week's focus: up to 3 items, in the order the server ranked them, each with its evidence and one action. */
-export function FocusList({ focus, candidates, fb }: { focus: CoachWords['focus']; candidates: Candidate[]; fb: Feedback }) {
+/** This week's focus: up to 3 items, in the order the server ranked them, each with its evidence and one action: the drill on that pattern when it has cards, else the coach's own action. */
+export function FocusList({ focus, candidates, fb, patterns, deck }: { focus: CoachWords['focus']; candidates: Candidate[]; fb: Feedback; patterns?: Pattern[]; deck?: DeckCategory[] }) {
   const items = focus.flatMap((f) => {
     const c = candidates.find((x) => x.id === f.candidateId);
     return c && !fb.hidden.has(itemKey('focus', f.candidateId)) ? [{ f, c }] : [];
@@ -27,7 +28,10 @@ export function FocusList({ focus, candidates, fb }: { focus: CoachWords['focus'
   return (
     <ol className="space-y-3">
       {items.map(({ f, c }, i) => {
-        const ev = f.action === 'see-evidence' ? null : evidenceLink(c);
+        const cat = kindCategory(c.kind);
+        const pattern = patterns?.find((p) => p.category === cat) ?? (cat === 'spelling' && deck ? { category: cat } : undefined); // spelling has its own row on Patterns
+        const drill = deck?.find((d) => d.category === cat && d.cards > 0) ?? null;
+        const ev = pattern ? ({ to: '/improve/patterns', search: { pattern: pattern.category } } as const) : f.action === 'see-evidence' ? null : evidenceLink(c);
         const act = actionLink(f.action, c);
         const outOf = Number(c.facts.outOf) || c.tests;
         return (
@@ -65,13 +69,19 @@ export function FocusList({ focus, candidates, fb }: { focus: CoachWords['focus'
                     .{' '}
                     {ev && (
                       <Link {...ev} className="font-medium text-accent-text underline underline-offset-2">
-                        See where it happened
+                        {pattern ? 'See every example' : 'See where it happened'}
                       </Link>
                     )}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {act && (
+                  {drill ? (
+                    <Link to="/improve/drill" search={{ pattern: drill.category, ...(drill.due === 0 && { ahead: true }) }} className={buttonStyles({ size: 'sm' })}>
+                      Drill this
+                      <span className="font-normal opacity-80">({Math.max(2, Math.round(Math.min(drill.cards, 10) / 2))} min)</span>
+                      <ArrowRight aria-hidden />
+                    </Link>
+                  ) : act && (
                     <Link {...act} className={buttonStyles({ variant: f.action === 'see-evidence' ? 'outline' : 'primary', size: 'sm' })}>
                       {f.label}
                       {f.action !== 'see-evidence' && <span className="font-normal opacity-80">({ACTION[f.action].minutes} min)</span>}

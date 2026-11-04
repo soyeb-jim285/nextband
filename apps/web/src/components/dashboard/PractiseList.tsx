@@ -48,8 +48,7 @@ export function PractiseList({ liveReady }: { liveReady: boolean }) {
       </ul>
       <p className="type-body flex flex-wrap gap-x-6">
         <Link to="/bank" className={linkStyles}>Prompt bank</Link>
-        <Link to="/mistakes" className={linkStyles}>Mistakes</Link>
-        <Link to="/review" className={linkStyles}>Review deck</Link>
+        <Link to="/improve" className={linkStyles}>Improve</Link>
         <Link to="/history" className={linkStyles}>All attempts</Link>
       </p>
     </Section>

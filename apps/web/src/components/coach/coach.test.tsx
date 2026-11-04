@@ -5,6 +5,7 @@ import type { Candidate, CoachFacts, CoachWords, SkillFacts } from '@server/coac
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Coach } from './data';
 import { CoachView } from './CoachView';
+import { Patterns } from './Patterns';
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
 vi.mock('@tanstack/react-router', () => ({
@@ -102,9 +103,13 @@ it('items already hidden on the server stay hidden', () => {
   expect(focus().getAllByRole('article')).toHaveLength(2);
 });
 
-it('"Add all to Review" posts one vocab card per swap', async () => {
-  view(ready);
-  fireEvent.click(screen.getByRole('button', { name: /Add all to Review/ }));
+it('"Add all to drills" posts one vocab card per swap', async () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Patterns facts={facts} fb={{ hidden: new Set(), wrong: () => {} }} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Add all to drills/ }));
   await waitFor(() => expect(mocks.post).toHaveBeenCalled());
   const [path, { body }] = mocks.post.mock.calls[0]!;
   expect(path).toBe('/api/cards/bulk');

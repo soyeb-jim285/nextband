@@ -1330,6 +1330,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mistakes/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mistake categories as patterns: how often, in how many tests, the trend per test, and the drill cards behind each */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Patterns */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MistakePatterns"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mistakes/recurring/{attemptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One test's mistakes by category, each with how many of the 10 earlier tests (same skill) had it too, and the drill cards it added */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    attemptId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Recurring */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RecurringMistakes"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mistakes": {
         parameters: {
             query?: never;
@@ -1507,10 +1590,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Cards due for review now (oldest due first, max 50) and the total due count */
+        /** Cards due for review now (oldest due first, max 50) and the total due count; optionally one category, or ahead of schedule */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    category?: string;
+                    /** @description 1 = include cards not yet due (soonest first): a drill on demand */
+                    practice?: "1";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1587,6 +1674,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cards/{id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip a card for good: it is never due again (it stays out of drills and counts) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Skipped */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok: boolean;
+                        };
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quota": {
         parameters: {
             query?: never;
@@ -1611,6 +1747,56 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["Quota"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lr/cards/{id}/clip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where a Listening spelling drill card's word is spoken in its test recording
+         * @description The section audio (presigned, 1 h) and the seconds to play, from the word timings of the question the card came from. 404 when the card has no Listening test or the word is not located exactly; the client then falls back to the device voice.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Clip */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CardClip"];
+                    };
+                };
+                /** @description Not found (also for a Cambridge test this user may not open) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LrError"];
                     };
                 };
             };
@@ -5729,6 +5915,45 @@ export interface components {
                 skill: "speaking" | "writing";
             } | null;
         };
+        MistakePatterns: {
+            patterns: components["schemas"]["MistakePattern"][];
+            /** @description Drill cards per category, including categories with no mistake rows (Listening/Reading spelling) */
+            deck: {
+                category: string;
+                cards: number;
+                due: number;
+            }[];
+        };
+        MistakePattern: {
+            category: string;
+            count: number;
+            /** @description Tests it appeared in */
+            tests: number;
+            /** @description Finished tests of the skills it appears in */
+            outOf: number;
+            lastAt: string;
+            /** @description Per test, over the newest 3 tests of those skills (null under 4 tests) */
+            recent: number | null;
+            /** @description Per test, over the 3 tests before those */
+            before: number | null;
+            example: {
+                original: string;
+                correction: string;
+            };
+            /** @description Drill cards in this category */
+            cards: number;
+            due: number;
+        };
+        RecurringMistakes: {
+            items: {
+                category: string;
+                here: number;
+                before: number;
+                outOf: number;
+            }[];
+            /** @description Drill cards made from this test */
+            added: number;
+        };
         MistakeLog: {
             /** @description All categories, most frequent first */
             groups: {
@@ -5758,7 +5983,10 @@ export interface components {
             createdAt: string;
         };
         Card: components["schemas"]["CardInput"] & {
+            category: string | null;
             id: string;
+            attemptId: string | null;
+            origin: components["schemas"]["CardOrigin"];
             ease: number;
             /** @description Days */
             interval: number;
@@ -5766,11 +5994,21 @@ export interface components {
             due: string;
             createdAt: string;
         };
+        /** @description The Speaking/Writing test the card came from, when known */
+        CardOrigin: {
+            /** @enum {string} */
+            skill: "speaking" | "writing";
+            part: number;
+            title: string;
+            at: string;
+        } | null;
         CardInput: {
             front: string;
             back: string;
             /** @enum {string} */
             source: "mistake" | "vocab" | "fix";
+            /** @description Mistake category (grammar.article, spelling, ...); drills can be narrowed to one */
+            category?: string | null;
         };
         DueCards: {
             cards: components["schemas"]["Card"][];
@@ -5802,6 +6040,15 @@ export interface components {
                     total: number;
                 };
             };
+        };
+        CardClip: {
+            url: string;
+            from: number;
+            to: number;
+        };
+        LrError: {
+            error: string;
+            code?: string;
         };
         LrTestListItem: {
             id: string;
@@ -6010,10 +6257,6 @@ export interface components {
             paraphrase?: string[][];
             /** @description Drills: the trap this item sets (LR_TRAPS id) */
             trap?: string;
-        };
-        LrError: {
-            error: string;
-            code?: string;
         };
         LrAttemptListItem: {
             id: string;

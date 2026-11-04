@@ -18,7 +18,7 @@ function chunk(original: string, rewrite: string): Chunk[] {
   return out;
 }
 
-function Parts({ parts }: { parts: Change[] }) {
+export function Parts({ parts }: { parts: Change[] }) {
   return parts.map((p, i) =>
     p.removed ? (
       <del key={i} className="rounded-sm bg-bad-soft px-0.5 text-bad-text decoration-bad/60">

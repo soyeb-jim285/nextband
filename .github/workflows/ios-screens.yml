@@ -72,3 +72,4 @@ jobs:
         with:
           name: ios-screens
           path: apps/ios/shots
+          retention-days: 3

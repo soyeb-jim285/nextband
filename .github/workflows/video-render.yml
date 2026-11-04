@@ -42,3 +42,4 @@ jobs:
         with:
           name: video
           path: brag.mp4
+          retention-days: 3

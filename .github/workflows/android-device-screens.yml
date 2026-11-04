@@ -35,3 +35,4 @@ jobs:
         with:
           name: android-device-screens
           path: device-shots
+          retention-days: 3

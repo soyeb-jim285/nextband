@@ -3,7 +3,7 @@ import { Button } from '@/components/ui';
 
 export type FixItem = { title: string; why: string; before?: string; after?: string };
 
-/** Numbered fixes. The numeral is the same size as the title; before/after is an inline pair, no grey box. Owns the single "Add all to review deck" action. */
+/** Numbered fixes. The numeral is the same size as the title; before/after is an inline pair, no grey box. Owns the single "Add all to drills" action. */
 export function FixList({ items, onAddAll, added }: { items: FixItem[]; onAddAll?: () => void; added?: boolean }) {
   return (
     <div className="space-y-4">
@@ -39,11 +39,11 @@ export function FixList({ items, onAddAll, added }: { items: FixItem[]; onAddAll
       {onAddAll &&
         (added ? (
           <p className="type-body flex items-center gap-2 text-good-text">
-            <Check className="size-4" aria-hidden /> Added to review deck
+            <Check className="size-4" aria-hidden /> Added to your drills
           </p>
         ) : (
           <Button variant="link" onClick={onAddAll}>
-            Add all to review deck
+            Add all to drills
           </Button>
         ))}
     </div>

@@ -135,7 +135,7 @@ export const SITEMAP_PATHS = Object.keys(SITEMAP);
 /** Every path the web app can render (apps/web routes; the web test routes.test checks the two stay in step). Anything else
  *  is answered with the SPA shell (its not-found screen) but HTTP 404, so crawlers see no soft 404s. */
 const ROUTES = [
-  /^\/(overview|speaking|speaking\/live|speaking\/session|writing|writing\/full|listening|reading|mock|bank|coach|history|mistakes|review|settings|checkout|checkout\/done|about|contact|delivery|pricing|privacy|refunds|terms|login|signup|forgot-password|reset-password|live-demo|styleguide)?$/,
+  /^\/(overview|speaking|speaking\/live|speaking\/session|writing|writing\/full|listening|reading|mock|bank|coach|improve|improve\/patterns|improve\/drill|history|mistakes|review|settings|checkout|checkout\/done|about|contact|delivery|pricing|privacy|refunds|terms|login|signup|forgot-password|reset-password|live-demo|styleguide)?$/,
   /^\/(speaking\/result|writing\/result|writing\/task|lr\/run|lr\/result|mock|admin\/replays|admin\/users)\/[^/]+$/,
   /^\/admin(\/(activity|content|costs|emails|feedback|funnel|growth|health|logs|playground|replays|tests|users))?$/,
 ];

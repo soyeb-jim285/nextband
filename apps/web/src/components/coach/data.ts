@@ -23,7 +23,7 @@ export const ACTION: Record<ActionType, { minutes: number; to?: LinkProps['to'] 
   'listening-test': { minutes: 40, to: '/listening' },
   'reading-test': { minutes: 60, to: '/reading' },
   'see-evidence': { minutes: 5 },
-  'review-deck': { minutes: 10, to: '/review' },
+  'review-deck': { minutes: 10, to: '/improve/drill' },
 };
 
 /** The result page of the newest test behind a pattern; History when it names none. */
@@ -36,6 +36,11 @@ export function evidenceLink(c: Pick<Candidate, 'skill' | 'evidence'>): LinkProp
 }
 
 export const actionLink = (action: ActionType, c?: Candidate): LinkProps | null => (action === 'see-evidence' ? (c ? evidenceLink(c) : null) : { to: ACTION[action].to });
+
+/** A coach pattern kind as the mistake category its drill cards carry (inverse of the server's mistakeKind; Listening/Reading spelling cards are 'spelling'). */
+export function kindCategory(kind: string) {
+  return ({ collocation: 'lexis.collocation', 'word-choice': 'lexis.word-choice', pronunciation: 'pronunciation.word', 'fluency-hesitation': 'fluency.hesitation' } as Record<string, string>)[kind] ?? kind;
+}
 
 /** Feedback key of one item; the server stores it as-is (max 100 chars), `hidden` returns the same strings. */
 export const itemKey = (section: 'focus' | 'pattern' | 'cheat', id: string) => `${section}:${id}`.slice(0, 100);

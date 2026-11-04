@@ -130,7 +130,7 @@ export const TEMPLATES = {
       blocks: [
         { type: 'hero', eyebrow: 'Your week', title: '{{headline}}', subtitle: '', tone: 'brand' },
         { type: 'text', text: "Hi {{firstName}}, here's your week." },
-        { type: 'button', label: 'Open your coach', url: '/coach', variant: 'solid' },
+        { type: 'button', label: 'Open your coach', url: '/improve', variant: 'solid' },
       ],
     },
   },

@@ -46,7 +46,7 @@ describe('components', () => {
   });
   it('FixList numbers items and offers one add-all action', () => {
     render(<FixList items={[{ title: 'Articles', why: 'w', before: 'a', after: 'b' }]} onAddAll={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Add all to review deck' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add all to drills' })).toBeTruthy();
   });
   it('heading outline is h1 > h2 > h3 without skips', () => {
     render(

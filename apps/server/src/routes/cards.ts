@@ -3,7 +3,7 @@ import { review } from '@ielts/core';
 import { and, asc, count, eq, inArray, lte } from 'drizzle-orm';
 import { currentUser, requireAccount } from '../auth';
 import { db } from '../db/client';
-import { cards } from '../db/schema';
+import { attempts, cards, prompts } from '../db/schema';
 import type { Fix } from '../ai/types';
 import type { App } from '../types';
 
@@ -12,10 +12,19 @@ const ErrorSchema = z.object({ error: z.string() }).openapi('Error');
 const authed = { tags: ['Cards'], security: [{ bearer: [] }], middleware: [requireAccount] };
 
 export const CardInput = z
-  .object({ front: z.string().trim().min(1).max(2000), back: z.string().trim().min(1).max(4000), source: z.enum(['mistake', 'vocab', 'fix']) })
+  .object({
+    front: z.string().trim().min(1).max(2000),
+    back: z.string().trim().min(1).max(4000),
+    source: z.enum(['mistake', 'vocab', 'fix']),
+    category: z.string().max(60).nullish().openapi({ description: 'Mistake category (grammar.article, spelling, ...); drills can be narrowed to one' }),
+  })
   .openapi('CardInput');
+const Origin = z.object({ skill: z.enum(['speaking', 'writing']), part: z.number(), title: z.string(), at: z.string() }).openapi('CardOrigin');
 export const CardSchema = CardInput.extend({
   id: z.string(),
+  category: z.string().nullable(),
+  attemptId: z.string().nullable(),
+  origin: Origin.nullable().openapi({ description: 'The Speaking/Writing test the card came from, when known' }),
   ease: z.number(),
   interval: z.number().openapi({ description: 'Days' }),
   reps: z.number(),
@@ -24,14 +33,15 @@ export const CardSchema = CardInput.extend({
 }).openapi('Card');
 
 type CardRow = typeof cards.$inferSelect;
-export const toCard = ({ userId: _u, due, createdAt, source, ...c }: CardRow): z.infer<typeof CardSchema> => ({
+export const toCard = ({ userId: _u, suspended: _s, due, createdAt, source, ...c }: CardRow, origin: z.infer<typeof Origin> | null = null): z.infer<typeof CardSchema> => ({
   ...c,
+  origin,
   source: source as z.infer<typeof CardInput>['source'],
   due: due.toISOString(),
   createdAt: createdAt.toISOString(),
 });
 
-type Input = z.infer<typeof CardInput>;
+type Input = z.infer<typeof CardInput> & { attemptId?: string };
 const cardKey = (c: { source: string; front: string; back: string }) => JSON.stringify([c.source, c.front, c.back]);
 
 /** The card the web's "Add top fixes to review deck" creates for a fix (trimmed like CardInput). */
@@ -89,17 +99,33 @@ export function register(app: App) {
       ...authed,
       method: 'get',
       path: '/api/cards/due',
-      summary: 'Cards due for review now (oldest due first, max 50) and the total due count',
+      summary: 'Cards due for review now (oldest due first, max 50) and the total due count; optionally one category, or ahead of schedule',
+      request: {
+        query: z.object({
+          category: z.string().max(60).optional(),
+          practice: z.enum(['1']).optional().openapi({ description: '1 = include cards not yet due (soonest first): a drill on demand' }),
+        }),
+      },
       responses: { 200: json(z.object({ cards: z.array(CardSchema), total: z.number(), deck: z.number().openapi({ description: 'Total cards owned' }) }).openapi('DueCards'), 'Due cards') },
     }),
     async (c) => {
-      const where = and(eq(cards.userId, currentUser(c).id), lte(cards.due, new Date()));
+      const { category, practice } = c.req.valid('query');
+      const live = and(eq(cards.userId, currentUser(c).id), eq(cards.suspended, false));
+      const where = and(live, category ? eq(cards.category, category) : undefined, practice ? undefined : lte(cards.due, new Date()));
       const [rows, [{ total } = { total: 0 }], [{ deck } = { deck: 0 }]] = await Promise.all([
-        db.select().from(cards).where(where).orderBy(asc(cards.due)).limit(50),
+        db
+          .select({ card: cards, skill: attempts.skill, part: attempts.part, title: prompts.title, at: attempts.createdAt })
+          .from(cards)
+          .leftJoin(attempts, eq(attempts.id, cards.attemptId))
+          .leftJoin(prompts, eq(prompts.id, attempts.promptId))
+          .where(where)
+          .orderBy(asc(cards.due))
+          .limit(50),
         db.select({ total: count() }).from(cards).where(where),
-        db.select({ deck: count() }).from(cards).where(eq(cards.userId, currentUser(c).id)),
+        db.select({ deck: count() }).from(cards).where(live),
       ]);
-      return c.json({ cards: rows.map(toCard), total, deck }, 200);
+      const out = rows.map(({ card, skill, part, title, at }) => toCard(card, skill && part != null && title && at ? { skill, part, title, at: at.toISOString() } : null));
+      return c.json({ cards: out, total, deck }, 200);
     },
   );
 
@@ -122,6 +148,22 @@ export function register(app: App) {
       const next = review(card, c.req.valid('json').grade as 0 | 1 | 2 | 3 | 4 | 5);
       const [updated] = await db.update(cards).set(next).where(where).returning();
       return c.json(toCard(updated!), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      ...authed,
+      method: 'post',
+      path: '/api/cards/{id}/skip',
+      summary: 'Skip a card for good: it is never due again (it stays out of drills and counts)',
+      request: { params: z.object({ id: z.string().openapi({ param: { name: 'id', in: 'path' } }) }) },
+      responses: { 200: json(z.object({ ok: z.boolean() }), 'Skipped'), 404: json(ErrorSchema, 'Not found') },
+    }),
+    async (c) => {
+      const [gone] = await db.update(cards).set({ suspended: true }).where(and(eq(cards.id, c.req.valid('param').id), eq(cards.userId, currentUser(c).id))).returning({ id: cards.id });
+      if (!gone) return c.json({ error: 'Card not found' }, 404);
+      return c.json({ ok: true }, 200);
     },
   );
 }

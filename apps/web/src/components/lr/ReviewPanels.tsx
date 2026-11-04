@@ -394,7 +394,7 @@ export function VocabList({ section }: { section: LrSection }) {
       call(client.POST('/api/cards', { body: { front: v.word, back: v.example ? `${v.meaning}\n\n${v.example}` : v.meaning, source: 'vocab' } })),
     onSuccess: (_, v) => {
       setAdded((s) => new Set(s).add(v.word));
-      toast('Added to your review deck', { tone: 'good' });
+      toast('Added to your drills', { tone: 'good' });
     },
     onError: (e) => toast(e.message, { tone: 'bad' }),
   });
@@ -411,7 +411,7 @@ export function VocabList({ section }: { section: LrSection }) {
             </div>
             {account && (
               <Button size="sm" variant="ghost" className="shrink-0 max-md:min-h-11" disabled={added.has(v.word)} loading={add.isPending && add.variables?.word === v.word} icon={added.has(v.word) ? <Check /> : <Plus />} onClick={() => add.mutate(v)}>
-                {added.has(v.word) ? 'In review' : 'Add to review'}
+                {added.has(v.word) ? 'In drills' : 'Add to drills'}
                 <span className="sr-only">: {v.word}</span>
               </Button>
             )}

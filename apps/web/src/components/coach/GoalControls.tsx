@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { CalendarDays } from 'lucide-react';
+import { useId, useState } from 'react';
+import { Calendar } from '@/components/ui/shadcn/calendar';
 import { useUpdateSettings } from '@/components/settings/useUpdateSettings';
-import { Input, Select } from '@/components/ui';
+import { Button, controlStyles, Popover, Select } from '@/components/ui';
+import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { useMe } from '@/lib/query';
 
 const BANDS = Array.from({ length: 11 }, (_, i) => 4 + i * 0.5); // same range as the settings slider and API
@@ -13,22 +17,58 @@ export const daysUntil = (date: string | null | undefined) => {
   return d < 0 ? null : d;
 };
 
-/** Exam date field, shared by the coach header and Settings. Clearing it removes the date. */
+/** "2026-12-05" as a local date (new Date("2026-12-05") would be UTC midnight, the day before west of Greenwich). */
+const local = (ymd: string) => {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y!, m! - 1, d!);
+};
+
+/** Exam date picker (shadcn Calendar in a popover), shared by Improve and Settings. Past days are off; "Clear date" removes it. */
 export function ExamDateInput({ className }: { className?: string }) {
   const value = useMe().data?.settings.examDate ?? '';
   const { mutate } = useUpdateSettings();
+  const id = useId();
+  const chosen = value ? local(value) : undefined;
   return (
-    <Input
-      type="date"
-      label="Exam date"
-      min={value ? undefined : today()} // a saved past date must not show as invalid
-      value={value}
-      className={className}
-      onChange={(e) => {
-        const v = e.target.value;
-        if (v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v)) mutate({ examDate: v || null });
-      }}
-    />
+    <div className={className}>
+      <label htmlFor={id} className="mb-1.5 block text-sm leading-normal font-medium text-ink">
+        Exam date
+      </label>
+      <Popover
+        align="start"
+        className="w-auto p-0"
+        trigger={(p) => (
+          <button {...p} id={id} type="button" className={cn(controlStyles, 'flex w-full min-w-40 items-center justify-between gap-2 text-left', !chosen && 'text-muted')}>
+            <span className="type-num">{chosen ? formatDate(chosen) : 'Pick a date'}</span>
+            <CalendarDays className="size-4 shrink-0 text-muted" aria-hidden />
+          </button>
+        )}
+      >
+        {(close) => (
+          <div>
+            <Calendar
+              mode="single"
+              selected={chosen}
+              defaultMonth={chosen}
+              startMonth={new Date()}
+              disabled={{ before: local(today()) }}
+              onSelect={(d) => {
+                if (!d) return;
+                mutate({ examDate: d.toLocaleDateString('en-CA') });
+                close();
+              }}
+            />
+            {chosen && (
+              <div className="border-t border-line p-2">
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => (mutate({ examDate: null }), close())}>
+                  Clear date
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Popover>
+    </div>
   );
 }
 

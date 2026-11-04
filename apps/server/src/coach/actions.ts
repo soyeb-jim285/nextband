@@ -16,5 +16,5 @@ export const ACTIONS: Record<ActionType, { label: string; minutes: number; route
   'listening-test': { label: 'Take a Listening test', minutes: 40, route: () => '/listening' },
   'reading-test': { label: 'Take a Reading test', minutes: 60, route: () => '/reading' },
   'see-evidence': { label: 'See where it happened', minutes: 5, route: seeEvidence },
-  'review-deck': { label: 'Review your saved items', minutes: 10, route: () => '/review' },
+  'review-deck': { label: 'Drill your mistakes', minutes: 10, route: () => '/improve/drill' },
 };

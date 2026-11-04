@@ -42,3 +42,4 @@ jobs:
         with:
           name: android-device-video
           path: device-video
+          retention-days: 3

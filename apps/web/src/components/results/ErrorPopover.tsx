@@ -11,7 +11,7 @@ export function ErrorDetails({ error, onPlay, onDone, hideCategory }: { error: A
   const add = useMutation({
     mutationFn: () => addErrorToDeck(error),
     onSuccess: () => {
-      toast('Added to review deck', { tone: 'good' });
+      toast('Added to your drills', { tone: 'good' });
       onDone?.();
     },
     onError: (e) => toast(e.message, { tone: 'bad' }),
@@ -37,7 +37,7 @@ export function ErrorDetails({ error, onPlay, onDone, hideCategory }: { error: A
           </Button>
         )}
         <Button size="sm" variant="ghost" icon={<BookmarkPlus />} loading={add.isPending} disabled={add.isSuccess} onClick={() => add.mutate()}>
-          {add.isSuccess ? 'In your deck' : 'Add to review deck'}
+          {add.isSuccess ? 'In your drills' : 'Add to drills'}
         </Button>
       </div>
     </div>

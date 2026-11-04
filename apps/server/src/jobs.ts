@@ -4,7 +4,8 @@
 import { P1_TEST_QUESTIONS } from '@ielts/core';
 import { and, eq, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import { db } from './db/client';
-import { analyses, attempts, liveSessions, mistakes, prompts, user } from './db/schema';
+import { analyses, attempts, cards, liveSessions, mistakes, prompts, user } from './db/schema';
+import { chooseDrills } from './coach/drills';
 import { liveQuestions, type LiveState } from './ai/examiner';
 import { AiError } from './ai/openrouter';
 import { keyCtx } from './ai/keyctx';
@@ -128,6 +129,8 @@ async function analyzeAttempt(a: typeof attempts.$inferSelect, tries: number): P
       }
     }
 
+    // which mistakes become drill cards: judged before the save, so the result page can say so the moment it opens
+    const drills = result.errors.length ? await chooseDrills(a.userId, attemptId, result.errors).catch((e) => (console.error('chooseDrills failed', attemptId, e), [])) : [];
     await db.transaction(async (tx) => {
       const ownerId = (await tx.select({ userId: attempts.userId }).from(attempts).where(eq(attempts.id, attemptId)))[0]?.userId ?? a.userId; // not a.userId: a guest may have signed up meanwhile
       const row = { result, overall: result.overall, criteria: bands(result) as Record<string, number>, models };
@@ -137,6 +140,8 @@ async function analyzeAttempt(a: typeof attempts.$inferSelect, tries: number): P
         await tx.insert(mistakes).values(
           result.errors.map((e) => ({ userId: ownerId, attemptId, errorId: e.id, category: e.category, original: e.original, correction: e.correction, explanation: e.explanation, time: e.time })),
         );
+      await tx.delete(cards).where(and(eq(cards.attemptId, attemptId), eq(cards.reps, 0))); // a re-analysis replaces its untouched cards
+      if (drills.length) await tx.insert(cards).values(drills.map((d) => ({ ...d, userId: ownerId })));
       await tx.update(attempts).set({ status: 'done', error: null, errorRetryable: true, stage: null, partial: null, ...DONE_QUEUE }).where(eq(attempts.id, attemptId));
     });
     if (result.noSpeech) await refundAttempt(a); // nothing was heard: the test is given back

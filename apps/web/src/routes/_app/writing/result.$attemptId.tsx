@@ -1,4 +1,5 @@
 import { writingOverall, type RepeatedWord } from '@ielts/core';
+import { SeenBefore } from '@/components/improve/SeenBefore';
 import type { AnalysisResult } from '@server/ai/types';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
@@ -241,6 +242,7 @@ function Done({ a, r, offTopic, under, tab, setTab, target, capNote }: { a: Atte
   return (
     <div key={tab} role="tabpanel" id="wr-panel" aria-labelledby={`wr-${tab}`} className="page-enter space-y-8 md:space-y-12">
       {tab === 'overview' && <OverviewPanel result={r} order={WRITING_CRITERIA} target={target} alert={alert} capNote={capNote} next={<NextTabButton tab={{ label: r.errors.length ? `See your ${r.errors.length} mistakes in the essay` : 'See your marked essay', desc: '', onOpen: () => setTab('essay') }} />} />}
+      {tab === 'overview' && <SeenBefore attemptId={a.id} />}
       {tab === 'overview' && (
         <NextSteps
           skill="writing"

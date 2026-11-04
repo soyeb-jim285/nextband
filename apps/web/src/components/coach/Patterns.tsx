@@ -69,7 +69,7 @@ function Swaps({ swaps, fb, title }: { swaps: Swap[]; fb: Feedback; title: strin
     try {
       await call(client.POST('/api/cards/bulk', { body: { cards } }));
       setState('done');
-      toast(`Added ${plural(cards.length, 'word')} to Review`, { tone: 'good' });
+      toast(`Added ${plural(cards.length, 'word')} to your drills`, { tone: 'good' });
     } catch (e) {
       setState('idle');
       toast(`Couldn't add them: ${(e as Error).message}`, { tone: 'bad' });
@@ -82,7 +82,7 @@ function Swaps({ swaps, fb, title }: { swaps: Swap[]; fb: Feedback; title: strin
       footer={
         account && cards.length > 0 && (
           <Button variant="outline" size="sm" className="self-start" icon={<Plus aria-hidden />} loading={state === 'busy'} disabled={state === 'done'} onClick={add}>
-            {state === 'done' ? 'Added to Review' : 'Add all to Review'}
+            {state === 'done' ? 'Added to drills' : 'Add all to drills'}
           </Button>
         )
       }

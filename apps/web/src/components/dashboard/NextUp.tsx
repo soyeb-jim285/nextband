@@ -15,7 +15,7 @@ const linkStyles = 'font-medium text-accent-text underline underline-offset-4 ho
 
 /**
  * The one action the page asks for, in the one tinted surface. Priority: an open mock, then your weakest criterion, then a suggested Listening or Reading test, then a full speaking test.
- * Secondary text links: the review deck when cards are due, and the mock when it is not the main action.
+ * Secondary text links: the drill when cards are due, and the mock when it is not the main action.
  */
 export function NextUp({ p, target, due, lr }: { p: Progress; target: number; due: number; lr?: LrData }) {
   const mock = useCurrentMock().data;
@@ -68,8 +68,8 @@ export function NextUp({ p, target, due, lr }: { p: Progress; target: number; du
 
   const links = [
     due > 0 && (
-      <Link key="r" to="/review" className={linkStyles}>
-        Review deck, {plural(due, 'card')} due
+      <Link key="r" to="/improve/drill" search={{}} className={linkStyles}>
+        Drill your mistakes, {plural(due, 'card')} due
       </Link>
     ),
   ].filter(Boolean);

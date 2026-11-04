@@ -2252,6 +2252,153 @@
           "lastFailed"
         ]
       },
+      "MistakePatterns": {
+        "type": "object",
+        "properties": {
+          "patterns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MistakePattern"
+            }
+          },
+          "deck": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "cards": {
+                  "type": "number"
+                },
+                "due": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "category",
+                "cards",
+                "due"
+              ]
+            },
+            "description": "Drill cards per category, including categories with no mistake rows (Listening/Reading spelling)"
+          }
+        },
+        "required": [
+          "patterns",
+          "deck"
+        ]
+      },
+      "MistakePattern": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          },
+          "tests": {
+            "type": "number",
+            "description": "Tests it appeared in"
+          },
+          "outOf": {
+            "type": "number",
+            "description": "Finished tests of the skills it appears in"
+          },
+          "lastAt": {
+            "type": "string"
+          },
+          "recent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Per test, over the newest 3 tests of those skills (null under 4 tests)"
+          },
+          "before": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Per test, over the 3 tests before those"
+          },
+          "example": {
+            "type": "object",
+            "properties": {
+              "original": {
+                "type": "string"
+              },
+              "correction": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "original",
+              "correction"
+            ]
+          },
+          "cards": {
+            "type": "number",
+            "description": "Drill cards in this category"
+          },
+          "due": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "category",
+          "count",
+          "tests",
+          "outOf",
+          "lastAt",
+          "recent",
+          "before",
+          "example",
+          "cards",
+          "due"
+        ]
+      },
+      "RecurringMistakes": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "here": {
+                  "type": "number"
+                },
+                "before": {
+                  "type": "number"
+                },
+                "outOf": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "category",
+                "here",
+                "before",
+                "outOf"
+              ]
+            }
+          },
+          "added": {
+            "type": "number",
+            "description": "Drill cards made from this test"
+          }
+        },
+        "required": [
+          "items",
+          "added"
+        ]
+      },
       "MistakeLog": {
         "type": "object",
         "properties": {
@@ -2370,8 +2517,23 @@
           {
             "type": "object",
             "properties": {
+              "category": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "type": "string"
+              },
+              "attemptId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/CardOrigin"
               },
               "ease": {
                 "type": "number"
@@ -2391,7 +2553,10 @@
               }
             },
             "required": [
+              "category",
               "id",
+              "attemptId",
+              "origin",
               "ease",
               "interval",
               "reps",
@@ -2400,6 +2565,37 @@
             ]
           }
         ]
+      },
+      "CardOrigin": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "skill": {
+            "type": "string",
+            "enum": [
+              "speaking",
+              "writing"
+            ]
+          },
+          "part": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill",
+          "part",
+          "title",
+          "at"
+        ],
+        "description": "The Speaking/Writing test the card came from, when known"
       },
       "CardInput": {
         "type": "object",
@@ -2421,6 +2617,14 @@
               "vocab",
               "fix"
             ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 60,
+            "description": "Mistake category (grammar.article, spelling, ...); drills can be narrowed to one"
           }
         },
         "required": [
@@ -2553,6 +2757,39 @@
           "examiner",
           "live",
           "lr"
+        ]
+      },
+      "CardClip": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "from": {
+            "type": "number"
+          },
+          "to": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "url",
+          "from",
+          "to"
+        ]
+      },
+      "LrError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
         ]
       },
       "LrTestListItem": {
@@ -3360,20 +3597,6 @@
           }
         },
         "description": "Only after submission"
-      },
-      "LrError": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "error"
-        ]
       },
       "LrAttemptListItem": {
         "type": "object",
@@ -9852,6 +10075,76 @@
         }
       }
     },
+    "/api/mistakes/patterns": {
+      "get": {
+        "tags": [
+          "Mistakes"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mistake categories as patterns: how often, in how many tests, the trend per test, and the drill cards behind each",
+        "responses": {
+          "200": {
+            "description": "Patterns",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MistakePatterns"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mistakes/recurring/{attemptId}": {
+      "get": {
+        "tags": [
+          "Mistakes"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One test's mistakes by category, each with how many of the 10 earlier tests (same skill) had it too, and the drill cards it added",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "attemptId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recurring",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringMistakes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/mistakes": {
       "get": {
         "tags": [
@@ -10047,7 +10340,31 @@
             "bearer": []
           }
         ],
-        "summary": "Cards due for review now (oldest due first, max 50) and the total due count",
+        "summary": "Cards due for review now (oldest due first, max 50) and the total due count; optionally one category, or ahead of schedule",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "1 = include cards not yet due (soonest first): a drill on demand"
+            },
+            "required": false,
+            "description": "1 = include cards not yet due (soonest first): a drill on demand",
+            "name": "practice",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Due cards",
@@ -10117,6 +10434,59 @@
         }
       }
     },
+    "/api/cards/{id}/skip": {
+      "post": {
+        "tags": [
+          "Cards"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Skip a card for good: it is never due again (it stays out of drills and counts)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Skipped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/quota": {
       "get": {
         "tags": [
@@ -10136,6 +10506,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Quota"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lr/cards/{id}/clip": {
+      "get": {
+        "tags": [
+          "Listening & Reading"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Where a Listening spelling drill card's word is spoken in its test recording",
+        "description": "The section audio (presigned, 1 h) and the seconds to play, from the word timings of the question the card came from. 404 when the card has no Listening test or the word is not located exactly; the client then falls back to the device voice.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clip",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardClip"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (also for a Cambridge test this user may not open)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LrError"
                 }
               }
             }

@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { analyseAttempt, CAUSES, DRILL_FAMILIES, DRILL_TYPES, type DrillType, lrTypeLabel, maskWord, pickParts, residualGaps, scoreLr, stripAnswers, tfngPattern, type CauseFamily, type GapEntry, type LrAnalysis, type LrTest, type LrType } from '@ielts/core';
+import { analyseAttempt, audioWindow, CAUSES, locatePhrase, DRILL_FAMILIES, DRILL_TYPES, type DrillType, lrTypeLabel, maskWord, pickParts, residualGaps, scoreLr, stripAnswers, tfngPattern, type CauseFamily, type GapEntry, type LrAnalysis, type LrTest, type LrType } from '@ielts/core';
 import { and, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { aiGapReasons } from '../ai/lr-mistakes';
@@ -279,6 +279,37 @@ async function toAttempt(a: AttemptRow, t: typeof lrTests.$inferSelect) {
 }
 
 export function register(app: App) {
+  app.openapi(
+    createRoute({
+      method: 'get',
+      path: '/api/lr/cards/{id}/clip',
+      ...common,
+      summary: "Where a Listening spelling drill card's word is spoken in its test recording",
+      description: 'The section audio (presigned, 1 h) and the seconds to play, from the word timings of the question the card came from. 404 when the card has no Listening test or the word is not located exactly; the client then falls back to the device voice.',
+      request: { params: z.object({ id: z.string() }) },
+      responses: { 200: json(z.object({ url: z.string(), from: z.number(), to: z.number() }).openapi('CardClip'), 'Clip'), ...errors },
+    }),
+    async (c) => {
+      const none = () => c.json({ error: 'No clip for this card' }, 404);
+      const uid = currentUser(c).id;
+      const [card] = await db.select().from(cards).where(and(eq(cards.id, c.req.valid('param').id), eq(cards.userId, uid)));
+      if (!card?.attemptId || card.category !== 'spelling') return none();
+      const word = card.back.split('\n')[0]!.trim();
+      const a = await db.query.lrAttempts.findFirst({ where: and(eq(lrAttempts.id, card.attemptId), eq(lrAttempts.userId, uid)) });
+      const gap = a?.analysis?.gaps.find((g) => g.word === word);
+      const t = gap && (await db.query.lrTests.findFirst({ where: eq(lrTests.id, a!.testId) }));
+      if (!t || t.skill !== 'listening') return none();
+      const section = t.data.sections.find((s) => s.groups.some((g) => g.questions.some((q) => q.n === gap!.n)));
+      const q = section?.groups.flatMap((g) => g.questions).find((q) => q.n === gap!.n);
+      const w = section?.audio && q ? audioWindow(section, q) : null;
+      if (!w?.exact) return none(); // a rough position would play the wrong words
+      // the word itself, searched inside the answer's phrase (a name can be said, then spelt, elsewhere); the phrase when it isn't found
+      const near = section!.timings?.filter(([, st, en]) => Number(st) >= w.start - 1 && Number(en) <= w.end + 1);
+      const at = locatePhrase(near, word) ?? w;
+      return c.json({ url: await storage.presignGet(lrAssetKey(section!.audio!), 3600), from: Math.max(0, at.start - 0.15), to: at.end + 0.25 }, 200);
+    },
+  );
+
   app.openapi(
     createRoute({
       method: 'get',
@@ -584,7 +615,7 @@ export function register(app: App) {
         .where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'in_progress')))
         .returning();
       if (!row) throw new HTTPException(409, { message: 'Attempt already submitted' });
-      await spellingCards(user.id, t.data.skill, analysis);
+      await spellingCards(user.id, t.data.skill, analysis, a.id);
       return c.json(await toAttempt(row, t), 200);
     },
   );
@@ -711,13 +742,13 @@ async function priorGaps(userId: string): Promise<GapEntry[]> {
 }
 
 /** One Review card per misspelt word (de-duplicated per user + word); shows up in the normal Review flow. */
-async function spellingCards(userId: string, skill: 'listening' | 'reading', analysis: LrAnalysis) {
+async function spellingCards(userId: string, skill: 'listening' | 'reading', analysis: LrAnalysis, attemptId: string) {
   const slips = [...new Map(analysis.gaps.filter((g) => g.kind === 'spelling' && g.word && g.typed).map((g) => [g.word!, g])).values()];
   if (!slips.length) return;
   const head = (w: string) => `${skill === 'listening' ? '🎧 Listening' : '📖 Reading'} · spell the word ${skill === 'listening' ? 'you heard' : 'from the passage'}: '${maskWord(w)}'`;
   const have = await db.select({ front: cards.front }).from(cards).where(and(eq(cards.userId, userId), or(...slips.map((g) => like(cards.front, `${head(g.word!).replace(/[%_\\]/g, '\\$&')}%`)))));
   const fresh = slips.filter((g) => !have.some((h) => h.front.startsWith(head(g.word!))));
   if (!fresh.length) return;
-  await insertCards(userId, fresh.map((g) => ({ front: `${head(g.word!)} (${g.word!.length} letters)`, back: `${g.word}\nYou wrote: ${g.typed}`, source: 'mistake' as const })));
+  await insertCards(userId, fresh.map((g) => ({ front: `${head(g.word!)} (${g.word!.length} letters)`, back: `${g.word}\nYou wrote: ${g.typed}`, source: 'mistake' as const, category: 'spelling', attemptId })));
 }
 

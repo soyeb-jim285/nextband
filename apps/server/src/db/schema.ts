@@ -161,12 +161,15 @@ export const cards = pgTable('cards', {
   front: text('front').notNull(),
   back: text('back').notNull(),
   source: text('source').notNull(), // 'mistake' | 'vocab' | 'fix'
+  category: text('category'), // mistake category (grammar.article, spelling, ...); null for fix/vocab cards
+  attemptId: text('attempt_id'), // the test it came from (attempts or lr_attempts id); no FK: deleting a test keeps the card
+  suspended: boolean('suspended').notNull().default(false), // "Skip this card": never due again
   ease: real('ease').notNull().default(2.5),
   interval: integer('interval').notNull().default(0),
   reps: integer('reps').notNull().default(0),
   due: timestamp('due', { withTimezone: true }).notNull().defaultNow(),
   createdAt: createdAt(),
-}, (t) => [index('cards_user_due_idx').on(t.userId, t.due), index('cards_user_front_idx').on(t.userId, t.front)]);
+}, (t) => [index('cards_user_due_idx').on(t.userId, t.due), index('cards_user_front_idx').on(t.userId, t.front), index('cards_user_cat_idx').on(t.userId, t.category)]);
 
 export const liveSessions = pgTable('live_sessions', {
   id: id(),

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { SeenBefore } from '@/components/improve/SeenBefore';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, MicOff, RotateCcw } from 'lucide-react';
 import type { RepeatedWord } from '@ielts/core';
@@ -357,6 +358,7 @@ function Panel({ tab, a, timeline, target, audio, off, lean, onLean, deck, onTab
       return (
         <div className="space-y-8 md:space-y-12">
           <Overview result={r} target={target} off={off} deck={deck} next={<NextTabButton tab={{ label: r.errors.length ? `See your ${r.errors.length} mistakes in the transcript` : 'See your marked transcript', desc: '', onOpen: () => onTab('transcript') }} />} />
+          <SeenBefore attemptId={a.id} />
           <NextSteps
             skill="speaking"
             tabs={[
