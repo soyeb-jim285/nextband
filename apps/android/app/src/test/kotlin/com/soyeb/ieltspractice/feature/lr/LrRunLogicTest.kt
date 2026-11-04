@@ -1,5 +1,6 @@
 package com.soyeb.ieltspractice.feature.lr
 
+import com.soyeb.ieltspractice.data.model.LrAttempt
 import com.soyeb.ieltspractice.data.model.LrGroup
 import com.soyeb.ieltspractice.data.model.LrQuestion
 import com.soyeb.ieltspractice.data.net.AppJson
@@ -10,6 +11,16 @@ import kotlin.test.assertTrue
 
 /** The runner's pure logic: highlights and notes, display settings, the clocks. Ported from the old app's LrLogicTest. */
 class LrRunLogicTest {
+    @Test fun unsyncedAnswersWinUnlessTheServerIsFurtherAlong() {
+        val server = LrAttempt("a1", test = LrTest(skill = "reading", title = "T"), responses = mapOf("1" to "old"), elapsedS = 100)
+        val local = parsePending(pendingJson(PendingAnswers(mapOf("1" to "new", "2" to "B"), 130)))
+        assertEquals(mapOf("1" to "new", "2" to "B"), withPending(server, local).responses)
+        assertEquals(130, withPending(server, local).elapsedS)
+        assertEquals(server, withPending(server, PendingAnswers(mapOf("1" to "x"), 90))) // worked on elsewhere since
+        assertEquals(server, withPending(server, parsePending("not json")))
+        assertEquals(server, withPending(server, null))
+    }
+
     @Test fun reviewTimeFollowsTheRecording() {
         // demo part lengths 412, 405, 420, 398 s: the checking time ends checkEndsAt seconds into the last part
         val parts = listOf(412.0, 405.0, 420.0, 398.0)

@@ -196,9 +196,10 @@ fun MockHubScreen(nav: Nav, route: MockHub) {
                     leading = { SkillTile(Skill.Speaking, 40.dp) },
                     onClick = {
                         choose = false
-                        nav.startTest("speaking") {
-                            act("speaking") { api.mockChoose(m.id, "recorded"); nav.go(SpeakingSession("full", mockId = m.id)) }
-                        }
+                        val go = { act("speaking") { api.mockChoose(m.id, "recorded"); nav.go(SpeakingSession("full", mockId = m.id)) } }
+                        // Continuing a recorded test already paid for: mockChoose checks this session, not the allowance for a new test.
+                        val resume = m.section("speaking")?.let { it.state == "in_progress" && it.mode == "recorded" } == true
+                        if (resume) go() else nav.startTest("speaking", go)
                     },
                 )
                 RowDivider()

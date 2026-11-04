@@ -117,7 +117,7 @@ fun SpeakingSessionScreen(route: SpeakingSession, nav: Nav) {
     val states by graph.pending.states.collectAsState()
     fun stateOf(u: UploadItem): UploadState = vm.demoStates[u.id] ?: states[u.id] ?: UploadState.Uploading
     val doneIds = vm.uploads.mapNotNull { (stateOf(it) as? UploadState.Done)?.attemptId }
-    val allDone = vm.phase == Phase.Finishing && vm.items.isNotEmpty() && vm.uploads.size == vm.items.size && doneIds.size == vm.uploads.size
+    val allDone = vm.phase == Phase.Finishing && vm.items.isNotEmpty() && vm.uploads.size + vm.answered >= vm.items.size && doneIds.size == vm.uploads.size
     val notDone = vm.uploads.any { stateOf(it) !is UploadState.Done }
     val failedIds = vm.uploads.filter { stateOf(it) is UploadState.Failed }.joinToString(",") { it.id }
 
@@ -215,7 +215,7 @@ fun SpeakingSessionScreen(route: SpeakingSession, nav: Nav) {
                 Phase.Permission -> PermissionBody(vm.micDenied)
                 Phase.MicCheck -> MicCheckBody(vm, onRetry = vm::retryMicCheck)
                 Phase.Transition -> if (p != null) TransitionBody(p.part, vm::continueFromTransition)
-                Phase.Finishing -> FinishingBody(vm, ::stateOf, doneIds.size) { u -> vm.retry(u) }
+                Phase.Finishing -> FinishingBody(vm, ::stateOf, doneIds.size + vm.answered) { u -> vm.retry(u) }
                 Phase.Ready, Phase.Prep, Phase.Recording -> if (p != null) SessionBody(vm, p, ph)
             }
         }

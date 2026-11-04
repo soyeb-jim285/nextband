@@ -78,7 +78,8 @@ class PcmCapture(val rate: Int) {
             try {
                 while (running) {
                     val n = rec.read(buf, 0, buf.size)
-                    if (n < 0) break
+                    // ERROR_DEAD_OBJECT etc.: report it so callers recover on [failed] instead of recording silence on a frozen clock.
+                    if (n < 0) { failed = true; break }
                     if (n > 0) onPcm?.invoke(buf, n)
                 }
             } catch (e: Exception) {
@@ -102,8 +103,8 @@ class PcmCapture(val rate: Int) {
 
 /** PCM16 mono -> AAC-LC in an MPEG-4 container (.m4a, `audio/mp4`). Thread-safe; call [finish] once. */
 class AacWriter(val file: File, private val rate: Int) {
-    private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
-    private val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    private val codec: MediaCodec
+    private val muxer: MediaMuxer
     private val info = MediaCodec.BufferInfo()
     private var track = -1
     private var muxing = false
@@ -119,8 +120,18 @@ class AacWriter(val file: File, private val rate: Int) {
             setInteger(MediaFormat.KEY_BIT_RATE, 64_000)
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16_384)
         }
-        codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        codec.start()
+        // A failed configure/start or muxer open releases the codec here: the caller only sees the exception, and retries must not leak codecs.
+        val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+        muxer = try {
+            c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            c.start()
+            MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        } catch (e: Throwable) {
+            runCatching { c.stop() }
+            c.release()
+            throw e
+        }
+        codec = c
     }
 
     @Synchronized fun write(pcm: ShortArray, n: Int) {

@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -84,6 +85,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.soyeb.ieltspractice.data.logic.Block
 import com.soyeb.ieltspractice.data.logic.Inline
+import com.soyeb.ieltspractice.data.logic.gapLead
 import com.soyeb.ieltspractice.data.logic.gapPart
 import com.soyeb.ieltspractice.data.logic.multiPicks
 import com.soyeb.ieltspractice.data.logic.parseContent
@@ -91,6 +93,7 @@ import com.soyeb.ieltspractice.data.logic.parseInline
 import com.soyeb.ieltspractice.data.logic.numberGapParts
 import com.soyeb.ieltspractice.data.logic.setGapPart
 import com.soyeb.ieltspractice.data.logic.setMultiPicks
+import com.soyeb.ieltspractice.data.logic.spokenInline
 import com.soyeb.ieltspractice.data.logic.withAnswer
 import com.soyeb.ieltspractice.data.model.LrGroup
 import com.soyeb.ieltspractice.data.model.LrOption
@@ -173,12 +176,14 @@ fun QNum(n: Int, done: Boolean, flagged: Boolean, modifier: Modifier = Modifier)
 // ---------------------------------------------------------------- gap fill
 
 @Composable
-private fun GapField(n: Int, ctx: QCtx, wordLimit: String?, part: Int, of: Int) {
+private fun GapField(n: Int, ctx: QCtx, wordLimit: String?, part: Int, of: Int, lead: String) {
     val c = NB.colors
     val value = if (of > 1) gapPart(ctx.value(n), part) else ctx.value(n)
     var focused by remember { mutableStateOf(false) }
     val ring = if (focused || ctx.active == n) c.brand else c.faint
-    val w = (72 + 10 * value.length).coerceIn(96, 240).dp
+    // Grows with the text and the font scale; Modifier.width is still clamped to the line width, so it never overflows.
+    val fs = LocalDensity.current.fontScale
+    val w = ((72 + 10 * value.length) * fs).coerceAtLeast(96 * fs).coerceAtMost(360f).dp
     BasicTextField(
         value = value,
         onValueChange = { ctx.set(n, if (of > 1) setGapPart(ctx.value(n), part, of, it) else it) },
@@ -186,7 +191,7 @@ private fun GapField(n: Int, ctx: QCtx, wordLimit: String?, part: Int, of: Int) 
             // Only the first blank of a multi-blank question is the jump target: a requester can sit on one node.
             .let { if (part == 0) it.focusRequester(ctx.focuser(n)).bringIntoViewRequester(ctx.requester(n)) else it }
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) ctx.onFocus(n); ctx.onText(n, it.isFocused) }
-            .semantics { contentDescription = "Question $n" + (if (of > 1) ", blank ${part + 1} of $of" else "") + (wordLimit?.let { ", ${it.lowercase()}" } ?: "") },
+            .semantics { contentDescription = "Question $n" + (if (of > 1) ", blank ${part + 1} of $of" else "") + (if (lead.isNotEmpty()) ", after: $lead" else "") + (wordLimit?.let { ", ${it.lowercase()}" } ?: "") },
         singleLine = true,
         textStyle = NB.type.body.copy(color = c.ink, textAlign = TextAlign.Center, fontWeight = FontWeight.Medium),
         cursorBrush = SolidColor(c.brand),
@@ -205,7 +210,7 @@ private fun GapField(n: Int, ctx: QCtx, wordLimit: String?, part: Int, of: Int) 
 
 /** A blank of a word-box group: shows the chosen word; tapping selects it as the blank the next word goes into. */
 @Composable
-private fun WordSlot(n: Int, opts: List<LrOption>, ctx: QCtx, selected: Boolean, onSelect: () -> Unit) {
+private fun WordSlot(n: Int, opts: List<LrOption>, ctx: QCtx, selected: Boolean, lead: String, onSelect: () -> Unit) {
     val c = NB.colors
     val value = ctx.value(n)
     val label = opts.firstOrNull { it.key.equals(value, true) }?.let { it.text.ifBlank { it.key } } ?: value
@@ -214,7 +219,7 @@ private fun WordSlot(n: Int, opts: List<LrOption>, ctx: QCtx, selected: Boolean,
         border = androidx.compose.foundation.BorderStroke(if (selected) 2.dp else 1.dp, if (selected) c.brand else c.faint),
         modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp)
             .bringIntoViewRequester(ctx.requester(n))
-            .semantics { contentDescription = "Question $n, ${if (value.isEmpty()) "empty blank" else "word $label"}"; stateDescription = if (selected) "Selected" else "" },
+            .semantics { contentDescription = "Question $n" + (if (lead.isNotEmpty()) ", after: $lead" else "") + ", ${if (value.isEmpty()) "empty blank" else "word $label"}"; stateDescription = if (selected) "Selected" else "" },
     ) {
         Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             if (value.isEmpty()) Text("$n", style = NB.type.num, color = c.muted) else Text(label, style = NB.type.body.copy(fontWeight = FontWeight.Medium), color = c.ink)
@@ -284,17 +289,20 @@ private fun RichInline(inline: List<Inline>, ctx: QCtx, g: LrGroup, wb: WordBoxS
         return
     }
     // English sentence split into word tokens: FlowRow follows layout direction, so pin LTR or RTL would reverse the words.
+    // TalkBack: the row reads as one sentence ("... blank 3 ..."); the word nodes are hidden, the blanks stay their own stops.
+    val spoken = spokenInline(inline)
+    val hide = Modifier.clearAndSetSemantics {}
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { FlowRow(
-        modifier, horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier.semantics { contentDescription = spoken }, horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         tokens(inline).forEach { t ->
             when (t) {
-                is Tok.W -> Text(t.s, style = NB.type.body.copy(fontWeight = if (t.bold) FontWeight.Bold else FontWeight.Normal), color = c.ink)
+                is Tok.W -> Text(t.s, hide, style = NB.type.body.copy(fontWeight = if (t.bold) FontWeight.Bold else FontWeight.Normal), color = c.ink)
                 is Tok.G -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (wb != null) WordSlot(t.gap.n, g.options.orEmpty(), ctx, wb.slot == t.gap.n) { wb.tapSlot(ctx, t.gap.n) }
-                    else GapField(t.gap.n, ctx, g.wordLimit, t.gap.part, t.gap.of)
-                    if (t.trail.isNotEmpty()) Text(t.trail, style = NB.type.body, color = c.ink)
+                    if (wb != null) WordSlot(t.gap.n, g.options.orEmpty(), ctx, wb.slot == t.gap.n, gapLead(inline, t.gap)) { wb.tapSlot(ctx, t.gap.n) }
+                    else GapField(t.gap.n, ctx, g.wordLimit, t.gap.part, t.gap.of, gapLead(inline, t.gap))
+                    if (t.trail.isNotEmpty()) Text(t.trail, hide, style = NB.type.body, color = c.ink)
                 }
             }
         }

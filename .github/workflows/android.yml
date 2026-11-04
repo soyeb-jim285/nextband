@@ -35,8 +35,24 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      # Upload key (repo secrets). Without it (forks, missing secrets) the release build falls back to the debug key and no .aab is made.
+      - name: Decode the upload key
+        env:
+          KEYSTORE_B64: ${{ secrets.NEXTBAND_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.p12"
+            echo "NEXTBAND_KEYSTORE=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
+          fi
       - name: Build, test and record screenshots
-        run: ./gradlew assembleDebug assembleRelease recordRoborazziDebug --stacktrace --continue
+        env:
+          NEXTBAND_KEYSTORE_PASSWORD: ${{ secrets.NEXTBAND_KEYSTORE_PASSWORD }}
+          NEXTBAND_KEY_ALIAS: ${{ secrets.NEXTBAND_KEY_ALIAS }}
+          NEXTBAND_KEY_PASSWORD: ${{ secrets.NEXTBAND_KEY_PASSWORD }}
+        run: |
+          tasks="assembleDebug assembleRelease recordRoborazziDebug"
+          [ -n "$NEXTBAND_KEYSTORE" ] && tasks="$tasks bundleRelease"
+          ./gradlew $tasks --stacktrace --continue
       # Also a rolling pre-release per branch: release files don't count against the Actions artifact storage quota.
       - name: Publish screens and APKs to the branch's rolling release
         if: always()
@@ -45,7 +61,7 @@ jobs:
           TAG: android-${{ github.ref_name }}-latest
         run: |
           [ -d screenshots ] && (cd screenshots && zip -qr ../android-screens.zip .) || true
-          files=$(ls android-screens.zip app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release.apk 2>/dev/null || true)
+          files=$(ls android-screens.zip app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release.apk app/build/outputs/bundle/release/app-release.aab 2>/dev/null || true)
           [ -z "$files" ] && exit 0
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --target "$GITHUB_SHA" --title "$TAG" --notes "Rolling build from ${{ github.ref_name }}"
           gh release edit "$TAG" --notes "Rolling build from ${{ github.ref_name }} at $GITHUB_SHA"

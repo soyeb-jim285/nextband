@@ -99,6 +99,14 @@ class WritingLogicTest {
         assertEquals(pair, decodeIndex(encodeIndex(pair)))
     }
 
+    @Test fun aReopenedDraftKeepsItsSession() {
+        val s = ExamSession(listOf(prompt(1), prompt(2)), 0L, "new")
+        assertEquals("old", withDraftSession(s, listOf(Draft("a", sessionId = "old"), Draft())).sessionId)
+        assertEquals("new", withDraftSession(s, listOf(Draft("a"))).sessionId)
+        assertEquals("mock", withDraftSession(s.copy(sessionId = "mock", mockId = "m"), listOf(Draft("a", sessionId = "old"))).sessionId)
+        assertEquals(Draft("a", "p", "old"), decodeDraft(encodeDraft(Draft("a", "p", "old"))))
+    }
+
     @Test fun agoReadsLikeAPerson() {
         val now = 10_000_000_000L
         assertEquals("just now", ago(now - 20_000, now)); assertEquals("5 min ago", ago(now - 5 * 60_000, now))

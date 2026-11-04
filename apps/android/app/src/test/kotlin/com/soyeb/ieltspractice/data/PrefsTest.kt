@@ -1,6 +1,11 @@
 package com.soyeb.ieltspractice.data
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -39,5 +44,26 @@ class PrefsTest {
         p.setLastSeenFairUseDay(null); assertNull(p.lastSeenFairUseDay.first())
         p.setString("marks:a1", "[]"); assertEquals("[]", p.getString("marks:a1"))
         p.setString("marks:a1", null); assertNull(p.getString("marks:a1"))
+    }
+
+    @Test fun clearAttemptStateKeepsSettingsAndDrafts() = withPrefs { p ->
+        listOf("marks:a1", "flags:a1", "pos:a1", "answers:a1", "audio:a1", "draft-index:u1", "settings").forEach { p.setString(it, "x") }
+        p.setAppearance("dark")
+        p.clearAttemptState()
+        listOf("marks:a1", "flags:a1", "pos:a1", "answers:a1", "audio:a1").forEach { assertNull(p.getString(it), it) }
+        assertEquals("x", p.getString("draft-index:u1"))
+        assertEquals("x", p.getString("settings"))
+        assertEquals("dark", p.appearance.first())
+    }
+
+    @Test fun readFailureGivesDefaults() = runBlocking {
+        val broken = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { throw IOException("disk") }
+            override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = throw IOException("disk")
+        }
+        val p = Prefs(broken)
+        assertEquals("system", p.appearance.first())
+        assertEquals(false, p.onboardingDone.first())
+        assertNull(p.getString("draft:x"))
     }
 }

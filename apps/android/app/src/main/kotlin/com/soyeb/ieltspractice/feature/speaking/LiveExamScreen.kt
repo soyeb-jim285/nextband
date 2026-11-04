@@ -140,7 +140,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     val running = stage == LiveStage.Running
     val snack = LocalSnack.current
     // One exit rule for the gesture and the close button: confirm while running, hold (and say why) while uploading.
-    // ponytail: after a failure the recordings live only in this ViewModel (not the pending-upload queue), so leaving loses them: confirm.
+    // ponytail: after a failure the recordings live only in this ViewModel (not the pending-upload queue), and onCleared deletes them: confirm.
     val unsent = stage is LiveStage.Failed && exam.hasRecordings
     fun leave() {
         if (running) confirmEnd = true
@@ -239,7 +239,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     }
     if (confirmDiscard) {
         ConfirmDialog(
-            "Leave without scoring?", "Your recorded answers haven't been sent yet. If you leave now they are deleted and can't be recovered.", "Leave",
+            "Leave without scoring?", "The recordings still on this phone are deleted and can't be recovered. Parts already sent for scoring stay in your history, where you can delete them.", "Leave",
             onConfirm = { confirmDiscard = false; nav.back() }, onDismiss = { confirmDiscard = false }, dismiss = "Stay", destructive = true,
         )
     }

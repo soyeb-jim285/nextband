@@ -39,4 +39,18 @@ class LrSessionTest {
         s.submit()
         assertEquals(1, calls)
     }
+
+    /** Offline in an exam: the failed 15 s clock save still moves the device copy's clock, so a kill gives no time back. */
+    @Test fun failedClockSaveKeepsTheLocalClock() = runBlocking {
+        val down = Api("https://t.test", MemoryTokenStore(), Interceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(400).message("x")
+                .body("""{"error":"bad"}""".toResponseBody("application/json".toMediaType())).build()
+        }, initialToken = "t")
+        var stored: String? = null
+        val s = LrSession(LrAttempt("a1", test = LrTest(skill = "reading", title = "T")), down, CoroutineScope(Dispatchers.Unconfined), saveLocalAnswers = { stored = it })
+        s.elapsed = 600.0
+        s.flush(force = true)
+        assertEquals(SaveState.Error, s.state)
+        assertEquals(600, parsePending(stored)?.elapsed)
+    }
 }

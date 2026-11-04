@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import com.soyeb.ieltspractice.design.FocusRing
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NbMotion
 import com.soyeb.ieltspractice.design.pressScale
@@ -116,7 +117,7 @@ fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, todayBadge: Int = 0) {
                     val tint by animateColorAsState(if (selected) tab.skill?.color ?: c.brand else c.muted, tween(NbMotion.BASE, easing = NbMotion.EaseOut), label = "barIcon")
                     Column(
                         Modifier.weight(1f).fillMaxHeight()
-                            .selectable(selected, interactionSource = src, indication = null, role = Role.Tab) {
+                            .selectable(selected, interactionSource = src, indication = FocusRing, role = Role.Tab) {
                                 if (!selected) hf.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSelect(tab)
                             }

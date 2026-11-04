@@ -69,14 +69,24 @@ class Nav(
     }
 
     /** Back to mock [mockId]'s hub: pop to it when it's underneath (it reloads on return), else open it in place of this screen. */
-    fun toMock(mockId: String) {
-        if (!controller.popBackStack(MockHub(mockId), inclusive = false)) replace(MockHub(mockId))
+    fun toMock(mockId: String) = backTo(MockHub(mockId))
+
+    /** Pop to [route] when it's underneath, else open it in place of this screen (no duplicate copy above the finished one). */
+    fun backTo(route: Any) {
+        if (!controller.popBackStack(route, inclusive = false)) replace(route)
     }
 
-    /** Clear everything and land on [route] (after sign-in / sign-out / onboarding). */
-    fun reset(route: Any = TodayTab) = controller.navigate(route) {
-        popUpTo(controller.graph.id) { inclusive = true }
-        launchSingleTop = true
+    /**
+     * Clear everything and land on [route] (after sign-in / sign-out / onboarding). Also drops the tab stacks [navigateTab]
+     * saved off the back stack, with their ViewModels (LoadCache): the next account must never restore the last one's screens.
+     */
+    fun reset(route: Any = TodayTab) {
+        pendingAfterAuth = null
+        controller.navigate(route) {
+            popUpTo(controller.graph.id) { inclusive = true }
+            launchSingleTop = true
+        }
+        Tab.entries.forEach { if (it.route != route) controller.clearBackStack(it.route) }
     }
 
     /**
@@ -91,7 +101,8 @@ class Nav(
         navigateTab(tab)
     }
 
-    private fun onStack(route: Any): Boolean = runCatching { controller.getBackStackEntry(route) }.isSuccess
+    /** True when [route] is on the back stack (e.g. a drill opened from the Study plan rather than from Today). */
+    fun onStack(route: Any): Boolean = runCatching { controller.getBackStackEntry(route) }.isSuccess
 
     private fun navigateTab(tab: Tab) = controller.navigate(tab.route) {
         popUpTo(todayId() ?: controller.graph.findStartDestination().id) { saveState = true }

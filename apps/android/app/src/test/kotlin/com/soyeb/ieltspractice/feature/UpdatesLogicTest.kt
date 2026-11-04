@@ -34,6 +34,13 @@ class UpdatesLogicTest {
         assertEquals(0, freshCount(done, markSeen(done, seen)))
     }
 
+    @Test fun retriedOldAttemptKeepsMarkingInsteadOfFailing() {
+        val old = item("w9", HStatus.Analysing, at = "2026-10-03T10:00:00Z", band = null)
+        assertEquals(listOf(UpdateKind.Failed), build(old).map { it.kind })
+        val retried = buildUpdates(0, null, listOf(old), null, now, utc, retried = mapOf("w9" to now.minusSeconds(60)))
+        assertEquals(listOf(UpdateKind.Marking), retried.map { it.kind })
+    }
+
     @Test fun failedMarkingAlertsAndIsListed() {
         val rows = build(item("w2", HStatus.Failed, band = null))
         assertEquals(listOf(UpdateKind.Failed), rows.map { it.kind })

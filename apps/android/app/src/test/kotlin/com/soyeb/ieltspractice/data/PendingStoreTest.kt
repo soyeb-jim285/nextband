@@ -1,7 +1,13 @@
 package com.soyeb.ieltspractice.data
 
+import com.soyeb.ieltspractice.data.net.Api
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import okhttp3.Interceptor
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -58,5 +64,30 @@ class PendingStoreTest {
         assertTrue(blockedReason(mine, "acctB")!!.contains("another account"))
         assertEquals(null, blockedReason(mine, "acctA"))
         assertEquals(null, blockedReason(unowned, "acctA"))
+    }
+
+    @Test fun aSignOutWhileAnExpiredUploadIsPendingNeverCreatesAnAttemptInTheNextSession() = runBlocking {
+        val dir = Files.createTempDirectory("pending").toFile()
+        val store = PendingStore(dir, CoroutineScope(Dispatchers.Unconfined))
+        store.prepare()
+        store.audioFile("r1").writeBytes(byteArrayOf(1))
+        store.add(PendingRecording("r1", "p1", 1, "Part 1", 1L, 1000, emptyList(), emptyList(),
+            attemptId = "att1", uploadUrl = "https://storage.example/put1", ownerId = "acctA"))
+        var creates = 0
+        lateinit var api: Api
+        api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->
+            val r = chain.request()
+            fun answer(code: Int, body: String) = Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(code).message("x").body(body.toResponseBody()).build()
+            when {
+                r.url.encodedPath == "/api/me" -> answer(200, """{"user":{"id":"acctA"}}""")
+                r.url.host == "storage.example" -> { api.signOutLocal(); answer(403, "") } // A signs out while the expired PUT is in flight
+                r.method == "POST" && r.url.encodedPath == "/api/attempts" -> { creates++; answer(200, """{"id":"att2","uploadUrl":"https://storage.example/put2"}""") }
+                else -> answer(200, "{}")
+            }
+        }, initialToken = "tokenA")
+        assertEquals(null, store.upload(store.items.value.first(), api))
+        assertEquals(0, creates)
+        assertEquals("acctA", store.items.value.single().ownerId) // kept for A to retry after signing back in
+        assertEquals(UploadState.Failed(Api.SESSION_CHANGED), store.states.value["r1"])
     }
 }

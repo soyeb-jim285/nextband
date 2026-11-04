@@ -89,7 +89,7 @@ fun SettingsScreen(nav: Nav) {
     var deleting by remember { mutableStateOf(demoTab == "Delete") }
     var deletingGuest by remember { mutableStateOf(false) }
 
-    /** Delete the account (a guest needs no password) and this device's copies of its essays and unsent recordings. Null on success, else the error. */
+    /** Delete the account (a guest needs no password) and this device's copies of its essays, test notes and unsent recordings. Null on success, else the error. */
     suspend fun deleteEverything(password: String?): String? = try {
         val uid = currentUserId(api) // loads /api/me when it never answered, so the local cleanup below knows whose data to clear
         api.deleteAccount(password)
@@ -98,6 +98,8 @@ fun SettingsScreen(nav: Nav) {
             withContext(Dispatchers.IO) { graph.pending.reload() }
             graph.pending.items.value.filter { it.ownerId == uid || it.ownerId == null }.forEach { graph.pending.remove(it.id) }
         }
+        // Listening/Reading notes, flags and answers of attempts never submitted (submitting clears only the notes and answers).
+        graph.prefs.clearAttemptState()
         // Live exam parts still on this device (a test that was never scored): the account they belonged to is gone.
         withContext(Dispatchers.IO) {
             graph.app.cacheDir.listFiles { f -> f.name.startsWith("live-") && f.name.endsWith(".m4a") }?.forEach { it.delete() }
@@ -186,7 +188,7 @@ fun SettingsScreen(nav: Nav) {
     if (deleting) DeleteSheet(
         onDismiss = { deleting = false },
         // Forgot it: reset by email code, then come back here (Close on the sign-in step returns to Settings).
-        onForgot = { deleting = false; nav.go(Auth("forgot", email = me?.user?.email?.ifEmpty { null })) },
+        onForgot = { deleting = false; nav.go(Auth("forgot", reason = "Sign in with your new password, then delete your account from Settings.", email = me?.user?.email?.ifEmpty { null })) },
         onDelete = { password ->
             deleteEverything(password).also { if (it == null) { deleting = false; nav.reset(Welcome) } }
         },

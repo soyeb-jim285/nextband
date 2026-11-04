@@ -1,6 +1,7 @@
 package com.soyeb.ieltspractice.feature.lr
 
 import com.soyeb.ieltspractice.data.logic.LISTENING_REVIEW_SECONDS
+import com.soyeb.ieltspractice.data.model.LrAttempt
 import com.soyeb.ieltspractice.data.model.LrGroup
 import com.soyeb.ieltspractice.data.model.LrQuestion
 import com.soyeb.ieltspractice.data.net.AppJson
@@ -157,3 +158,21 @@ fun questionPrompt(g: LrGroup, q: LrQuestion): String {
     }
     return g.title?.takeIf { it.isNotBlank() } ?: "Question ${q.n}"
 }
+
+// ---------------------------------------------------------------- answers not yet on the server
+
+/** The answers and clock as last changed on this device, kept (prefs key `answers:<attemptId>`) until the server has them. */
+@Serializable
+data class PendingAnswers(val responses: Map<String, String>, val elapsed: Int)
+
+fun parsePending(json: String?): PendingAnswers? =
+    json?.let { runCatching { AppJson.decodeFromString(PendingAnswers.serializer(), it) }.getOrNull() }
+
+fun pendingJson(p: PendingAnswers): String = AppJson.encodeToString(PendingAnswers.serializer(), p)
+
+/**
+ * The attempt to resume: the device's unsynced answers (left offline, then the app was killed) win when they are at least as far along
+ * the clock as the server's; a server copy further along (worked on elsewhere) wins.
+ */
+fun withPending(a: LrAttempt, p: PendingAnswers?): LrAttempt =
+    if (p != null && p.elapsed >= a.elapsedS) a.copy(responses = p.responses, elapsedS = p.elapsed) else a

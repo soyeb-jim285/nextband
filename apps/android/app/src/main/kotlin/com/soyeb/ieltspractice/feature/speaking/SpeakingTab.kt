@@ -79,7 +79,9 @@ import com.soyeb.ieltspractice.nav.MockStart
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.SpeakingSession
 import com.soyeb.ieltspractice.nav.You
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private class PartInfo(val n: Int, val name: String, val time: String)
 
@@ -111,7 +113,8 @@ fun SpeakingTabScreen(nav: Nav) {
 
     LaunchedEffect(Unit) {
         runCatching { api.refreshQuotaIfStale() }
-        if (demo == null) store.reload()
+        // Disk scan + JSON parse per recording: off the main thread, a backlog would stall the first frame.
+        if (demo == null) withContext(Dispatchers.IO) { store.reload() }
         else if (demo.tab == "Pending") {
             val now = System.currentTimeMillis()
             store.add(PendingRecording("demo-p1", "sp1", 1, "Part 1: Hometown", now - 25 * 60_000, 62_000, emptyList(), listOf(0)))
@@ -130,7 +133,7 @@ fun SpeakingTabScreen(nav: Nav) {
         onRefresh = {
             recent.reload(); mock.reload()
             scope.launch { runCatching { api.refreshQuota() } }
-            if (demo == null) store.reload()
+            if (demo == null) scope.launch(Dispatchers.IO) { store.reload() }
         },
     ) {
         item {

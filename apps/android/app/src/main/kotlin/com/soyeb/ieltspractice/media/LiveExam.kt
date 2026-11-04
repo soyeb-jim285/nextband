@@ -192,7 +192,13 @@ class LiveExam(
     override fun onCleared() {
         run?.cancel()
         examiner?.close()
-        thread(name = "live-audio-stop") { audio.stop() } // may flush an encoder: never on the main thread
+        // Nothing can score this session's parts once the screen is gone (they are not in the upload queue), so they leave the phone now.
+        // Parts already sent with /live/part stay on the server like any attempt.
+        val prefix = "live-$sessionId-"
+        thread(name = "live-audio-stop") { // stopping may flush an encoder: never on the main thread, and before the files go
+            audio.stop()
+            if (demo == null) context.cacheDir.listFiles { f -> f.name.startsWith(prefix) && f.name.endsWith(".m4a") }?.forEach { it.delete() }
+        }
         mic.stop()
         scope.cancel()
     }
@@ -206,7 +212,9 @@ class LiveExam(
         if (part != null) {
             val f = File(context.cacheDir, "live-$sessionId-p$part.m4a")
             withContext(NonCancellable) { // the outer NonCancellable keeps the result when the test is cancelled mid-switch
-                withContext(Dispatchers.IO) { runCatching { audio.beginPart(f) } } // creating the encoder is slow-ish
+                val began = withContext(Dispatchers.IO) { runCatching { audio.beginPart(f) } } // creating the encoder is slow-ish
+                // No encoder or file: stop now (runLive shows the failure) instead of running a part that is never recorded.
+                if (began.isFailure) error("Your answer couldn't be recorded on this phone, so the test stopped." + if (recordings.isNotEmpty()) " The parts you recorded are safe." else "")
                 currentPart = part
             }
         }

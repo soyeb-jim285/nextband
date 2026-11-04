@@ -198,3 +198,18 @@ fun lrHubGroups(items: List<LrTestItem>): List<LrHubGroup> {
     if (own.isNotEmpty()) out += LrHubGroup("own", "Original practice tests", own)
     return out
 }
+
+/** What TalkBack reads for a gapped sentence: the words with each blank as "blank n" (so the sentence is one stop, not one per word). */
+fun spokenInline(inline: List<Inline>): String = inline.joinToString("") {
+    when (it) {
+        is Inline.Text -> it.text
+        is Inline.Bold -> it.text
+        is Inline.Gap -> " blank ${it.n}" + (if (it.of > 1) " part ${it.part + 1}" else "") + " "
+    }
+}.replace(Regex("""\s+"""), " ").replace(Regex(""" ([,.;:!?])"""), "\$1").trim()
+
+/** Up to [max] words just before [gap] in its sentence, so a focused blank says what it completes ("" when it opens the line). */
+fun gapLead(inline: List<Inline>, gap: Inline.Gap, max: Int = 6): String {
+    val before = inline.subList(0, inline.indexOf(gap).coerceAtLeast(0))
+    return spokenInline(before).split(' ').filter { it.isNotEmpty() }.takeLast(max).joinToString(" ")
+}

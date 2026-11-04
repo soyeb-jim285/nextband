@@ -40,6 +40,19 @@ class SpeakingLogicTest {
         assertEquals("In the target zone", zoneHint(2, 100))
     }
 
+    @Test fun aResumedMockSkipsAnsweredQuestions() {
+        val items = listOf(prompt(1).copy(id = "a"), prompt(1).copy(id = "b"), prompt(2), prompt(3))
+        assertEquals(0, resumeIndex(items, emptySet()))
+        assertEquals(2, resumeIndex(items, setOf("a", "b")))
+        assertEquals(-1, resumeIndex(items, setOf("a", "b", "p2", "p3"))) // nothing left: straight to the upload screen, never Part 1 again
+    }
+
+    @Test fun recordingAttemptsAreNotAnswered() {
+        fun a(prompt: String, status: String, sid: String? = "s") = AttemptListItem("id-$prompt", "t", "speaking", 1, "part1", status, createdAt = "", promptId = prompt, sessionId = sid)
+        val list = listOf(a("a", "done"), a("b", "analyzing"), a("c", "recording"), a("d", "done", sid = "other"), a("e", "failed"))
+        assertEquals(setOf("a", "b", "e"), answeredOnServer(list, "s"))
+    }
+
     @Test fun partLabelsCountPart1Topics() {
         val items = listOf(prompt(1), prompt(1), prompt(2), prompt(3))
         assertEquals("Part 1, 1 of 2", partLabel(items, 0))

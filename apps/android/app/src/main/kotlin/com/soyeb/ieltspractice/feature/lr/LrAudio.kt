@@ -66,10 +66,12 @@ import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.media.AudioPlayer
 import com.soyeb.ieltspractice.media.MediaCache
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.ceil
 import kotlin.math.max
@@ -97,6 +99,7 @@ class LrPlayer(private val demo: Boolean, private val resume: LrResume? = null) 
     private var stopAt: Double? = null
     private var ready = resume == null // false until the saved position is applied: the position is 0 and must not overwrite it
     private var lastPersist = 0.0
+    private var waited = 0 // polls without a duration; a slow load counts as failed after ~32 s until it arrives or [retry]
 
     init { if (resume != null) speed = resume.rate }
 
@@ -108,13 +111,13 @@ class LrPlayer(private val demo: Boolean, private val resume: LrResume? = null) 
     /** Keeps the state current (5 times a second while playing) until the screen leaves; while paused it sleeps until playback starts. */
     suspend fun poll() {
         val e = engine ?: return
-        var waited = 0
         while (true) {
             playing = e.playing.value
             position = e.positionMs / 1000.0
             stopAt?.let { if (position >= it) { e.pause(); playing = false; stopAt = null } }
             val d = e.durationMs / 1000.0
-            if (d > 0) duration = d else if (duration == 0.0 && ++waited > 80) failed = true
+            if (d > 0) duration = d
+            failed = e.error.value || (duration == 0.0 && ++waited > 80)
             if (resume != null) {
                 if (!ready && d > 0) {
                     ready = true
@@ -148,6 +151,9 @@ class LrPlayer(private val demo: Boolean, private val resume: LrResume? = null) 
         if (engine != null) playing = true
     }
 
+    /** "Try again" after a failed load or a playback error: prepare the recording again where it stopped. */
+    fun retry() { failed = false; waited = 0; engine?.reload() }
+
     fun seek(t: Double) {
         stopAt = null
         val v = t.coerceIn(0.0, if (duration > 0) duration else max(t, 0.0))
@@ -155,7 +161,7 @@ class LrPlayer(private val demo: Boolean, private val resume: LrResume? = null) 
         engine?.seekTo((v * 1000).toLong())
     }
 
-    fun replay() { seek(0.0); resumedAt = 0.0; if (!playing) toggle() }
+    fun replay() { if (failed) retry(); seek(0.0); resumedAt = 0.0; if (!playing) toggle() } // a failed player is prepared again first
 
     fun changeSpeed(s: Float) { speed = s; engine?.setSpeed(s); resume?.onRate?.invoke(s) }
 
@@ -241,7 +247,10 @@ fun PracticePlayer(player: LrPlayer, label: String, modifier: Modifier = Modifie
             }
         }
         if (player.resumedAt > 0) Text("Resumes from ${clock(player.resumedAt.toInt())}", style = NB.type.caption, color = c.brandText, modifier = Modifier.padding(start = 4.dp))
-        if (player.failed) Text("The recording could not be loaded. Check your connection.", style = NB.type.caption, color = c.badText, modifier = Modifier.padding(start = 4.dp))
+        if (player.failed) Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("The recording could not be loaded. Check your connection.", style = NB.type.caption, color = c.badText, modifier = Modifier.weight(1f).padding(start = 4.dp))
+            NbButton("Try again", player::retry, kind = BtnKind.Text, size = BtnSize.Small)
+        }
     }
 }
 
@@ -285,6 +294,7 @@ class ExamPlaylist(
         val p = ExoPlayer.Builder(context.applicationContext)
             .setAudioAttributes(AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).setUsage(C.USAGE_MEDIA).build(), true)
             .setMediaSourceFactory(MediaCache.sourceFactory(context))
+            .setHandleAudioBecomingNoisy(true) // headphones unplugged: pause (shows "Resume audio") rather than switch to the loudspeaker
             .build()
         p.addListener(object : Player.Listener {
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -309,13 +319,17 @@ class ExamPlaylist(
         exo = p
     }
 
+    private var reading: Deferred<List<Long?>>? = null
+
     /**
      * Each part's length read from its file. ExoPlayer prepares playlist items lazily, so the timeline only knows the
      * durations of the parts it has buffered and the start gate would wait forever on a multi-part test.
      */
     suspend fun loadDurations() {
         if (demoPhase != null || urls.isEmpty() || durations != null) return
-        val ds = withContext(Dispatchers.IO) {
+        // setDataSource blocks in native code and can't be cancelled: the read runs outside the caller, a retry waits on the one still
+        // running instead of stacking another, and a stalled server shows the error (and Retry) after 20 s instead of never.
+        val job = reading?.takeIf { it.isActive } ?: CoroutineScope(Dispatchers.IO).async {
             urls.map { u ->
                 val r = MediaMetadataRetriever()
                 try {
@@ -327,8 +341,10 @@ class ExamPlaylist(
                     runCatching { r.release() }
                 }
             }
-        }
+        }.also { reading = it }
+        val ds = withTimeoutOrNull(20_000) { job.await() }
         if (durations != null) return
+        if (ds == null) { error = true; return }
         if (ds.all { it != null && it > 0 }) { durations = ds.map { it!! / 1000.0 }; error = false } else error = true
     }
 
@@ -350,6 +366,9 @@ class ExamPlaylist(
 
     fun resume() { stalled = false; exo?.playWhenReady = true }
 
+    /** The app went to the background: no foreground service, so stop rather than play behind other apps. [stalled] offers "Resume audio" on return. */
+    fun pause() { exo?.playWhenReady = false }
+
     /** The stream failed mid-exam (a network drop): prepare again where it stopped. The clock reads the player, so it resumes there too. */
     fun retry() { error = false; stalled = false; exo?.apply { prepare(); playWhenReady = true } }
 
@@ -360,9 +379,10 @@ class ExamPlaylist(
     /** Start gate: read the lengths again and re-prepare the player, without starting playback. */
     fun retryLoad() { error = false; exo?.prepare(); loadTries++ }
 
-    /** Keeps [elapsed] current (4 times a second) until the screen leaves; [onElapsed] gets each new value. */
-    suspend fun tick(onElapsed: (Double) -> Unit = {}) {
+    /** Keeps [elapsed] current (4 times a second) until the screen leaves; [onElapsed] gets each new value. [awaitActive] suspends while backgrounded. */
+    suspend fun tick(awaitActive: suspend () -> Unit = {}, onElapsed: (Double) -> Unit = {}) {
         while (true) {
+            awaitActive() // Review reads the wall clock, Audio the player position: both catch up on the first tick back
             if (demoPhase == null) {
                 // Nothing to count at the start gate: sleep until the recording starts rather than wake four times a second.
                 if (phase == ExamPhase.Idle) { snapshotFlow { phase }.first { it != ExamPhase.Idle }; continue }

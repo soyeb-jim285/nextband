@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class Review(val pattern: String? = null, val ahead: Boolean = false) // feature/study
 @Serializable data object CoachRoute                              // feature/study
 /** Prompt bank. [skill]: speaking | writing. */
-@Serializable data class Bank(val skill: String = "speaking", val part: Int? = null) // feature/study
+@Serializable data class Bank(val skill: String = "speaking", val part: Int? = null, val variant: String? = null) // feature/study
 
 // Listening & Reading (feature/lr)
 /** [skill]: listening | reading. A pushed detail for one test (deep links from Today / History); hubs may use a sheet instead. */

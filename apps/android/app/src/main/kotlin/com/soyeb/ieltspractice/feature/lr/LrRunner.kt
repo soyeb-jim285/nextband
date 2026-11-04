@@ -89,6 +89,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -98,6 +99,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -142,6 +144,7 @@ import com.soyeb.ieltspractice.nav.LrResult
 import com.soyeb.ieltspractice.nav.LrRun
 import com.soyeb.ieltspractice.nav.Nav
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -157,7 +160,8 @@ fun LrRunScreen(route: LrRun, nav: Nav) {
     val graph = LocalGraph.current
     val load = rememberLoad(route.attemptId) {
         val a = graph.api.lrAttempt(route.attemptId)
-        a to RunLocal.load(graph.prefs, a.id)
+        val local = RunLocal.load(graph.prefs, a.id)
+        withPending(a, local.pending) to local
     }
     when (val s = load.state) {
         Load.Loading -> PushedScreen("Test", nav::back, close = true) { pad -> SkeletonList(Modifier.padding(pad)) }
@@ -186,6 +190,9 @@ class LrRunHolder : ViewModel() {
     var playlist: ExamPlaylist? = null
     var flagged: MutableState<Set<Int>>? = null
     var settings: MutableState<LrSettings>? = null
+    // The submit runs on viewModelScope and its outcome lives here, so a rotation or theme change mid-submit neither cancels it nor loses it.
+    val leaving = mutableStateOf(false)
+    val submitError = mutableStateOf<String?>(null)
     // The exam player lives as long as the run (built on the application context), so rotating never restarts the recording.
     override fun onCleared() { playlist?.release() }
 }
@@ -276,7 +283,11 @@ private fun RunnerBody(
     val session = held.session ?: LrSession(
         attempt, graph.api, graph.scope, live = !isDemo, localAudio = local.audio,
         saveLocalAudio = { v -> graph.scope.launch { graph.prefs.setString("audio:${attempt.id}", v) } },
-    ).also { held.session = it }
+        saveLocalAnswers = { v -> graph.scope.launch { graph.prefs.setString("answers:${attempt.id}", v) } },
+    ).also {
+        held.session = it
+        if (local.pending != null && !isDemo) it.flushLater(force = true) // answers left on the device last time: send them now
+    }
     val reg = remember { QRegistry() }
     val hl = held.marks ?: Marks(if (isDemo) demoMarks(dv) else local.marks) { list -> if (!isDemo) graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", marksJson(list)) } }
         .also { if (isDemo && dv == "Highlight") { it.draft = Sel("passage:1:2", 8, 44); it.pending = true } }
@@ -303,8 +314,8 @@ private fun RunnerBody(
     var settingsOpen by remember { mutableStateOf(dv == "Settings") }
     var menuOpen by remember { mutableStateOf(false) }
     var hideTimer by remember { mutableStateOf(false) }
-    var leaving by remember { mutableStateOf(false) }
-    var submitError by remember { mutableStateOf<String?>(null) }
+    var leaving by held.leaving
+    var submitError by held.submitError
 
     // ---- clocks ----
     val clock = held.clock ?: RunClock(attempt.elapsedS.toDouble()).also { held.clock = it }
@@ -315,10 +326,10 @@ private fun RunnerBody(
     }.also { held.playlist = it }
     // attach is a no-op once the player exists; LrRunHolder.onCleared releases it when the run's screen goes.
     LaunchedEffect(playlist) { if (examListening) playlist.attach(context) }
-    LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.tick { session.elapsed = it } }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.tick({ lifecycle.awaitStarted() }) { session.elapsed = it } }
     LaunchedEffect(playlist, playlist.loadTries) { if (examListening && !isDemo) playlist.loadDurations() }
     // Wall clock, so pausing it in the background loses nothing: the first tick back catches up.
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(examListening) {
         if (examListening || isDemo) return@LaunchedEffect
         val t0 = System.nanoTime()
@@ -340,7 +351,7 @@ private fun RunnerBody(
     var foreground by remember { mutableStateOf(true) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { foreground = true }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { foreground = false }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (!isDemo) session.flushLater(true) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (!isDemo) { session.flushLater(true); if (examListening && playlist.phase == ExamPhase.Audio) playlist.pause() } }
     DisposableEffect(session) { onDispose { if (!isDemo) session.flushLater(true) } }
     // The clock save: only while the screen is visible (ON_STOP already saved once), so a test left open in the background never wakes the radio.
     LaunchedEffect(session) { if (!isDemo) while (true) { delay(15_000); lifecycle.awaitStarted(); session.flush(true) } }
@@ -361,7 +372,10 @@ private fun RunnerBody(
         try {
             session.submit()
             leaving = true
-            graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", null) } // notes are not kept past the attempt
+            graph.scope.launch { // notes and unsynced answers are not kept past the attempt
+                graph.prefs.setString("marks:${attempt.id}", null)
+                graph.prefs.setString("answers:${attempt.id}", null)
+            }
             if (mockId != null) nav.toMock(mockId) else nav.replace(LrResult(attempt.id))
             return null
         } catch (e: CancellationException) {
@@ -374,7 +388,7 @@ private fun RunnerBody(
     }
     fun submit() {
         if (leaving || session.submitting) return
-        scope.launch { submitNow() }
+        held.viewModelScope.launch { submitNow() }
     }
     fun exit() {
         leaving = true
@@ -391,7 +405,7 @@ private fun RunnerBody(
         var failures = 0
         while (!leaving) {
             lifecycle.awaitStarted()
-            val e = submitNow()
+            val e = held.viewModelScope.async { submitNow() }.await() // a recreated screen's loop finds it still going (session.submitting)
             if (leaving) break
             failures = minOf(failures + 1, 8)
             delay(if (e == null) 2_000L else saveRetryMs(failures, e) ?: break)
@@ -615,7 +629,8 @@ private fun RunnerBody(
     }
     if (leave) ConfirmDialog(
         title = "Leave the test?",
-        body = "Your answers are saved. You can pick this attempt up again from the ${skill.label} tab." + if (exam) " The exam clock stops while you are away." else "",
+        body = (if (session.state == SaveState.Saved) "Your answers are saved." else "Your latest answers are kept on this phone until they reach your account.") +
+            " You can pick this attempt up again from the ${skill.label} tab." + if (exam) " The exam clock stops while you are away." else "",
         confirm = "Leave", onConfirm = { leave = false; exit() },
         onDismiss = { leave = false }, dismiss = "Keep going",
     )
@@ -662,26 +677,37 @@ private fun RunBottomBar(
     onNavigator: () -> Unit, onFlag: () -> Unit, onPrev: () -> Unit, onNext: () -> Unit,
 ) {
     val c = NB.colors
+    // The navigator text gets the width left after padding, three 48dp buttons, gaps and its icon (~248dp); about 70dp of
+    // text at 1x. Too narrow or too large: an icon-only navigator with the counts on their own full-width line above.
+    val compact = LocalConfiguration.current.screenWidthDp - 248 < 70 * LocalDensity.current.fontScale
     Surface(color = c.surface, contentColor = c.ink) {
         Column {
             HorizontalDivider(color = c.line)
+            if (compact) Text(
+                "Q $current of $total · $answered answered", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = c.ink,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp).clearAndSetSemantics {},
+            )
             Row(
                 Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
                     onClick = onNavigator, shape = NB.shape.tile, color = c.surface2, contentColor = c.ink,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    modifier = (if (compact) Modifier.size(48.dp) else Modifier.weight(1f).heightIn(min = 48.dp))
                         .semantics { contentDescription = "Open the question navigator. Question $current of $total, $answered answered" },
                 ) {
-                    Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        Modifier.heightIn(min = 48.dp).padding(horizontal = if (compact) 0.dp else 12.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = if (compact) Arrangement.Center else Arrangement.spacedBy(10.dp),
+                    ) {
                         Icon(Icons.Rounded.GridView, null, Modifier.size(22.dp), tint = c.ink)
-                        Column {
+                        if (!compact) Column {
                             Text("Q $current of $total", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = c.ink, maxLines = 1)
                             Text("$answered answered", style = NB.type.caption, color = c.muted, maxLines = 1)
                         }
                     }
                 }
+                if (compact) Spacer(Modifier.weight(1f))
                 Surface(
                     onClick = onFlag, shape = CircleShape, color = if (flagged) c.warnSoft else c.surface2, contentColor = if (flagged) c.warnText else c.ink,
                     modifier = Modifier.size(48.dp).semantics { contentDescription = if (flagged) "Remove flag from question $current" else "Flag question $current for review" },

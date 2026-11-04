@@ -28,6 +28,8 @@ class RunLocal(
     val position: Pair<Int, Int>? = null,
     val audio: String? = null,
     val settings: LrSettings = LrSettings(),
+    /** Answers changed here that the server may not have yet (see [withPending]). */
+    val pending: PendingAnswers? = null,
 ) {
     companion object {
         suspend fun load(prefs: Prefs, attemptId: String): RunLocal = RunLocal(
@@ -36,6 +38,7 @@ class RunLocal(
             position = prefs.getString("pos:$attemptId")?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size >= 2 }?.let { it[0] to it[1] },
             audio = prefs.getString("audio:$attemptId"),
             settings = parseSettings(prefs.getString("settings")),
+            pending = parsePending(prefs.getString("answers:$attemptId")),
         )
     }
 }
@@ -53,6 +56,8 @@ class LrSession(
     private val live: Boolean = true,
     localAudio: String? = null,
     private val saveLocalAudio: (String) -> Unit = {},
+    /** Keeps the unsynced answers on the device (JSON), or clears them (null) once the server has them. */
+    private val saveLocalAnswers: (String?) -> Unit = {},
 ) {
     var responses by mutableStateOf(attempt.responses)
         private set
@@ -65,9 +70,10 @@ class LrSession(
     // Pacing: seconds per part, answer changes per question, questions answered late.
     /** Elapsed seconds after which an answer counts as late: reading 3300, exam listening the end of the recordings, otherwise never. */
     @Volatile var lateFrom: () -> Double = { Double.POSITIVE_INFINITY }
-    private val partS = HashMap<String, Double>(attempt.stats?.partS.orEmpty())
-    private val changes = HashMap<String, Int>(attempt.stats?.changes.orEmpty())
-    private val late = LinkedHashSet<Int>(attempt.stats?.late.orEmpty())
+    // Written on the main thread, copied by stats() inside saves on the background scope: concurrent maps so a copy never throws.
+    private val partS = java.util.concurrent.ConcurrentHashMap<String, Double>(attempt.stats?.partS.orEmpty())
+    private val changes = java.util.concurrent.ConcurrentHashMap<String, Int>(attempt.stats?.changes.orEmpty())
+    private val late = java.util.concurrent.ConcurrentSkipListSet<Int>(attempt.stats?.late.orEmpty())
 
     // Practice listening position: noteAudio is hot (every player tick, memory only); saveAudio stores it on the device and queues a server save.
     @Volatile private var audio: LrAudioState? = LrAudioState.pick(localAudio, attempt.stats?.audio)
@@ -117,6 +123,7 @@ class LrSession(
         }
         responses = next
         if (!live) return
+        saveLocalAnswers(pendingJson(PendingAnswers(next, elapsed.toInt())))
         dirty = true
         state = SaveState.Dirty
         debounce?.cancel()
@@ -135,6 +142,8 @@ class LrSession(
             try {
                 api.lrSave(attempt.id, responses, elapsed.toInt(), stats())
                 state = if (dirty) SaveState.Dirty else SaveState.Saved
+                // ponytail: the prefs writes are async launches, so a clear can in theory land after a newer snapshot; a later save clears again.
+                if (!dirty) saveLocalAnswers(null)
                 failures = 0
             } catch (e: CancellationException) {
                 throw e
@@ -143,6 +152,8 @@ class LrSession(
                 if ((e as? ApiError)?.status == 409) { done = true; submitted = true; state = SaveState.Saved; return }
                 dirty = true
                 state = SaveState.Error
+                // Keep the device copy's clock current too (the 15 s clock save lands here offline), so a kill never gives exam time back.
+                saveLocalAnswers(pendingJson(PendingAnswers(responses, elapsed.toInt())))
                 debounce?.cancel()
                 // The next change, the 15 s clock save or leaving the screen tries again even after the retries stop.
                 saveRetryMs(++failures, e)?.let { ms -> debounce = scope.launch { delay(ms); flush() } }
@@ -165,8 +176,9 @@ class LrSession(
         submitting = true
         try {
             lock.withLock { api.lrSubmit(attempt.id, responses, elapsed.toInt(), stats()) }
+            saveLocalAnswers(null)
         } catch (e: ApiError) {
-            if (e.status == 409) { submitted = true; return }
+            if (e.status == 409) { submitted = true; saveLocalAnswers(null); return }
             done = false
             throw e
         } catch (e: Throwable) {

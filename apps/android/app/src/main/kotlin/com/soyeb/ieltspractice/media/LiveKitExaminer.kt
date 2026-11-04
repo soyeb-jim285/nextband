@@ -59,6 +59,8 @@ class LiveKitExaminer(private val context: Context, private val audio: LiveAudio
 
     /** Joins the room, publishes the microphone, waits for the worker (30 s) and starts the test. Throws if any step fails. */
     suspend fun connect(join: LiveKitJoin) {
+        // Like every other server-given URL (isWebUrl): TLS only, since the room token and the microphone go over it.
+        if (!join.url.startsWith("wss://", ignoreCase = true)) throw ApiError(0, "Couldn't start the examiner. Try again.")
         val r = LiveKit.create(context.applicationContext).also { room = it }
         // Collect before connecting: the worker may say "ready" as soon as we join.
         events = scope.launch(start = CoroutineStart.UNDISPATCHED) {

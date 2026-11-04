@@ -84,6 +84,7 @@ class Api(
     companion object {
         /** The production server. Fixed in the app; there is no user-facing server setting (matches iOS). */
         const val SERVER = "https://ielts.soyebjim.me"
+        const val SESSION_CHANGED = "You signed out or switched account. Your recording is saved on this device; sign back in to upload it."
     }
 
     private val http = OkHttpClient.Builder()
@@ -150,7 +151,8 @@ class Api(
 
     // MARK: Requests
 
-    suspend fun raw(method: String, path: String, body: JsonElement? = null): ApiResponse {
+    /** [asToken]: send only with this session's token; another session (signed out or switched account since) throws [ApiError] 0 unsent. */
+    suspend fun raw(method: String, path: String, body: JsonElement? = null, asToken: String? = null, extraHeaders: Map<String, String> = emptyMap()): ApiResponse {
         val payload = when {
             body != null -> AppJson.encodeToString(JsonElement.serializer(), body).toRequestBody(JSON_MEDIA)
             method == "GET" || method == "HEAD" || method == "DELETE" -> null
@@ -158,8 +160,9 @@ class Api(
         }
         // The token this request carries: a late 401/403 for an older session must not end the one adopted since.
         val sent = _token.value
+        if (asToken != null && sent != asToken) throw ApiError(0, SESSION_CHANGED)
         val req = Request.Builder().url(baseUrl + path).method(method, payload)
-            .apply { sent?.let { header("Authorization", "Bearer $it") } }
+            .apply { sent?.let { header("Authorization", "Bearer $it") }; extraHeaders.forEach { (k, v) -> header(k, v) } }
             .build()
         val (status, text, headers) = execute(req, "Can't reach NextBand. Check your internet connection and try again.")
         if (status !in 200..299) {
@@ -305,7 +308,7 @@ class Api(
 
     /** Whether the code email was sent, behind a [statusToken]. */
     suspend fun emailStatus(token: String): EmailStatus =
-        AppJson.decodeFromString(EmailStatus.serializer(), raw("GET", "/api/auth-email/status?token=${java.net.URLEncoder.encode(token, "UTF-8")}").body)
+        AppJson.decodeFromString(EmailStatus.serializer(), raw("GET", "/api/auth-email/status", extraHeaders = mapOf("x-email-status-token" to token)).body) // a header: query strings land in access logs
 
     /** Verifies the address with the emailed code and signs the user in. */
     suspend fun verifyEmail(email: String, otp: String) {
@@ -420,12 +423,23 @@ class Api(
 
     /** Deleting needs the account password (Better Auth delete-user), like the web dialog. */
     suspend fun deleteAccount(password: String? = null) {
-        raw("POST", "/api/auth/delete-user", password?.let { buildJsonObject { put("password", it) } })
+        val sent = _token.value
+        try {
+            raw("POST", "/api/auth/delete-user", password?.let { buildJsonObject { put("password", it) } })
+        } catch (e: ApiError) {
+            // 401 is the session, not the password (a wrong one is 400), e.g. revoked by a password reset. raw() leaves /api/auth/ 401s alone.
+            if (e.status != 401 || sent == null || _token.value != sent) throw e
+            val wasAccount = _account.value
+            signOutLocal(accountExpired = wasAccount)
+            _sessionEnded.trySend(wasAccount)
+            throw ApiError(401, "Your session ended. Sign in again, then delete.")
+        }
         signOutLocal()
     }
 
     fun signOutLocal(accountExpired: Boolean = false) {
         val lastUser = _me.value?.user?.id
+        expiredUser = if (accountExpired) lastUser else null
         setSession(null, false)
         _me.value = null
         _quota.value = null
@@ -439,6 +453,12 @@ class Api(
      * (so only it can upload them after signing back in) and drops them otherwise.
      */
     @Volatile var onSignedOut: ((accountExpired: Boolean, lastUser: String?) -> Unit)? = null
+
+    /**
+     * The account whose session the server ended (401), until the next sign-out. Sign-in after it continues in place only for that
+     * same account (AuthScreen): anyone else starts from a clean stack, so the expired account's screens and cached data never show.
+     */
+    @Volatile var expiredUser: String? = null
 
     // MARK: Endpoints (one suspend function per route in apps/web/src/openapi.json; admin and replay are left out)
 

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -81,7 +83,16 @@ internal enum class Phase { Loading, Ready, Failed }
 /** The merged, paged list behind History. Speaking and Writing come page by page; Listening and Reading in one request. */
 @Stable
 /** The loaded feeds per filter, held by the History entry: opening a result and coming back keeps the pages and the scroll. */
-class HistoryFeeds : ViewModel() { internal val bySkill = HashMap<Skill?, Feed>() }
+class HistoryFeeds : ViewModel() {
+    private val bySkill = HashMap<Skill?, Feed>()
+    private var session: String? = null
+
+    /** The feed for [skill] in this [session] (bearer token): another session (an expired one replaced by a different account) starts empty. */
+    internal fun feed(session: String?, skill: Skill?, make: () -> Feed): Feed {
+        if (session != this.session) { bySkill.clear(); this.session = session }
+        return bySkill.getOrPut(skill, make)
+    }
+}
 
 internal class Feed(private val api: Api, private val skill: Skill?) {
     var items by mutableStateOf<List<HistoryItem>>(emptyList()); private set
@@ -182,7 +193,7 @@ fun HistoryScreen(nav: Nav, skillArg: String?) {
         if (!hasAccount) EmptyState(
             Icons.Rounded.History, "History keeps your results",
             "Create a free account and every test you take is saved here, with its band.",
-            Modifier.padding(pad), action = "Create free account",
+            Modifier.padding(pad).verticalScroll(rememberScrollState()).readable(), action = "Create free account",
             onAction = { nav.requireAccount("Create an account to keep your results.") { } },
         ) else HistoryBody(nav, skillArg, pad)
     }
@@ -201,11 +212,11 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
 
     var filter by rememberSaveable { mutableIntStateOf(historyFilters.indexOf(Skill.of(skillArg)).coerceAtLeast(0)) }
     val skill = historyFilters[filter]
-    val feeds = viewModel<HistoryFeeds>()
-    val feed = feeds.bySkill.getOrPut(skill) { Feed(api, skill) }
+    val session by api.token.collectAsState()
+    val feed = viewModel<HistoryFeeds>().feed(session, skill) { Feed(api, skill) }
     // First page only: refresh on return (a result may have finished marking). Deeper: keep the pages; pull to refresh.
     LaunchedEffect(feed) { if (feed.phase != Phase.Ready || !feed.paged) feed.refresh() }
-    var hidden by remember { mutableStateOf(emptySet<String>()) }
+    var hidden by remember(session) { mutableStateOf(emptySet<String>()) }
     val listState = rememberLazyListState()
 
     val nearEnd by remember { derivedStateOf { listState.layoutInfo.let { (it.visibleItemsInfo.lastOrNull()?.index ?: 0) >= it.totalItemsCount - 4 } } }
@@ -243,15 +254,16 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
         Box(Modifier.weight(1f)) {
             when (feed.phase) {
                 Phase.Loading -> SkeletonList()
-                Phase.Failed -> ErrorState(feed.error, { scope.launch { feed.refresh() } })
+                Phase.Failed -> StateScroll(pad) { ErrorState(feed.error, { scope.launch { feed.refresh() } }, Modifier.readable()) }
                 Phase.Ready -> {
                     val visible = feed.items.filter { it.id !in hidden }
                     PullToRefreshBox(feed.refreshing, { scope.launch { feed.refresh() } }, Modifier.fillMaxSize()) {
-                        if (visible.isEmpty()) {
+                        if (visible.isEmpty()) StateScroll(pad) {
                             EmptyState(
                                 Icons.Rounded.History,
                                 if (skill == null) "No results yet" else "No ${skill.label} results yet",
                                 "Finish a test and its result shows up here.",
+                                Modifier.readable(),
                                 action = if (skill == null) "Start practising" else "Take a ${skill.label.lowercase()} test",
                                 onAction = { if (skill == null) nav.home() else nav.openTab(skillTab(skill)) },
                             )
@@ -285,6 +297,12 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
             }
         }
     }
+}
+
+/** Empty and error states scroll, so their action stays reachable in landscape or at large text (and pull-to-refresh still works). */
+@Composable
+private fun StateScroll(pad: PaddingValues, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = pad.calculateBottomPadding())) { content() }
 }
 
 @Composable

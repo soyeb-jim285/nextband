@@ -22,17 +22,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.data.logic.sentenceCase
 import com.soyeb.ieltspractice.data.model.Prompt
 import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.feature.speaking.CueCard
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.ChipRow
 import com.soyeb.ieltspractice.design.components.EmptyState
@@ -56,18 +59,25 @@ import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.coroutines.delay
 
 private val skills = listOf("speaking", "writing")
+private val variants = listOf(null, "academic", "general")
+private val variantOptions = listOf("Academic and General", "Academic", "General")
+
+internal class BankHolder : ViewModel() {
+    val pager = Pager<Prompt>(viewModelScope)
+    var filters: List<Any?>? = null
+}
 
 /** The prompt bank: search, filter by skill, part and topic, preview a prompt and practise it. */
 @Composable
 fun BankScreen(nav: Nav, route: Bank) {
     val api = com.soyeb.ieltspractice.LocalGraph.current.api
-    val scope = rememberCoroutineScope()
     val demoSheet = LocalDemo.current?.screen == "bank-sheet"
     val fixedSkill = route.skill.isNotBlank()
 
     // Saveable: practising a prompt and coming back keeps the learner's search and filters.
     var skill by rememberSaveable { mutableStateOf(route.skill.ifBlank { "speaking" }) }
     var part by rememberSaveable { mutableStateOf(route.part) }
+    var variant by rememberSaveable { mutableStateOf(route.variant) } // Writing Task 1 only: "academic" / "general", null = both
     var topic by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var q by rememberSaveable { mutableStateOf("") } // the debounced query the list uses
@@ -77,11 +87,18 @@ fun BankScreen(nav: Nav, route: Bank) {
         if (query.trim() != q) { delay(300); q = query.trim() }
     }
     val meta = rememberLoad { api.promptMeta() }
-    val pager = remember { Pager<Prompt>(scope) }
-    LaunchedEffect(skill, part, topic, q) {
+    // Held by the back-stack entry: practising a prompt and coming back (or rotating) keeps the loaded pages and the scroll position.
+    val holder = viewModel<BankHolder>()
+    val pager = holder.pager
+    // Task 2 has no variant, so the filter applies to Task 1 only.
+    val v = variant.takeIf { skill == "writing" && part == 1 }
+    LaunchedEffect(skill, part, v, topic, q) {
         val s = skill; val p = part; val t = topic; val text = q
+        val filters = listOf(s, p, v, t, text)
+        if (holder.filters == filters) return@LaunchedEffect // same filters as before leaving: keep what's loaded
+        holder.filters = filters
         pager.reset { page ->
-            val r = api.prompts(skill = s, part = p, topic = t, q = text.ifEmpty { null }, page = page)
+            val r = api.prompts(skill = s, part = p, variant = v, topic = t, q = text.ifEmpty { null }, page = page)
             r.items to r.total
         }
     }
@@ -120,6 +137,9 @@ fun BankScreen(nav: Nav, route: Bank) {
             item {
                 ChipRow(partOptions, setOf(part ?: 0), { i -> part = if (i == 0) null else i; topic = null })
             }
+            if (skill == "writing" && part == 1) item {
+                ChipRow(variantOptions, setOf(variants.indexOf(variant)), { i -> variant = variants[i] })
+            }
             if (topics.isNotEmpty()) item {
                 val at = topics.indexOf(topic) + 1
                 ChipRow(listOf("All topics") + topics, setOf(at), { i -> topic = if (i == 0) null else topics[i - 1] })
@@ -134,7 +154,7 @@ fun BankScreen(nav: Nav, route: Bank) {
             if (pager.loaded && pager.items.isEmpty()) item(key = "empty") {
                 EmptyState(
                     Icons.Rounded.Search, "No prompts match", "Try another word, or clear the filters.",
-                    action = "Clear filters", onAction = { query = ""; q = ""; part = null; topic = null },
+                    action = "Clear filters", onAction = { query = ""; q = ""; part = null; variant = null; topic = null },
                 )
             }
             items(pager.items, key = { it.id }) { p ->
@@ -178,12 +198,11 @@ private fun PromptPreview(p: Prompt) {
         p.topic?.takeIf { it.isNotBlank() }?.let { Tag(it) }
         p.sourceRef?.takeIf { it.isNotBlank() }?.let { Tag(it) }
     }
-    val title = sentenceCase(p.title)
-    Text(title, style = NB.type.readingTitle, color = NB.colors.ink)
-    if (p.body.isNotBlank() && p.body.trim() != p.title.trim()) Text(p.body, style = NB.type.reading, color = NB.colors.ink)
-    p.bullets?.takeIf { it.isNotEmpty() }?.let { bullets ->
-        Overline("You should say")
-        bullets.forEach { Text("•  $it", style = NB.type.readingSmall, color = NB.colors.ink) }
+    // Part 2 cue card: same component as the test, which strips the repeated title/"You should say" lead and puts "and explain…" last.
+    if (p.skill == "speaking" && !p.bullets.isNullOrEmpty()) CueCard(p, Modifier.fillMaxWidth())
+    else {
+        Text(sentenceCase(p.title), style = NB.type.readingTitle, color = NB.colors.ink)
+        if (p.body.isNotBlank() && p.body.trim() != p.title.trim()) Text(p.body, style = NB.type.reading, color = NB.colors.ink)
     }
     p.followUps?.takeIf { it.isNotEmpty() }?.let { qs ->
         Overline(if (p.part == 3) "Discussion questions" else "Questions")

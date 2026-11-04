@@ -47,6 +47,13 @@ class LrLogicTest {
         assertEquals(2, l.items.size)
     }
 
+    @Test fun gapSentenceReadsAsOnePhrase() {
+        val inline = listOf(Inline.Text("Meet at the  "), Inline.Bold("north"), Inline.Text(" gate on "), Inline.Gap(3), Inline.Text(", then "), Inline.Gap(4, 1, 2))
+        assertEquals("Meet at the north gate on blank 3, then blank 4 part 2", spokenInline(inline))
+        assertEquals("the north gate on", gapLead(inline, Inline.Gap(3), max = 4))
+        assertEquals("", gapLead(listOf(Inline.Gap(1), Inline.Text(" km")), Inline.Gap(1)))
+    }
+
     @Test fun multiBlankQuestionGetsOneSlotPerBlank() {
         assertEquals("from {{7:0:2}} to {{7:1:2}}, {{8}}", numberGapParts("from {{7}} to {{7}}, {{8}}"))
         assertEquals(

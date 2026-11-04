@@ -65,9 +65,10 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
             scope.launch { if (expired && lastUser != null) pending.claimUnowned(lastUser) else pending.dropUnowned() }
         }
         // A goal picked in onboarding before there was a session (prefs "goal:*") goes to the account once one exists,
-        // then the device copy is dropped. A failed save stays queued for the next sign-in or launch.
+        // then the device copy is dropped. A failed save stays queued for the next sign-in or launch. Accounts only:
+        // the server refuses a guest's settings (403), and a guest converting to an account flips hasAccount, not signedIn.
         if (demo == null) scope.launch {
-            api.signedIn.filter { it }.collect {
+            api.hasAccount.filter { it }.collect {
                 val band = prefs.getString(GOAL_BAND)?.toDoubleOrNull() ?: return@collect
                 val date = prefs.getString(GOAL_DATE)
                 runCatching { api.saveSettings(targetBand = band, examDate = date) }.onSuccess {

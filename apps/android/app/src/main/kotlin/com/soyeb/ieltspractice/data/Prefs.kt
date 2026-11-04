@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
@@ -29,7 +30,9 @@ private val Context.prefsStore by preferencesDataStore("prefs", corruptionHandle
 class Prefs(private val store: DataStore<Preferences>) {
     constructor(context: Context) : this(context.applicationContext.prefsStore)
 
-    private fun <T> read(f: (Preferences) -> T): Flow<T> = store.data.map(f)
+    // A read I/O failure gives the defaults instead of crashing the collecting screen (DataStore's documented pattern).
+    private fun <T> read(f: (Preferences) -> T): Flow<T> =
+        store.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }.map(f)
 
     // Settings writes are fire-and-forget from screens: a failed write (disk full) is logged and the old value stays.
     private suspend fun edit(f: suspend (MutablePreferences) -> Unit) {
@@ -71,6 +74,12 @@ class Prefs(private val store: DataStore<Preferences>) {
         edit { p -> if (value == null) { p.remove(k) } else { p[k] = value } }
     }
 
+    /** Drops every Listening/Reading attempt's local state ([isAttemptKey]): notes, flags, position, answers, audio. Used when the account is deleted. */
+    // ponytail: attempt keys carry no owner, so another account's unfinished notes on this phone go too; track owners if shared phones matter.
+    suspend fun clearAttemptState() {
+        edit { p -> p.asMap().keys.map { it.name }.filter(::isAttemptKey).forEach { p.remove(stringPreferencesKey(it)) } }
+    }
+
     private companion object {
         val APPEARANCES = setOf("system", "light", "dark")
         val APPEARANCE = stringPreferencesKey("appearance")
@@ -82,3 +91,8 @@ class Prefs(private val store: DataStore<Preferences>) {
         val MOCK_VARIANT = stringPreferencesKey("mockVariant")
     }
 }
+
+private val ATTEMPT_PREFIXES = listOf("marks:", "flags:", "pos:", "answers:", "audio:")
+
+/** A per-attempt Listening/Reading key (`marks:<attemptId>` and its siblings), as opposed to a setting. */
+fun isAttemptKey(name: String) = ATTEMPT_PREFIXES.any { name.startsWith(it) }

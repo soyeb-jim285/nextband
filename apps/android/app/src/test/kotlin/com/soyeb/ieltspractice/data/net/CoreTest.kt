@@ -108,6 +108,16 @@ class CoreTest {
         assertEquals(true, api.sessionEnded.first())
     }
 
+    @Test fun deleteWithARevokedSessionEndsItAndSaysSo() = runBlocking {
+        val api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(401).message("Unauthorized").body("{}".toResponseBody()).build()
+        }, initialToken = "revoked")
+        val e = assertFailsWith<ApiError> { api.deleteAccount("password1") }
+        assertEquals("Your session ended. Sign in again, then delete.", e.message)
+        assertTrue(!api.isSignedIn)
+        assertEquals(true, api.sessionEnded.first())
+    }
+
     @Test fun signOutIsLocalAtOnceAndRevokesTheOldTokenInTheBackground() = runBlocking {
         val revoked = kotlinx.coroutines.CompletableDeferred<String?>()
         val api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->

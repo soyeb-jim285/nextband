@@ -18,6 +18,7 @@ import com.soyeb.ieltspractice.data.UploadState
 import com.soyeb.ieltspractice.data.currentUserId
 import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.logic.newSessionId
+import com.soyeb.ieltspractice.data.model.AttemptListItem
 import com.soyeb.ieltspractice.data.model.AudioLine
 import com.soyeb.ieltspractice.data.model.Prompt
 import com.soyeb.ieltspractice.data.net.ApiError
@@ -76,6 +77,8 @@ class SessionModel(
     var prepLeft by mutableIntStateOf(PREP_SECONDS); private set
     var notes by mutableStateOf("")
     var uploads by mutableStateOf<List<UploadItem>>(emptyList()); private set
+    /** Mock resume: parts already answered on the server (not in this device's queue); they count towards the finish screen. */
+    var answered by mutableIntStateOf(0); private set
     var startError by mutableStateOf<String?>(null)
     var micDenied by mutableStateOf(false); private set
     var demoStates by mutableStateOf<Map<String, UploadState>>(emptyMap()); private set
@@ -104,6 +107,9 @@ class SessionModel(
     private var transitionJob: Job? = null
     private var introduced = -1
     private var recId = newSessionId()
+    /** The session and account this part was recorded under, bound when capture starts (see [savePart]). */
+    private var recToken: String? = null
+    private var recOwner: String? = null
     private var sessionId = newSessionId() // a mock test replaces it with the mock's Speaking session
     private var parent: String? = null
     private var prepEnd = 0L
@@ -137,6 +143,27 @@ class SessionModel(
                 val t = c.test ?: throw ApiError(0, "The mock test has no Speaking questions.")
                 sessionId = c.sessionId ?: sessionId
                 items = t.part1 + t.part2 + t.part3
+                // Continuing: skip what this session already answered (on the server or still uploading from this device).
+                val sid = sessionId
+                // ponytail: no session filter on /api/attempts, so page back (5 pages max); other practice since the mock started can push it off page 1.
+                val done = mutableListOf<AttemptListItem>()
+                try {
+                    for (pg in 1..5) {
+                        val page = api.attempts("speaking", pg)
+                        done += page.items
+                        if (page.items.isEmpty() || done.size >= page.total) break
+                    }
+                } catch (e: CancellationException) { throw e } catch (e: Exception) { /* offline: resume from this device's queue only */ }
+                val local = store.items.value.filter { it.sessionId == sid }
+                val ids = items.map { it.id }.toSet()
+                val server = answeredOnServer(done, sid) - local.map { it.promptId }.toSet()
+                answered = items.count { it.id in server }
+                // Recordings of this session still on the device join the upload list (and are retried), so the finish screen can complete.
+                uploads = local.filter { it.promptId in ids }.map { UploadItem(it.id, it.label) }
+                local.forEach { store.start(it, api) }
+                val next = resumeIndex(items, server + local.map { it.promptId })
+                if (next < 0) { phase = Phase.Finishing; return } // every part is answered: never record them again
+                index = next
             } else {
                 val source = api.sourceParam(graph.prefs.speakingSource.first())
                 val promptId = route.promptId
@@ -280,6 +307,8 @@ class SessionModel(
             phase = Phase.Ready
             return
         }
+        recToken = api.token.value
+        recOwner = api.me.value?.user?.id
         windows = mutableListOf()
         question = 0
         questionStart = 0.0
@@ -346,10 +375,19 @@ class SessionModel(
             createdAt = System.currentTimeMillis(), durationMs = r.durationMs, energy = r.energy.take(20000),
             marks = windows.map { it.startMs }.take(200), segments = windows.take(200),
             sessionId = if (isFull) sessionId else null, parentAttemptId = parent, mockId = route.mockId,
-            // Owner from memory, else a short /api/me lookup; still unknown (offline) is stamped at upload and dropped on sign-out.
-            ownerId = api.me.value?.user?.id ?: withTimeoutOrNull(3000) { currentUserId(api) },
+            // Owner bound at capture start, else a short /api/me lookup; still unknown (offline) is stamped at upload.
+            ownerId = recOwner ?: withTimeoutOrNull(3000) { currentUserId(api) },
         )
-        withContext(Dispatchers.IO) { store.add(rec) }
+        // An owner-less recording whose session ended meanwhile (sign-out, or a 401 on that lookup) is deleted, never left for
+        // the next account. Checked before and after the add: sign-out's dropUnowned may run on either side of it.
+        val ended = { rec.ownerId == null && api.token.value != recToken }
+        if (!ended()) withContext(Dispatchers.IO) { store.add(rec) }
+        if (ended()) {
+            withContext(Dispatchers.IO) { store.remove(rec.id) } // the m4a, and the metadata when it was added
+            startError = "You were signed out, so this recording wasn't kept."
+            phase = Phase.Ready
+            return
+        }
         uploads = uploads + UploadItem(rec.id, rec.label)
         store.start(rec, api)
         if (index + 1 < items.size) {

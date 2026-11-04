@@ -3,6 +3,11 @@ package com.soyeb.ieltspractice.media
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.Callable
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class PartRecording(val file: File, val durationMs: Int, val energy: List<Int>)
 
@@ -23,7 +28,13 @@ class LiveAudio {
         var broken = false
     }
 
-    private val lock = Any()
+    /**
+     * One worker owns the encoder: WebRTC's audio thread only copies PCM and queues it, so a slow encode, a part change or slow storage
+     * never blocks live audio. ponytail: 500 blocks = 5 s of backlog; past that blocks are dropped rather than queued without bound.
+     */
+    private val worker = ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, ArrayBlockingQueue(500)) { r -> Thread(r, "live-audio-encoder").apply { isDaemon = true } }
+        .apply { allowCoreThreadTimeOut(true) }
+    /** Touched only on [worker]. */
     private var part: PartSink? = null
     @Volatile private var rate = 48_000 // WebRTC's capture rate, known once the first samples arrive
 
@@ -37,20 +48,29 @@ class LiveAudio {
         rate = sampleRate
         onLevel?.invoke(levelOf(rmsOf(pcm, n)))
         if (!capturing || examinerSpeaking) return
-        synchronized(lock) {
-            part?.takeIf { it.rate == sampleRate && !it.broken }?.let {
-                try { it.writer.write(pcm, n); it.meter.feed(pcm, n) } catch (e: Exception) { it.broken = true }
+        try {
+            worker.execute {
+                part?.takeIf { it.rate == sampleRate && !it.broken }?.let {
+                    try { it.writer.write(pcm, n); it.meter.feed(pcm, n) } catch (e: Exception) { it.broken = true }
+                }
             }
-        }
+        } catch (e: RejectedExecutionException) { } // encoder 5 s behind: drop this block, never block the audio thread
     }
 
-    fun beginPart(file: File) { synchronized(lock) { part?.let { p -> runCatching { p.writer.finish() } }; part = PartSink(AacWriter(file, rate), Meter(rate), file, rate) } }
-
-    fun endPart(): PartRecording? = synchronized(lock) {
-        val p = part
-        part = null
-        if (p != null && runCatching { p.writer.finish() }.getOrDefault(false)) PartRecording(p.file, (p.meter.samples * 1000 / p.rate).toInt(), p.meter.energy) else null
+    /** Blocks the caller (Dispatchers.IO) until the worker has finished the queued blocks and closed the previous part. */
+    fun beginPart(file: File) {
+        val r = rate
+        worker.submit(Callable<Unit> { part?.let { p -> runCatching { p.writer.finish() } }; part = PartSink(AacWriter(file, r), Meter(r), file, r) }).get()
     }
 
-    fun stop() { synchronized(lock) { part?.let { p -> runCatching { p.writer.finish() } }; part = null } }
+    fun endPart(): PartRecording? = runCatching {
+        worker.submit(Callable<PartRecording?> {
+            val p = part
+            part = null
+            if (p != null && runCatching { p.writer.finish() }.getOrDefault(false)) PartRecording(p.file, (p.meter.samples * 1000 / p.rate).toInt(), p.meter.energy) else null
+        }).get()
+    }.getOrNull()
+
+    /** Blocks until the open part is closed, so its file can be deleted right after. */
+    fun stop() { runCatching { worker.submit(Callable<Unit> { part?.let { p -> runCatching { p.writer.finish() } }; part = null }).get() } }
 }

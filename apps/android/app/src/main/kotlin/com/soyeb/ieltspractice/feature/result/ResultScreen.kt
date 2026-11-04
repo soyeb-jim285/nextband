@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.data.UploadState
 import com.soyeb.ieltspractice.data.logic.notAssessed
 import com.soyeb.ieltspractice.data.model.Attempt
 import com.soyeb.ieltspractice.data.net.ApiError
@@ -39,6 +40,7 @@ import com.soyeb.ieltspractice.design.components.awaitStarted
 import com.soyeb.ieltspractice.design.components.nextPollMs
 import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.feature.speaking.SpeakingResult
+import com.soyeb.ieltspractice.feature.updates.MarkingRetries
 import com.soyeb.ieltspractice.feature.writing.WritingResult
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.SpeakingSession
@@ -53,7 +55,9 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun AttemptResultScreen(ids: List<String>, nav: Nav) {
-    val api = LocalGraph.current.api
+    val graph = LocalGraph.current
+    val api = graph.api
+    val saved by graph.pending.items.collectAsState()
     val demo = LocalDemo.current
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
@@ -112,6 +116,7 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
                     if (!(e is ApiError && e.status == 409)) { err = e; continue } // 409: already analysing from an earlier try
                 }
                 attempts[a.id] = a.copy(status = "analyzing", stage = null, error = null)
+                MarkingRetries.mark(a.id)
                 sent = true
             }
             if (sent) round++
@@ -133,9 +138,21 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
                 error != null && list.size < ids.size -> Shell(nav) { ErrorState(error.orEmpty(), onRetry = { round++ }) }
                 list.size < ids.size || first == null -> Shell(nav) { SkeletonList() }
                 unsent != null -> Shell(nav) {
-                    FailedState("This recording never finished uploading. Record it again from the Speaking tab.", retryable = false, onRetry = {})
+                    // The m4a is usually still on the device (a PUT or submit that failed): upload that instead of asking for a re-record.
+                    val local = saved.firstOrNull { it.attemptId == unsent.id }
+                    if (local != null) FailedState("This recording is saved on this device but didn't finish uploading.", retryable = true, onRetry = {
+                        scope.launch {
+                            if (graph.pending.upload(local, api) != null) round++
+                            else (graph.pending.states.value[local.id] as? UploadState.Failed)?.let { snack.showSnackbar(it.message) }
+                        }
+                    })
+                    else FailedState("This recording never finished uploading. Record it again from the Speaking tab.", retryable = false, onRetry = {})
                 }
-                failed.isNotEmpty() -> Shell(nav) { FailedState(failed.first().error, failed.all { it.retryable }, { retry(failed) }) }
+                // Retry the parts that can recover even when another part can't (mixed retryable flags).
+                failed.isNotEmpty() -> Shell(nav) {
+                    val again = failed.filter { it.retryable }
+                    FailedState((again.firstOrNull() ?: failed.first()).error, again.isNotEmpty(), { retry(again) })
+                }
                 busy != null -> Shell(nav) { AnalysingState(busy.stage, Skill.of(busy.skill) ?: Skill.Writing) }
                 first.skill == "speaking" && list.size == 1 && first.analysis?.let { notAssessed(it) } == true -> Shell(nav) {
                     NoSpeechState({ nav.startTest("speaking") { nav.replace(SpeakingSession("part${first.part}", first.promptId)) } })

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,9 +47,11 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -328,6 +331,8 @@ private fun labelled(label: String, text: String): AnnotatedString = buildAnnota
     withStyle(SpanStyle(color = NB.colors.muted)) { append(text) }
 }
 
+private val AXIS_W = 30.dp
+
 // MARK: Pace chart with the speaking timeline (web WpmChart in FluencyPanel.tsx)
 
 /**
@@ -345,59 +350,73 @@ private fun PaceCard(metrics: SpeechMetrics, timeline: Timeline, player: ResultP
     val focused = focus?.let { id -> timeline.markers.firstOrNull { it.id == id } }
     val lowest = series.minOfOrNull { it.wpm }?.roundToInt()
     val highest = series.maxOfOrNull { it.wpm }?.roundToInt()
+    val ticks = (50 until yMax.toInt() step 50).toList()
     NbCard {
-        Canvas(
-            Modifier.fillMaxWidth().height(180.dp)
-                .semantics {
-                    contentDescription = "Pace over time, from about $lowest to $highest words a minute. The typical band 7 range is 120 to 170."
-                    // The markers are tap-only on the canvas; TalkBack and switch users reach each one here.
-                    customActions = timeline.markers.map { m ->
-                        CustomAccessibilityAction("${m.type.label}: ${m.label} at ${clock(m.t.roundToInt())}") {
-                            onFocus(m.id); if (player.isLoaded) player.seek(max(0.0, m.t - 0.3)); true
-                        }
-                    }
+        Row(Modifier.fillMaxWidth()) {
+            // WPM scale; the canvas description already reads the range, so TalkBack skips these labels.
+            Box(Modifier.width(AXIS_W).height(180.dp).clearAndSetSemantics {}) {
+                for (v in ticks) {
+                    Text(
+                        "$v", Modifier.offset(y = 180.dp * (1f - (v / yMax).toFloat()) - 8.dp),
+                        style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted,
+                    )
                 }
-                .pointerInput(timeline, duration, player.isLoaded) {
-                    detectTapGestures { off ->
-                        val w = size.width.toFloat()
-                        val near = timeline.markers.minByOrNull { abs(w * (it.t / duration).toFloat() - off.x) }
-                        if (near != null && abs(w * (near.t / duration).toFloat() - off.x) <= 24.dp.toPx()) {
-                            onFocus(near.id)
-                            if (player.isLoaded) player.seek(max(0.0, near.t - 0.3))
-                        } else {
-                            onFocus(null)
-                            if (player.isLoaded) player.seek(duration * (off.x / w))
+            }
+            Canvas(
+                Modifier.weight(1f).height(180.dp)
+                    .semantics {
+                        contentDescription = "Pace over time, from about $lowest to $highest words a minute. The typical band 7 range is 120 to 170."
+                        // The markers are tap-only on the canvas; TalkBack and switch users reach each one here.
+                        customActions = timeline.markers.map { m ->
+                            CustomAccessibilityAction("${m.type.label}: ${m.label} at ${clock(m.t.roundToInt())}") {
+                                onFocus(m.id); if (player.isLoaded) player.seek(max(0.0, m.t - 0.3)); true
+                            }
                         }
                     }
-                },
-        ) {
-            val w = size.width
-            val h = size.height
-            fun x(t: Double) = (w * (t / duration)).toFloat()
-            fun y(v: Double) = (h - (v / yMax * h)).toFloat()
-            // typical band-7 pace
-            drawRect(c.brand.copy(alpha = 0.12f), Offset(0f, y(170.0)), Size(w, y(120.0) - y(170.0)))
-            for (p in timeline.pauses) drawRect(c.bad.copy(alpha = 0.14f), Offset(x(p.start), 0f), Size(max(2.dp.toPx(), x(p.end) - x(p.start)), h))
-            for (q in timeline.questions.drop(1)) {
-                drawLine(c.faint, Offset(x(q.start), 0f), Offset(x(q.start), h), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
-            }
-            val path = Path()
-            series.forEachIndexed { i, pt ->
-                val px = x(pt.t + 5)
-                if (i == 0) path.moveTo(px, y(pt.wpm)) else path.lineTo(px, y(pt.wpm))
-            }
-            drawPath(path, c.ink.copy(alpha = 0.85f), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            for (m in timeline.markers) {
-                val at = Offset(x(m.t), y(wpmAt(series, m.t)))
-                if (m.id == focus) drawCircle(c.ink, 9.dp.toPx(), at, style = Stroke(2.dp.toPx()))
-                drawMarker(m.type, at, 5.dp.toPx(), colors.getValue(m.type), c.surface)
-            }
-            if (player.isLoaded) {
-                val px = x(player.currentTime.coerceIn(0.0, duration))
-                drawLine(c.brand, Offset(px, 0f), Offset(px, h), 2.dp.toPx())
+                    .pointerInput(timeline, duration, player.isLoaded) {
+                        detectTapGestures { off ->
+                            val w = size.width.toFloat()
+                            val near = timeline.markers.minByOrNull { abs(w * (it.t / duration).toFloat() - off.x) }
+                            if (near != null && abs(w * (near.t / duration).toFloat() - off.x) <= 24.dp.toPx()) {
+                                onFocus(near.id)
+                                if (player.isLoaded) player.seek(max(0.0, near.t - 0.3))
+                            } else {
+                                onFocus(null)
+                                if (player.isLoaded) player.seek(duration * (off.x / w))
+                            }
+                        }
+                    },
+            ) {
+                val w = size.width
+                val h = size.height
+                fun x(t: Double) = (w * (t / duration)).toFloat()
+                fun y(v: Double) = (h - (v / yMax * h)).toFloat()
+                for (v in ticks) drawLine(c.line, Offset(0f, y(v.toDouble())), Offset(w, y(v.toDouble())), 1.dp.toPx())
+                // typical band-7 pace
+                drawRect(c.brand.copy(alpha = 0.12f), Offset(0f, y(170.0)), Size(w, y(120.0) - y(170.0)))
+                for (p in timeline.pauses) drawRect(c.bad.copy(alpha = 0.14f), Offset(x(p.start), 0f), Size(max(2.dp.toPx(), x(p.end) - x(p.start)), h))
+                for (q in timeline.questions.drop(1)) {
+                    drawLine(c.faint, Offset(x(q.start), 0f), Offset(x(q.start), h), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+                }
+                val path = Path()
+                series.forEachIndexed { i, pt ->
+                    // samples sit mid-window (t + 5s) but never past the end of the recording
+                    val px = x(min(pt.t + 5, duration))
+                    if (i == 0) path.moveTo(px, y(pt.wpm)) else path.lineTo(px, y(pt.wpm))
+                }
+                clipRect { drawPath(path, c.ink.copy(alpha = 0.85f), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)) }
+                for (m in timeline.markers) {
+                    val at = Offset(x(m.t), y(wpmAt(series, m.t)))
+                    if (m.id == focus) drawCircle(c.ink, 9.dp.toPx(), at, style = Stroke(2.dp.toPx()))
+                    drawMarker(m.type, at, 5.dp.toPx(), colors.getValue(m.type), c.surface)
+                }
+                if (player.isLoaded) {
+                    val px = x(player.currentTime.coerceIn(0.0, duration))
+                    drawLine(c.brand, Offset(px, 0f), Offset(px, h), 2.dp.toPx())
+                }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth().padding(start = AXIS_W, top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("0:00", style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
             Text(clock(duration.roundToInt()), style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
         }

@@ -1,7 +1,7 @@
 # NextBand for Android
 
 Native Kotlin + Jetpack Compose app with feature, flow and styling parity with the web app (`apps/web`, the reference for features,
-flow and copy) and the iOS app (`apps/ios`). Package `com.soyeb.ieltspractice`, minSdk 26, target/compile SDK 36.
+flow and copy) and the iOS app (`apps/ios`). Application ID `app.nextband` (Kotlin namespace `com.soyeb.ieltspractice`), minSdk 26, target/compile SDK 36.
 
 > **Android is built only on GitHub Actions.** Never run `./gradlew`, an emulator or `adb` on a dev laptop. See [CI](#ci-and-how-to-verify).
 
@@ -111,7 +111,7 @@ app assets at build time). `DemoInterceptor` uses the same lookup as iOS: exact 
 Launch extras (the iOS `-demo -screen -tab` equivalents):
 
 ```
-adb shell am start -n com.soyeb.ieltspractice/.MainActivity --ez demo true --es screen result-speaking --es tab Overview --es theme dark
+adb shell am start -n app.nextband/com.soyeb.ieltspractice.MainActivity --ez demo true --es screen result-speaking --es tab Overview --es theme dark
 ```
 
 `ScreenshotTest` renders every row of `screenCatalog` in light and dark at 412x915dp with Roborazzi on Robolectric (JVM, no emulator) into

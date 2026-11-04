@@ -24,7 +24,7 @@ class DraftStore(private val prefs: Prefs, private val owner: () -> String?) {
     /** An empty draft is removed rather than stored (a test that was opened and never written in leaves nothing behind). [meta] adds it to the hub list. */
     suspend fun save(promptId: String, draft: Draft, meta: DraftMeta? = null) = lock.withLock {
         val o = owner() ?: return@withLock
-        if (draft == Draft()) {
+        if (draft.text.isEmpty() && draft.plan.isEmpty()) {
             prefs.setString(key(o, promptId), null)
             writeIndex(o, readIndex(o).filter { it.promptId != promptId })
         } else {

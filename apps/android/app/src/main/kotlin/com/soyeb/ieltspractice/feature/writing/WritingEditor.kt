@@ -68,7 +68,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soyeb.ieltspractice.AppGraph
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
@@ -106,6 +110,7 @@ import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.WritingTask
+import com.soyeb.ieltspractice.design.components.awaitStarted
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -183,7 +188,14 @@ private fun ExamScreen(session: ExamSession, nav: Nav) {
         value = session.prompts.mapIndexed { i, p -> p.id to (if (demo != null) demoDraft(demo.screen, demo.tab, i) else store.load(p.id)) }.toMap()
     }
     val d = drafts
-    if (d == null) LoadingEditor(nav, null) {} else ExamBody(session, d, store, nav)
+    if (d == null) LoadingEditor(nav, null) {} else ExamBody(remember(d) { withDraftSession(session, d.values) }, d, store, nav)
+}
+
+/** The submit outlives rotation, a theme or font change and split-screen resizes: the recreated editor shows its progress and error. */
+class WritingSubmitHolder : ViewModel() {
+    val submitting = mutableStateOf(false)
+    val error = mutableStateOf<String?>(null)
+    val created = mutableMapOf<String, String>() // promptId to attemptId, so a retried submit never duplicates attempts
 }
 
 private val TextMapSaver = Saver<SnapshotStateMap<String, String>, HashMap<String, String>>(
@@ -209,7 +221,8 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     val multi = prompts.size > 1
     val total = examSeconds(prompts)
     val flags = remember { Flags() }
-    val created = remember { mutableMapOf<String, String>() } // promptId to attemptId, so a retried submit never duplicates attempts
+    val holder = viewModel<WritingSubmitHolder>(key = "w-submit:${session.sessionId}")
+    val created = holder.created
     // Saveable: rotation or fold/unfold keeps what was typed, even the last moments before the debounced autosave.
     val texts = rememberSaveable(saver = TextMapSaver) { mutableStateMapOf<String, String>().apply { prompts.forEach { put(it.id, initial[it.id]?.text.orEmpty()) } } }
     val plans = rememberSaveable(saver = TextMapSaver) { mutableStateMapOf<String, String>().apply { prompts.forEach { put(it.id, initial[it.id]?.plan.orEmpty()) } } }
@@ -221,8 +234,8 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     var showPlan by remember { mutableStateOf(variant == "Plan") }
     var showTask by remember { mutableStateOf(false) }
     var showExit by remember { mutableStateOf(false) }
-    var submitting by remember { mutableStateOf(false) }
-    var submitError by remember { mutableStateOf<String?>(null) }
+    var submitting by holder.submitting
+    var submitError by holder.error
 
     fun toast(text: String) {
         snack.currentSnackbarData?.dismiss()
@@ -235,14 +248,16 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     // Wall clock, not ticks: the deadline is startedAt + seconds, so backgrounding or a throttled loop can't drift it.
     val startedAt = session.startedAt
     var now by remember { mutableLongStateOf(if (demo != null) startedAt + demoElapsed(variant, total) * 1000L else System.currentTimeMillis()) }
-    LaunchedEffect(session) { if (demo == null) while (true) { now = System.currentTimeMillis(); delay(250) } }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // Paused in the background (no wake-ups, no clock PATCHes); the first tick back catches up from the wall clock.
+    LaunchedEffect(session) { if (demo == null) while (true) { lifecycle.awaitStarted(); now = System.currentTimeMillis(); delay(250) } }
     val left = remember { derivedStateOf { secondsLeft(total, startedAt, now) } }
 
     // Autosave: a moment after typing stops, whenever the app goes to the background, and when the screen closes.
     fun persist() {
         if (flags.submitted || demo != null) return
         val items = prompts.map { q ->
-            Triple(q.id, Draft(texts[q.id].orEmpty(), plans[q.id].orEmpty()), DraftMeta(q.id, q.part, q.title, q.variant, pairId = prompts.firstOrNull { it.id != q.id }?.id).takeIf { session.mockId == null })
+            Triple(q.id, Draft(texts[q.id].orEmpty(), plans[q.id].orEmpty(), session.sessionId), DraftMeta(q.id, q.part, q.title, q.variant, pairId = prompts.firstOrNull { it.id != q.id }?.id).takeIf { session.mockId == null })
         }
         graph.scope.launch { items.forEach { (id, d, meta) -> store.save(id, d, meta) } }
     }
@@ -257,7 +272,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
         val used = ((System.currentTimeMillis() - startedAt) / 1000).toInt()
         graph.scope.launch { runCatching { api.mockWritingClock(mockId, used) } }
     }
-    LaunchedEffect(session) { if (mockId != null && demo == null) while (true) { delay(15_000); saveClock() } }
+    LaunchedEffect(session) { if (mockId != null && demo == null) while (true) { delay(15_000); lifecycle.awaitStarted(); saveClock() } }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { saveClock() }
     DisposableEffect(Unit) { onDispose { saveClock() } }
 
@@ -274,7 +289,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
         val items = prompts.map { q -> Triple(q, texts[q.id].orEmpty(), plans[q.id].orEmpty()) }
         // The attempt ids also live in prefs, so a retry after rotation, process death or reopening the mock never creates a second attempt.
         val createdKey = "wcreated:${session.sessionId}"
-        scope.launch {
+        holder.viewModelScope.launch {
             try {
                 if (created.isEmpty()) graph.prefs.getString(createdKey)?.split(",")?.forEach { kv ->
                     kv.split("=").takeIf { it.size == 2 }?.let { created[it[0]] = it[1] }

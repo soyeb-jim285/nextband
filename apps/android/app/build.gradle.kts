@@ -24,7 +24,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.soyeb.ieltspractice"
+        applicationId = "app.nextband" // the Play listing id (Dolphin Commerce owns nextband.app); the Kotlin namespace stays com.soyeb.ieltspractice
         minSdk = 26
         targetSdk = 36
         // CI passes -Pnextband.versionCode=<run number>: every Play upload needs a higher code than the last.

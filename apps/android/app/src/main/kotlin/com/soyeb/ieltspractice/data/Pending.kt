@@ -175,21 +175,24 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
         _states.update { s -> if (s[rec.id] is UploadState.Uploading) { busy = true; s } else { busy = false; s + (rec.id to UploadState.Uploading) } }
         if (busy) return null
         var p = _items.value.firstOrNull { it.id == rec.id } ?: rec
+        // Every request below is sent with this session's token only: a sign-out or account switch mid-upload fails it (the
+        // recording stays its owner's), so an expired upload URL can never create the replacement attempt in another account.
+        val token = api.token.value
         val uid = currentUserId(api)
-        blockedReason(p, uid)?.let { msg ->
+        (blockedReason(p, uid) ?: Api.SESSION_CHANGED.takeIf { token == null || api.token.value != token })?.let { msg ->
             _states.update { it + (p.id to UploadState.Failed(msg)) }
             return null
         }
         if (p.ownerId == null) p = p.copy(ownerId = uid).also(::add)
         // Creating an attempt reserves nothing (the quota is taken at submit), so a fresh one can replace an expired upload URL.
         suspend fun create(from: PendingRecording): PendingRecording {
-            val created: Created = api.send("POST", "/api/attempts", buildJsonObject {
+            val created = AppJson.decodeFromString(Created.serializer(), api.raw("POST", "/api/attempts", buildJsonObject {
                 put("promptId", from.promptId); put("skill", "speaking"); put("part", from.part); put("mode", "practice")
                 put("audioContentType", "audio/mp4")
                 from.sessionId?.let { put("sessionId", it) }
                 from.mockId?.let { put("mockId", it) }
                 from.parentAttemptId?.let { put("parentAttemptId", it) }
-            })
+            }, asToken = token).body)
             val url = created.uploadUrl ?: throw ApiError(0, "The server didn't return an upload URL.")
             return from.copy(attemptId = created.id, uploadUrl = url).also(::write)
         }
@@ -202,7 +205,7 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
                 } catch (e: ApiError) {
                     // The presigned PUT lives 5-15 minutes; a later retry gets 400/401/403. Swap the half-made attempt for a fresh one.
                     if (e.status !in 400..403) throw e
-                    p.attemptId?.let { runCatching { api.deleteAttempt(it) } }
+                    p.attemptId?.let { runCatching { api.raw("DELETE", "/api/attempts/$it", asToken = token) } }
                     p = create(p.copy(attemptId = null, uploadUrl = null))
                     api.upload(p.uploadUrl!!, audioFile(p.id), "audio/mp4")
                 }
@@ -210,7 +213,7 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
             }
             val attemptId = p.attemptId ?: throw ApiError(0, "Couldn't start the upload.")
             try {
-                api.raw("POST", "/api/attempts/$attemptId/submit", submitBody(p.durationMs, p.energy, p.marks, p.segments))
+                api.raw("POST", "/api/attempts/$attemptId/submit", submitBody(p.durationMs, p.energy, p.marks, p.segments), asToken = token)
             } catch (e: ApiError) {
                 // 409: an earlier submit already went through and only its response was lost.
                 if (e.status != 409) throw e

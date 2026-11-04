@@ -83,8 +83,11 @@ fun looksPasted(old: String, new: String) = insertedLength(old, new) >= PASTE_CH
 
 // MARK: Drafts
 
-/** Essay and plan live under one key per prompt as JSON (`draft:{promptId}`, same shape as web and the old app). */
-@Serializable data class Draft(val text: String = "", val plan: String = "")
+/**
+ * Essay and plan live under one key per prompt as JSON (`draft:{promptId}`, same shape as web and the old app).
+ * [sessionId]: the editor session that wrote it, so reopening the draft reuses the attempts that session already created.
+ */
+@Serializable data class Draft(val text: String = "", val plan: String = "", val sessionId: String? = null)
 
 fun encodeDraft(d: Draft): String = AppJson.encodeToString(Draft.serializer(), d)
 
@@ -130,6 +133,10 @@ fun ago(thenMs: Long, nowMs: Long): String {
 
 /** A running exam: the prompts and the wall-clock start, saved across configuration changes so a rotation never reshuffles the task. */
 @Serializable data class ExamSession(val prompts: List<Prompt>, val startedAt: Long, val sessionId: String, val parentId: String? = null, val mockId: String? = null)
+
+/** A reopened (non-mock) draft continues its first session: attempt ids saved under `wcreated:<sessionId>` are reused, never created twice. */
+fun withDraftSession(s: ExamSession, drafts: Collection<Draft>): ExamSession =
+    if (s.mockId != null) s else drafts.firstNotNullOfOrNull { it.sessionId }?.let { s.copy(sessionId = it) } ?: s
 
 /** The task title unless the body already opens with it or the figure repeats it (seeded titles are the body's first sentence, cut with an ellipsis). */
 fun showPromptTitle(p: Prompt, chartTitle: String?): Boolean {

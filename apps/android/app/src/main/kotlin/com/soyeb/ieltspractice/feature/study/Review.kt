@@ -118,7 +118,9 @@ internal class DrillSession(private val api: Api, private val scope: CoroutineSc
     val card: DueCard? get() = if (ended) null else queue.getOrNull(index)
     val finished: Boolean get() = card == null && done.isNotEmpty()
     /** Ahead of schedule every card counts, so "more" is what this visit has not drilled yet. */
-    val more: Int get() = if (route.ahead) batch.count { c -> done.none { it.first.id == c.id } } else dueTotal
+    val more: Int get() = if (route.ahead) batch.count { c -> c.id !in drilled && done.none { it.first.id == c.id } } else dueTotal
+    /** Ahead of schedule: every card drilled in earlier batches of this visit, so "Keep going" never offers them again. */
+    private var drilled by mutableStateOf<Set<String>>(emptySet())
 
     suspend fun load(skip: Set<String> = emptySet()) {
         loading = queue.isEmpty()
@@ -140,7 +142,7 @@ internal class DrillSession(private val api: Api, private val scope: CoroutineSc
     }
 
     fun keepGoing() {
-        val drilled = if (route.ahead) done.map { it.first.id }.toSet() else emptySet()
+        if (route.ahead) drilled = drilled + done.map { it.first.id }
         done = emptyList(); ended = false; queue = emptyList()
         scope.launch { load(drilled) }
     }
@@ -218,7 +220,9 @@ fun ReviewScreen(nav: Nav, route: Review) {
             if (account && card != null) VerdictBar(s, card, say)
             else if (account && s.finished) StickyActionBar {
                 if (s.more > 0) NbButton("Keep going · ${if (route.ahead) "${s.more} more" else "${s.more} ${plural(s.more, "card")} due"}", s::keepGoing, fill = true, size = BtnSize.Large)
-                NbButton("Back to your plan", { nav.go(CoachRoute) }, kind = if (s.more > 0) BtnKind.Text else BtnKind.Primary, fill = true, size = if (s.more > 0) BtnSize.Medium else BtnSize.Large)
+                // Only the Study plan opened from it gets "Back to your plan"; from Today, You, Patterns, etc. just go back.
+                val fromPlan = remember { nav.onStack(CoachRoute) }
+                NbButton(if (fromPlan) "Back to your plan" else "Done", { if (fromPlan) nav.backTo(CoachRoute) else nav.back() }, kind = if (s.more > 0) BtnKind.Text else BtnKind.Primary, fill = true, size = if (s.more > 0) BtnSize.Medium else BtnSize.Large)
             }
         },
     ) { pad ->

@@ -191,12 +191,16 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?, email: String? = null) {
         f.banner = null; f.codeIssue = null; f.code = ""; f.tried = false; f.exists = false
     }
     fun close() { if (reason != null) nav.authFinished(false) else nav.back() }
-    fun leave() { if (step.top) close() else go(AuthStep.SignIn) }
+    // The step Auth opened at closes too (Settings > Delete account > Forgot password: back returns to Settings, not a sign-in form).
+    val closes = step.top || step == stepOf(mode)
+    fun leave() { if (closes) close() else go(AuthStep.SignIn) }
     BackHandler { leave() }
 
     /** Signed in: continue what the guest was doing, or land on Today (Onboarding the first time). */
     fun finished() {
-        if (reason != null) nav.authFinished(true)
+        // After an expired session, only the same account continues where it was; another account starts clean (Nav.reset).
+        val sameAccount = api.expiredUser.let { it == null || it == api.me.value?.user?.id }
+        if (reason != null && sameAccount) nav.authFinished(true)
         else scope.launch {
             val me = api.me.value ?: runCatching { api.loadMe() }.getOrNull()
             val needs = if (me == null) !prefs.onboardingDone.first() // profile didn't load: the device flag is the best guess
@@ -310,7 +314,7 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?, email: String? = null) {
         BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 96.dp, y = (-40).dp).size(300.dp))
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.statusBarsPadding().padding(start = 4.dp, end = NB.space.gutter, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                NbIconButton(if (step.top) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack, if (step.top) "Close" else "Back to sign in", ::leave, tint = onHero)
+                NbIconButton(if (closes) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack, if (closes) "Close" else "Back to sign in", ::leave, tint = onHero)
                 Spacer(Modifier.weight(1f))
                 Logo(height = 24.dp, dark = true)
             }

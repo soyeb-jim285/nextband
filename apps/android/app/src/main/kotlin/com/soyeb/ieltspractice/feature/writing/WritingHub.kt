@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,7 +45,10 @@ import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.CardTone
 import com.soyeb.ieltspractice.design.components.ConfirmDialog
+import com.soyeb.ieltspractice.design.components.EmptyState
+import com.soyeb.ieltspractice.design.components.ErrorState
 import com.soyeb.ieltspractice.design.components.IconTile
+import com.soyeb.ieltspractice.design.components.Load
 import com.soyeb.ieltspractice.design.components.MockStrip
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
@@ -56,6 +60,7 @@ import com.soyeb.ieltspractice.design.components.RowGroup
 import com.soyeb.ieltspractice.design.components.SectionHeader
 import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.design.components.SkillTile
+import com.soyeb.ieltspractice.design.components.Skeleton
 import com.soyeb.ieltspractice.design.components.TabScreen
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.rememberLoad
@@ -69,7 +74,7 @@ import com.soyeb.ieltspractice.nav.You
 import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.coroutines.launch
 
-private class HubData(val drafts: List<DraftMeta>, val recent: List<AttemptListItem>, val mock: Mock?)
+private class HubData(val drafts: List<DraftMeta>, val mock: Mock?)
 
 private class TaskKind(
     val title: String, val meta: String, val blurb: String, val types: List<String>, val icon: ImageVector,
@@ -116,19 +121,21 @@ fun WritingHub(nav: Nav) {
         if (demo == null && api.isSignedIn) currentUserId(api) // the drafts are keyed by the account id
         HubData(
             drafts = store.index(),
-            recent = if (!account) emptyList() else runCatching {
-                api.attempts("writing", 1).items.filter { it.status == "done" || it.status == "analyzing" }.take(3)
-            }.getOrDefault(emptyList()),
             mock = runCatching { api.mockCurrent() }.getOrNull()?.takeIf { it.open },
         )
     }
     val data = load.value
+    // Its own loader, so a failed fetch shows an error with Retry instead of looking like "no results" (a reload keeps the old rows).
+    val recentLoad = rememberLoad(account) {
+        if (!account) emptyList<AttemptListItem>()
+        else api.attempts("writing", 1).items.filter { it.status == "done" || it.status == "analyzing" }.take(3)
+    }
     val tasks = if (variant == "general") listOf(general, academic, essay) else listOf(academic, general, essay)
 
     TabScreen(
         "Writing",
         actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(me?.user?.name?.takeIf { !guest && it.isNotBlank() }, Modifier.padding(end = 8.dp), onClick = { nav.go(You) }) },
-        refreshing = load.refreshing, onRefresh = load.reload,
+        refreshing = load.refreshing || recentLoad.refreshing, onRefresh = { load.reload(); recentLoad.reload() },
     ) {
         item {
             val m = data?.mock
@@ -180,7 +187,7 @@ fun WritingHub(nav: Nav) {
                             { nav.startTest("writing") { nav.go(WritingTask(if (k.part == 1) "task1" else "task2", k.variant)) } },
                             Modifier.weight(1f), kind = BtnKind.Secondary,
                         )
-                        NbButton("Choose from bank", { nav.go(Bank("writing", k.part)) }, Modifier.weight(1f), kind = BtnKind.Outline)
+                        NbButton("Choose from bank", { nav.go(Bank("writing", k.part, k.variant)) }, Modifier.weight(1f), kind = BtnKind.Outline)
                     }
                 }
             }
@@ -204,10 +211,19 @@ fun WritingHub(nav: Nav) {
                 }
             }
         }
-        val recent = data?.recent.orEmpty()
-        if (recent.isNotEmpty()) {
-            item { SectionHeader("Recent results", Modifier.padding(top = 12.dp), action = "See all", onAction = { nav.go(History("writing")) }) }
-            item {
+        if (account) item { SectionHeader("Recent results", Modifier.padding(top = 12.dp), action = "See all", onAction = { nav.go(History("writing")) }) }
+        val recent = recentLoad.value.orEmpty()
+        when {
+            !account -> {}
+            recentLoad.state is Load.Loading -> item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Skeleton(Modifier.fillMaxWidth(), height = 64.dp, corner = 16.dp)
+                    Skeleton(Modifier.fillMaxWidth(), height = 64.dp, corner = 16.dp)
+                }
+            }
+            recentLoad.state is Load.Failed -> item { ErrorState((recentLoad.state as Load.Failed).message, recentLoad.reload) }
+            recent.isEmpty() -> item { EmptyState(Icons.Rounded.EditNote, "No writing results yet", "Submit a task and its band will show up here.") }
+            else -> item {
                 RowGroup {
                     recent.forEachIndexed { i, a ->
                         if (i > 0) RowDivider()

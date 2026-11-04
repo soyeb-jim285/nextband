@@ -20,12 +20,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -109,11 +112,16 @@ fun KeepScreenOn(on: Boolean = true) {
 
 // MARK: Rings and meters
 
-/** A progress ring with [content] in the middle. [progress] is 0..1. */
+/**
+ * A progress ring with [content] in the middle. [progress] is 0..1.
+ * The diameter grows with the font scale so a large-text clock still fits on one line, capped at the available width.
+ */
 @Composable
 fun TimerRing(progress: Float, color: Color, ringSize: Dp, stroke: Dp, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val track = NB.colors.surface3
-    Box(modifier.size(ringSize), contentAlignment = Alignment.Center) {
+    // ponytail: linear fontScale over-estimates Android 14 nonlinear sp, so the ring is a little roomy at 200%, never too small.
+    val diameter = ringSize * LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Box(modifier.widthIn(max = diameter).aspectRatio(1f), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val sw = stroke.toPx()
             val arc = Size(this.size.width - sw, this.size.height - sw)

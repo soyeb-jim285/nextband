@@ -11,6 +11,18 @@ import java.time.ZoneId
 /** createdAt is when the attempt started (a speaking test runs ~15 min), and marking takes a minute or two. */
 val STUCK_MARKING: Duration = Duration.ofHours(1)
 
+/**
+ * When this process last resent each attempt for marking (ResultScreen "Try marking again"). The server keeps createdAt on a
+ * retry, so without this a retried attempt older than [STUCK_MARKING] would read as failed while it is marking.
+ */
+// ponytail: in memory, lost on process death (then an old retry shows failed until it lands). Upgrade path: the server
+// exposing when analysis last started.
+object MarkingRetries {
+    private val at = java.util.concurrent.ConcurrentHashMap<String, Instant>()
+    fun mark(id: String, now: Instant = Clocks.now()) { at[id] = now }
+    fun snapshot(): Map<String, Instant> = HashMap(at)
+}
+
 enum class UpdateKind { Marking, Failed, Result, Cards, Mock, Exam }
 
 /** One line in the Updates sheet. [item] for attempt rows; [n] = cards due or days to the exam; [mockId] for Mock, and on Exam when a mock is already open. */
@@ -20,13 +32,15 @@ data class UpdateRow(val kind: UpdateKind, val key: String, val item: HistoryIte
 }
 
 /** [attempts] newest first (mergeItems). Attempts from the last 3 days; at most 4 results. */
-fun buildUpdates(due: Int, mockId: String?, attempts: List<HistoryItem>, examDate: String?, now: Instant = Clocks.now(), zone: ZoneId = Clocks.zone()): List<UpdateRow> {
+fun buildUpdates(due: Int, mockId: String?, attempts: List<HistoryItem>, examDate: String?, now: Instant = Clocks.now(), zone: ZoneId = Clocks.zone(), retried: Map<String, Instant> = MarkingRetries.snapshot()): List<UpdateRow> {
     val since = now.minus(Duration.ofDays(3))
     // ponytail: the server never moves a stuck marking to failed, so one older than STUCK_MARKING counts as failed here;
     // otherwise the bell would poll every 30 s for 3 days. Upgrade path: a server sweep setting stale 'analyzing' to 'failed'.
     val stuck = now.minus(STUCK_MARKING)
-    val recent = attempts.filter { (it.instant ?: Instant.EPOCH) > since }.map {
-        if (it.status == HStatus.Analysing && (it.instant ?: Instant.EPOCH) < stuck) it.copy(status = HStatus.Failed) else it
+    // A retry restarts the marking clock (and keeps the attempt in the 3-day window).
+    fun started(h: HistoryItem) = maxOf(h.instant ?: Instant.EPOCH, retried[h.id] ?: Instant.EPOCH)
+    val recent = attempts.filter { started(it) > since }.map {
+        if (it.status == HStatus.Analysing && started(it) < stuck) it.copy(status = HStatus.Failed) else it
     }
     val days = daysToExam(examDate, now, zone)?.takeIf { it in 0..30 }
     return buildList {

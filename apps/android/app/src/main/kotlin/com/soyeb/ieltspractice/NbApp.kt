@@ -155,12 +155,15 @@ private fun AppShell(graph: AppGraph, start: Any) {
     // Back in the foreground: re-read the plan and limits (/api/me carries the quota), so Pro bought on nextband.app shows
     // without a restart. Also runs once when the shell first appears; never in demo/screenshot runs (fixtures stay put).
     val live = LocalDemo.current == null
+    val pausedAt = remember { longArrayOf(0L) }
     LifecycleResumeEffect(hasAccount) {
         // Plan runs its own recheck on resume (with a "Checking…" state), so skip it there; skip too when /api/me just
-        // answered (cold start: restoreSession has loaded it).
+        // answered (cold start: restoreSession has loaded it). Away 10 s or more (long enough to buy Pro on the website)
+        // always re-reads, however fresh the last answer was; a quick permission dialog keeps the 30 s cache.
         val onPlan = controller.currentBackStackEntry?.destination?.hasRoute(Plan::class) == true
-        if (hasAccount && live && !onPlan) graph.scope.launch { runCatching { graph.api.loadMeIfStale() } }
-        onPauseOrDispose { }
+        val away = pausedAt[0] > 0 && System.currentTimeMillis() - pausedAt[0] >= 10_000
+        if (hasAccount && live && !onPlan) graph.scope.launch { runCatching { graph.api.loadMeIfStale(if (away) 0L else 30_000L) } }
+        onPauseOrDispose { pausedAt[0] = System.currentTimeMillis() }
     }
 
     // The server ended the session (expired account, purged guest): say so instead of quietly flipping to the guest state.

@@ -38,6 +38,13 @@ fun zoneHint(part: Int, s: Int): String {
 /** The ring's full circle: P2 2:00, P3 1:00, P1 0:40. */
 fun ringMax(part: Int): Double = if (part == 2) P2_MAX_SECONDS else if (part == 3) 60.0 else 40.0
 
+/** A resumed mock Speaking test starts at the first question not answered yet, so answered parts are never retaken (and charged) again. -1 = all answered. */
+fun resumeIndex(items: List<Prompt>, answered: Set<String>): Int = items.indexOfFirst { it.id !in answered }
+
+/** Prompts this session answered on the server. A "recording" attempt has no audio there yet (its upload failed somewhere), so it is still open. */
+fun answeredOnServer(attempts: List<AttemptListItem>, sessionId: String): Set<String> =
+    attempts.filter { it.sessionId == sessionId && it.status != "recording" }.map { it.promptId }.toSet()
+
 /** "Part 1, 2 of 3" for a Part 1 topic in a multi-topic test, else "Part N". */
 fun partLabel(items: List<Prompt>, i: Int): String {
     val p = items.getOrNull(i) ?: return "Speaking"
