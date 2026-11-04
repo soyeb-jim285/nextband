@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { queryClient } from '@/lib/query';
+import { streakChanged } from '@/lib/streak';
 import { cleanAudio, loadAudio, saveAudioLocal, type AudioState } from '@/lib/audioPos';
 import type { LrAttempt, LrResponses } from '@/lib/lr';
 
@@ -143,6 +144,7 @@ export function useLrSession(attempt: LrAttempt, lateFrom: { current: number }, 
       queryClient.setQueryData(['lr-attempt', id], res);
       void queryClient.invalidateQueries({ queryKey: ['lr-tests'] });
       void queryClient.invalidateQueries({ queryKey: ['lr-attempts'] });
+      streakChanged();
       if (mockId) void queryClient.invalidateQueries({ queryKey: ['mock'] });
       // Inside a mock test the next stop is the mock's transition screen, not this section's result.
       await (mockId ? navigate({ to: '/mock/$id', params: { id: mockId }, replace: true }) : navigate({ to: '/lr/result/$attemptId', params: { attemptId: id }, replace: true }));

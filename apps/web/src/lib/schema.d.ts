@@ -78,6 +78,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/guest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete the current guest and all its data (guests only) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+                /** @description Not a guest: accounts delete with their password */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -5363,6 +5409,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/streak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Practice streak in the student's time zone: count, freezes, this week, this month, repair offer. Guests too.
+         * @description A practice day is a submitted test part, 5 drill cards graded, or 10+ minutes of Listening/Reading. docs/engagement/notifications-and-streaks.md §3
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Streak */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Streak"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7484,6 +7569,49 @@ export interface components {
              * @enum {boolean}
              */
             acceptTerms: true;
+        };
+        Streak: {
+            /** @description Today in the student's time zone (the calendar every other field uses) */
+            date: string;
+            current: number;
+            longest: number;
+            /** @description Saved freezes (0-2): 1 earned per 7 days in a row; a missed day uses one */
+            freezes: number;
+            /** @enum {string} */
+            today: "done" | "pending";
+            /** @description Monday to Sunday of the current local week; today = not practised yet */
+            week: {
+                /** @description YYYY-MM-DD in the student's time zone */
+                day: string;
+                /** @enum {string} */
+                state: "done" | "frozen" | "missed" | "today" | "future";
+            }[];
+            /** @description Every day of the current local month (kept for older clients; `days` covers it) */
+            month: {
+                /** @description YYYY-MM-DD in the student's time zone */
+                day: string;
+                /** @description 0 none, 1 drills only, 2 a test, 3 a test plus drills (or 3+ tests) */
+                level: number;
+            }[];
+            /** @description The last 182 local days ending today, oldest first (6-month heatmap); frozen = a freeze or repair covered this missed day */
+            days: {
+                /** @description YYYY-MM-DD in the student's time zone */
+                day: string;
+                /** @description 0 none, 1 drills only, 2 a test, 3 a test plus drills (or 3+ tests) */
+                level: number;
+                frozen: boolean;
+            }[];
+            /** @description Practice days in the last 35 local days, today included */
+            practicedLast35: number;
+            nextMilestone: number | null;
+            /** @description Broken streak with no freeze: practise on 2 separate days before `until` to get `target` back */
+            repair: {
+                target: number;
+                until: string;
+                daysDone: number;
+            } | null;
+            /** @description A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today */
+            justReached?: number;
         };
     };
     responses: never;

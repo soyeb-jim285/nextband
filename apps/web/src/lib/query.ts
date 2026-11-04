@@ -55,6 +55,9 @@ export const meQuery = queryOptions({
   staleTime: 5 * 60_000,
 });
 
+/** Dashboard stats (band trend, minutes, ...). Account only. */
+export const progressQuery = queryOptions({ queryKey: ['progress'], queryFn: () => call(client.GET('/api/progress')), staleTime: 0 });
+
 /** Current user + settings, or null for a guest. Resolved by the `_app` layout loader. Pages behind `requireSignIn` can rely on it being set (`data!`). */
 export const useMe = () => useQuery(meQuery);
 

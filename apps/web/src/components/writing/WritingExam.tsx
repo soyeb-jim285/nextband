@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { blockerOf, type Blocker } from '@/lib/community';
 import { formatClock, plural } from '@/lib/format';
 import { queryClient, useMe } from '@/lib/query';
+import { streakChanged } from '@/lib/streak';
 import { minWords, SUBMIT_FLOOR, taskLabel } from '@/lib/writing';
 import { PromptPanel, type WritingPrompt } from './PromptPanel';
 import { countWords, NO_ASSIST, useDrafts, WritingEditor } from './WritingEditor';
@@ -108,6 +109,7 @@ export function WritingExam({
       }
       clear();
       void queryClient.invalidateQueries({ queryKey: ['quota'] }); // this test is now used
+      streakChanged();
       if (mockId) {
         void queryClient.invalidateQueries({ queryKey: ['mock'] });
         void navigate({ to: '/mock/$id', params: { id: mockId }, replace: true });

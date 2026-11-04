@@ -15,7 +15,8 @@ import * as feedback from './feedback';
 import * as mock from './mock';
 import * as coach from './coach';
 import * as pay from './pay';
+import * as streak from './streak';
 
 export function registerRoutes(app: App) {
-  for (const m of [me, settings, prompts, attempts, live, progress, mistakes, cards, community, lr, admin, replay, feedback, mock, coach, pay]) m.register(app);
+  for (const m of [me, settings, prompts, attempts, live, progress, mistakes, cards, community, lr, admin, replay, feedback, mock, coach, pay, streak]) m.register(app);
 }

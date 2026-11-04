@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, pgEnum, text, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex, real, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, pgEnum, text, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex, real, primaryKey, date } from 'drizzle-orm/pg-core';
 
 const id = () => text('id').primaryKey().$defaultFn(() => crypto.randomUUID());
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
@@ -546,3 +546,25 @@ export const payments = pgTable('payments', {
   createdAt: createdAt(),
   paidAt: timestamp('paid_at', { withTimezone: true }),
 }, (t) => [index('payments_user_idx').on(t.userId, t.createdAt)]);
+
+// ---------- Streaks (docs/engagement/notifications-and-streaks.md §3; src/streaks.ts) ----------
+// One row per local day (the student's timeZone, default Asia/Dhaka) with anything practised; a "practice day" is tests>=1 or drills>=5 or minutes>=10.
+export const activityDays = pgTable('activity_days', {
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  day: date('day', { mode: 'string' }).notNull(),
+  tests: integer('tests').notNull().default(0),
+  drills: integer('drills').notNull().default(0),
+  minutes: integer('minutes').notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.userId, t.day] })]);
+
+// Cache of streaks.ts replay over activity_days (rewritten on every record/read); read by later sweeps without replaying.
+export const streaks = pgTable('streaks', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  current: integer('current').notNull().default(0),
+  longest: integer('longest').notNull().default(0),
+  lastDay: date('last_day', { mode: 'string' }),
+  freezes: integer('freezes').notNull().default(0),
+  frozenDays: date('frozen_days', { mode: 'string' }).array().notNull().default(sql`'{}'::date[]`),
+  repairUntil: timestamp('repair_until', { withTimezone: true }),
+  updatedAt: updatedAt(),
+});

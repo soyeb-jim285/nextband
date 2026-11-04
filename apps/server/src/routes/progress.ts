@@ -4,23 +4,11 @@ import { and, count, desc, eq, gt, gte, ne, sql } from 'drizzle-orm';
 import { currentUser, requireAccount } from '../auth';
 import { db } from '../db/client';
 import { analyses, attempts, mistakes } from '../db/schema';
+import { getStreak } from '../streaks';
 import type { App } from '../types';
 
 const Skill = z.enum(['speaking', 'writing']);
 const DAY = 864e5;
-const dayStr = (t: number) => new Date(t).toISOString().slice(0, 10);
-
-/** Consecutive days (YYYY-MM-DD, newest first) with activity, ending today or yesterday. ponytail: UTC days; pass the user's TZ if it matters. */
-export function streak(days: string[], now = Date.now()) {
-  let t = days[0] === dayStr(now) ? now : now - DAY;
-  let n = 0;
-  for (const d of days) {
-    if (d !== dayStr(t)) break;
-    n++;
-    t -= DAY;
-  }
-  return n;
-}
 
 const Progress = z
   .object({
@@ -64,9 +52,7 @@ export function register(app: App) {
           .where(and(eq(attempts.userId, uid), eq(attempts.status, 'done'), eq(attempts.skill, s), gt(analyses.overall, 0)))
           .orderBy(desc(attempts.createdAt))
           .limit(5);
-      const day = sql<string>`to_char(${attempts.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`;
-
-      const [trend, days, [week], [total], topMistakes, sp, wr, [last]] = await Promise.all([
+      const [trend, st, [week], [total], topMistakes, sp, wr, [last]] = await Promise.all([
         db
           .select({ attemptId: attempts.id, date: attempts.createdAt, skill: attempts.skill, part: attempts.part, overall: analyses.overall, criteria: analyses.criteria, sessionId: attempts.sessionId })
           .from(attempts)
@@ -74,7 +60,7 @@ export function register(app: App) {
           .where(assessed)
           .orderBy(desc(attempts.createdAt))
           .limit(30),
-        db.selectDistinct({ day }).from(attempts).where(done).orderBy(desc(day)).limit(400),
+        getStreak(uid).catch((e) => (console.error('progress streak', uid, (e as Error).message), { current: 0 })), // same streak as GET /api/streak; a streak error never fails the dashboard
         // Only measured time (recording length, editor time sent with the submit): a missing duration counts 0, not the task's time limit.
         db.select({ ms: sql<string>`coalesce(sum(${attempts.durationMs}), 0)` }).from(attempts).where(and(done, gte(attempts.createdAt, sql`date_trunc('week', now())`))),
         db.select({ n: count() }).from(attempts).innerJoin(analyses, eq(analyses.attemptId, attempts.id)).where(assessed),
@@ -116,7 +102,7 @@ export function register(app: App) {
       return c.json(
         {
           trend: trend.reverse().map(({ sessionId: _, ...t }) => ({ ...t, date: t.date.toISOString() })),
-          streak: streak(days.map((d) => d.day)),
+          streak: st.current,
           minutesThisWeek: Math.ceil(Number(week?.ms ?? 0) / 60000),
           attempts: total?.n ?? 0,
           weakest,

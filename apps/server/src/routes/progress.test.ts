@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { db } from '../db/client';
 import { analyses, attempts, mistakes } from '../db/schema';
 import { req, seedPrompt, testUser } from '../test/helpers';
-import { streak } from './progress';
+import { recordActivity } from '../streaks';
 
 const DAY = 864e5;
 const body = async (r: Response) => (await r.json()) as any;
@@ -13,19 +13,9 @@ async function doneAttempt(userId: string, promptId: string, daysAgo: number, ov
     .values({ userId, promptId, skill, part: o.part ?? 1, sessionId: o.sessionId, status: 'done', durationMs: 120000, createdAt: new Date(Date.now() - daysAgo * DAY) })
     .returning();
   await db.insert(analyses).values({ attemptId: a!.id, result: {}, overall, criteria, models: {} });
+  await recordActivity(userId, { tests: 1 }, a!.createdAt); // what the submit hook does
   return a!;
 }
-
-describe('streak', () => {
-  const now = Date.parse('2026-09-30T12:00:00Z');
-  it('counts consecutive days ending today or yesterday; a gap resets it', () => {
-    expect(streak(['2026-09-30', '2026-09-29', '2026-09-28'], now)).toBe(3);
-    expect(streak(['2026-09-29', '2026-09-28', '2026-09-27'], now)).toBe(3);
-    expect(streak(['2026-09-30', '2026-09-28', '2026-09-27'], now)).toBe(1);
-    expect(streak(['2026-09-28', '2026-09-27'], now)).toBe(0);
-    expect(streak([], now)).toBe(0);
-  });
-});
 
 describe('GET /api/progress', () => {
   it('reports trend, streak, weakest, mistakes and predicted bands', async () => {

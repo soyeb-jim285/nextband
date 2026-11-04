@@ -1,6 +1,6 @@
 import { queryOptions, useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
-import { ArrowRight, Compass, Flame } from 'lucide-react';
+import { ArrowRight, Compass } from 'lucide-react';
 import { coachQuery } from '@/components/coach/data';
 import { MockPanel } from '@/components/dashboard/MockPanel';
 import { NextUp } from '@/components/dashboard/NextUp';
@@ -11,12 +11,13 @@ import { YourPicture } from '@/components/dashboard/YourPicture';
 import { Alert, buttonStyles, Card, PageContainer, PageHeader } from '@/components/ui';
 import { fmtDate, PlanButton, usePlan } from '@/components/pricing/PlanStatus';
 import { call, client } from '@/lib/api';
-import { formatMinutes, plural } from '@/lib/format';
+import { formatMinutes } from '@/lib/format';
 import { lrProgressQuery } from '@/lib/lr';
-import { isAccount, meQuery, useMe } from '@/lib/query';
-import { cn } from '@/lib/utils';
+import { isAccount, meQuery, progressQuery, useMe } from '@/lib/query';
+import { streakQuery } from '@/lib/streak';
+import { StreakCard } from '@/components/streak/Streak';
 
-const progressQuery = queryOptions({ queryKey: ['progress'], queryFn: () => call(client.GET('/api/progress')), staleTime: 0 });
+const NO_STREAK = { longest: 0 } as const;
 const dueCountQuery = queryOptions({ queryKey: ['cards', 'due'], queryFn: () => call(client.GET('/api/cards/due')), staleTime: 0 });
 
 /** The account dashboard. A visitor or a guest has no dashboard: they get the landing page at '/' (which shows a guest's recent tests). */
@@ -24,7 +25,7 @@ export const Route = createFileRoute('/_app/overview')({
   beforeLoad: async ({ context }) => {
     if (!isAccount(await context.queryClient.ensureQueryData(meQuery))) throw redirect({ to: '/', replace: true });
   },
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(progressQuery), context.queryClient.ensureQueryData(dueCountQuery), context.queryClient.ensureQueryData(lrProgressQuery)]),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(progressQuery), context.queryClient.ensureQueryData(dueCountQuery), context.queryClient.ensureQueryData(lrProgressQuery), context.queryClient.ensureQueryData(streakQuery).catch(() => null)]), // the streak line is optional; the dashboard never fails on it,
   component: Dashboard,
 });
 
@@ -36,6 +37,7 @@ function Dashboard() {
   const { data: p } = useSuspenseQuery(progressQuery);
   const { data: due } = useSuspenseQuery(dueCountQuery);
   const { data: lr } = useQuery(lrProgressQuery);
+  const { data: s = NO_STREAK } = useQuery(streakQuery);
   const first = me.user.name.split(' ')[0];
   const target = me.settings.targetBand;
   const hasProgress = p.trend.length > 0 || !!lr?.trend.length;
@@ -47,13 +49,7 @@ function Dashboard() {
         title={`${greeting()}${first ? `, ${first}` : ''}`}
         description={
           p.attempts ? (
-            <span className="inline-flex flex-wrap items-center gap-x-5 gap-y-1">
-              <span className="inline-flex items-center gap-1.5">
-                <Flame className={cn('size-4', p.streak ? 'text-warn-text' : 'text-muted')} aria-hidden />
-                {p.streak ? `${plural(p.streak, 'day')} in a row` : 'Practise today to start a streak'}
-              </span>
-              <span>{formatMinutes(p.minutesThisWeek)} practised this week</span>
-            </span>
+            `${formatMinutes(p.minutesThisWeek)} practised this week`
           ) : (
             'Welcome. Here is how to get your first score.'
           )
@@ -90,6 +86,7 @@ function Dashboard() {
           </Alert>
         )}
         <YourPicture p={p} target={target} />
+        {(p.attempts > 0 || s.longest > 0) && <StreakCard />}
         <ImproveCard />
         {p.attempts === 0 ? <Onboarding /> : <NextUp p={p} target={target} due={due.total} lr={lr} />}
         <MockPanel continuedAbove={p.attempts > 0} />

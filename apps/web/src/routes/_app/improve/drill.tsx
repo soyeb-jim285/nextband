@@ -13,6 +13,7 @@ import { Parts } from '@/components/writing/DiffView';
 import { call, client } from '@/lib/api';
 import { formatRelative, plural } from '@/lib/format';
 import { loadForAccount, useAccount } from '@/lib/query';
+import { streakChanged } from '@/lib/streak';
 import { categoryLabel } from '@/lib/result';
 
 type Search = { pattern?: string; ahead?: boolean };
@@ -54,6 +55,7 @@ function Drill() {
   const finished = !card && done.length > 0;
   useEffect(() => {
     if (finished) void qc.invalidateQueries({ queryKey: ['cards', 'due'] }); // the nav badge and Today count catch up
+    if (finished) streakChanged();
   }, [finished, qc]);
 
   const keepGoing = () => {

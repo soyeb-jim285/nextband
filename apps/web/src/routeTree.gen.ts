@@ -26,6 +26,7 @@ import { Route as AppMistakesRouteImport } from './routes/_app/mistakes'
 import { Route as AppOverviewRouteImport } from './routes/_app/overview'
 import { Route as AppReviewRouteImport } from './routes/_app/review'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppStreakRouteImport } from './routes/_app/streak'
 import { Route as AppStyleguideRouteImport } from './routes/_app/styleguide'
 import { Route as AppLegalAboutRouteImport } from './routes/_app/_legal/about'
 import { Route as AppLegalContactRouteImport } from './routes/_app/_legal/contact'
@@ -151,6 +152,11 @@ const AppReviewRoute = AppReviewRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStreakRoute = AppStreakRouteImport.update({
+  id: '/streak',
+  path: '/streak',
   getParentRoute: () => AppRoute,
 } as any)
 const AppStyleguideRoute = AppStyleguideRouteImport.update({
@@ -388,6 +394,7 @@ export interface FileRoutesByFullPath {
   '/overview': typeof AppOverviewRoute
   '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRoute
+  '/streak': typeof AppStreakRoute
   '/styleguide': typeof AppStyleguideRoute
   '/about': typeof AppLegalAboutRoute
   '/contact': typeof AppLegalContactRoute
@@ -446,6 +453,7 @@ export interface FileRoutesByTo {
   '/overview': typeof AppOverviewRoute
   '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRoute
+  '/streak': typeof AppStreakRoute
   '/styleguide': typeof AppStyleguideRoute
   '/about': typeof AppLegalAboutRoute
   '/contact': typeof AppLegalContactRoute
@@ -509,6 +517,7 @@ export interface FileRoutesById {
   '/_app/overview': typeof AppOverviewRoute
   '/_app/review': typeof AppReviewRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/streak': typeof AppStreakRoute
   '/_app/styleguide': typeof AppStyleguideRoute
   '/_app/_legal/about': typeof AppLegalAboutRoute
   '/_app/_legal/contact': typeof AppLegalContactRoute
@@ -571,6 +580,7 @@ export interface FileRouteTypes {
     | '/overview'
     | '/review'
     | '/settings'
+    | '/streak'
     | '/styleguide'
     | '/about'
     | '/contact'
@@ -629,6 +639,7 @@ export interface FileRouteTypes {
     | '/overview'
     | '/review'
     | '/settings'
+    | '/streak'
     | '/styleguide'
     | '/about'
     | '/contact'
@@ -691,6 +702,7 @@ export interface FileRouteTypes {
     | '/_app/overview'
     | '/_app/review'
     | '/_app/settings'
+    | '/_app/streak'
     | '/_app/styleguide'
     | '/_app/_legal/about'
     | '/_app/_legal/contact'
@@ -865,6 +877,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/streak': {
+      id: '/_app/streak'
+      path: '/streak'
+      fullPath: '/streak'
+      preLoaderRoute: typeof AppStreakRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/styleguide': {
@@ -1264,6 +1283,7 @@ interface AppRouteChildren {
   AppOverviewRoute: typeof AppOverviewRoute
   AppReviewRoute: typeof AppReviewRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppStreakRoute: typeof AppStreakRoute
   AppStyleguideRoute: typeof AppStyleguideRoute
   AppCheckoutDoneRoute: typeof AppCheckoutDoneRoute
   AppMockIdRoute: typeof AppMockIdRoute
@@ -1294,6 +1314,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppOverviewRoute: AppOverviewRoute,
   AppReviewRoute: AppReviewRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppStreakRoute: AppStreakRoute,
   AppStyleguideRoute: AppStyleguideRoute,
   AppCheckoutDoneRoute: AppCheckoutDoneRoute,
   AppMockIdRoute: AppMockIdRoute,

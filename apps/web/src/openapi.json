@@ -8555,6 +8555,159 @@
           "phone",
           "acceptTerms"
         ]
+      },
+      "Streak": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Today in the student's time zone (the calendar every other field uses)"
+          },
+          "current": {
+            "type": "number"
+          },
+          "longest": {
+            "type": "number"
+          },
+          "freezes": {
+            "type": "number",
+            "description": "Saved freezes (0-2): 1 earned per 7 days in a row; a missed day uses one"
+          },
+          "today": {
+            "type": "string",
+            "enum": [
+              "done",
+              "pending"
+            ]
+          },
+          "week": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD in the student's time zone"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "frozen",
+                    "missed",
+                    "today",
+                    "future"
+                  ]
+                }
+              },
+              "required": [
+                "day",
+                "state"
+              ]
+            },
+            "description": "Monday to Sunday of the current local week; today = not practised yet"
+          },
+          "month": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD in the student's time zone"
+                },
+                "level": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3,
+                  "description": "0 none, 1 drills only, 2 a test, 3 a test plus drills (or 3+ tests)"
+                }
+              },
+              "required": [
+                "day",
+                "level"
+              ]
+            },
+            "description": "Every day of the current local month (kept for older clients; `days` covers it)"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD in the student's time zone"
+                },
+                "level": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3,
+                  "description": "0 none, 1 drills only, 2 a test, 3 a test plus drills (or 3+ tests)"
+                },
+                "frozen": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "day",
+                "level",
+                "frozen"
+              ]
+            },
+            "description": "The last 182 local days ending today, oldest first (6-month heatmap); frozen = a freeze or repair covered this missed day"
+          },
+          "practicedLast35": {
+            "type": "integer",
+            "description": "Practice days in the last 35 local days, today included"
+          },
+          "nextMilestone": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "repair": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "target": {
+                "type": "number"
+              },
+              "until": {
+                "type": "string"
+              },
+              "daysDone": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "target",
+              "until",
+              "daysDone"
+            ],
+            "description": "Broken streak with no freeze: practise on 2 separate days before `until` to get `target` back"
+          },
+          "justReached": {
+            "type": "number",
+            "description": "A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today"
+          }
+        },
+        "required": [
+          "date",
+          "current",
+          "longest",
+          "freezes",
+          "today",
+          "week",
+          "month",
+          "days",
+          "practicedLast35",
+          "nextMilestone",
+          "repair"
+        ]
       }
     },
     "parameters": {}
@@ -8609,6 +8762,45 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/me/guest": {
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Delete the current guest and all its data (guests only)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a guest: accounts delete with their password"
           }
         }
       }
@@ -14616,6 +14808,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CheckoutStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/streak": {
+      "get": {
+        "tags": [
+          "Progress"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Practice streak in the student's time zone: count, freezes, this week, this month, repair offer. Guests too.",
+        "description": "A practice day is a submitted test part, 5 drill cards graded, or 10+ minutes of Listening/Reading. docs/engagement/notifications-and-streaks.md §3",
+        "responses": {
+          "200": {
+            "description": "Streak",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Streak"
                 }
               }
             }

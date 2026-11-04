@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { review } from '@ielts/core';
 import { and, asc, count, eq, inArray, lte } from 'drizzle-orm';
 import { currentUser, requireAccount } from '../auth';
+import { recordActivity } from '../streaks';
 import { db } from '../db/client';
 import { attempts, cards, prompts } from '../db/schema';
 import type { Fix } from '../ai/types';
@@ -147,6 +148,7 @@ export function register(app: App) {
       if (!card) return c.json({ error: 'Card not found' }, 404);
       const next = review(card, c.req.valid('json').grade as 0 | 1 | 2 | 3 | 4 | 5);
       const [updated] = await db.update(cards).set(next).where(where).returning();
+      await recordActivity(card.userId, { drills: 1 });
       return c.json(toCard(updated!), 200);
     },
   );

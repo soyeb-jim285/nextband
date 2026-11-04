@@ -12,6 +12,7 @@ import { useRecorder } from '@/hooks/useRecorder';
 import { rememberSession } from '@/lib/attempt';
 import { playLine } from '@/lib/examiner';
 import { queryClient } from '@/lib/query';
+import { streakChanged } from '@/lib/streak';
 import { blockerOf, type Blocker } from '@/lib/community';
 import { formatClock } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -217,6 +218,7 @@ export function SessionFlow({ segments, sessionId, parentAttemptId, mockId }: { 
     if (!allDone) return;
     const first = uploads.find((u) => u.key === 0)!.id!;
     void queryClient.invalidateQueries({ queryKey: ['quota'] }); // this test is now used
+    streakChanged();
     if (sessionId) rememberSession(sessionId, [...uploads].sort((a, b) => a.key - b.key).map((u) => u.id!));
     if (mockId) {
       void queryClient.invalidateQueries({ queryKey: ['mock'] });

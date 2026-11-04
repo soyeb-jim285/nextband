@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle
 import { HTTPException } from 'hono/http-exception';
 import { aiGapReasons } from '../ai/lr-mistakes';
 import { currentUser, isCambridgeAllowed, isOwner, requireUser } from '../auth';
+import { recordActivity } from '../streaks';
 import { db } from '../db/client';
 import { cards, lrAttempts, lrTests } from '../db/schema';
 import { isSubscribed } from '../quota';
@@ -30,6 +31,8 @@ const Parts = z.array(z.number().int().min(1).max(4)).nullable().openapi({ descr
 
 const ErrorSchema = z.object({ error: z.string(), code: z.string().optional() }).openapi('LrError');
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { 'application/json': { schema } } });
+/** Streak minutes: autosaves send the running total, so each save credits the whole minutes it crossed. */
+const wholeMinutes = (s: number) => Math.floor(s / 60);
 const common = { tags: ['Listening & Reading'], security: [{ bearer: [] }], middleware: [requireUser] };
 const errors = { 404: json(ErrorSchema, 'Not found (also for a Cambridge test this user may not open)') };
 
@@ -578,6 +581,7 @@ export function register(app: App) {
         .update(lrAttempts)
         .set({ responses: cleanResponses(responses, pickParts(t.data, a.parts, a.types)), elapsedS, ...(stats && { stats: keepAudio(stats, a.stats) }) })
         .where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'in_progress')));
+      await recordActivity(a.userId, { minutes: wholeMinutes(elapsedS) - wholeMinutes(a.elapsedS) });
       return c.json({ savedAt: new Date().toISOString() }, 200);
     },
   );
@@ -615,6 +619,7 @@ export function register(app: App) {
         .where(and(eq(lrAttempts.id, a.id), eq(lrAttempts.status, 'in_progress')))
         .returning();
       if (!row) throw new HTTPException(409, { message: 'Attempt already submitted' });
+      await recordActivity(a.userId, { tests: 1, minutes: wholeMinutes(row.elapsedS) - wholeMinutes(a.elapsedS) });
       await spellingCards(user.id, t.data.skill, analysis, a.id);
       return c.json(await toAttempt(row, t), 200);
     },

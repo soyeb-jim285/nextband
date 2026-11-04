@@ -3,6 +3,7 @@ import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { visiblePromptWhere } from '../access';
 import { currentUser, isOwner, requireUser } from '../auth';
+import { recordActivity } from '../streaks';
 import { db } from '../db/client';
 import { analyses, attempts, mockExams, prompts } from '../db/schema';
 import { ApiError } from '../errors';
@@ -233,6 +234,7 @@ export function register(app: App) {
         .where(and(eq(attempts.id, id), eq(attempts.status, a.status)))
         .returning({ id: attempts.id });
       if (!updated) return c.json({ error: 'Attempt is already analyzing' }, 409); // lost a double-submit race
+      if (a.status === 'recording') await recordActivity(user.id, { tests: 1 }); // a re-run of a failed part was counted on its first submit
       void runAnalysis(id).catch((e) => console.error('runAnalysis', id, e));
       return c.json({ status: 'analyzing' as const }, 200);
     },

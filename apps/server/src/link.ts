@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from './db/client';
 import { attempts, cards, feedback, guestConversions, liveSessions, lrAttempts, mistakes, quotaUsage, replaySessions, user } from './db/schema';
 import { storage } from './storage';
+import { mergeDays, refreshStreak } from './streaks';
 
 export async function linkGuest(anonId: string, newId: string) {
   if (anonId === newId) return;
@@ -18,8 +19,10 @@ export async function linkGuest(anonId: string, newId: string) {
     await tx.update(mistakes).set({ userId: newId }).where(eq(mistakes.userId, anonId));
     await tx.update(lrAttempts).set({ userId: newId }).where(eq(lrAttempts.userId, anonId)); // Listening & Reading tests
     await tx.update(cards).set({ userId: newId }).where(eq(cards.userId, anonId)); // spelling cards made on L/R submit
+    await mergeDays(tx, anonId, newId); // streak days add onto the account's
     return tx.update(attempts).set({ userId: newId }).where(eq(attempts.userId, anonId)).returning({ id: attempts.id, audioKey: attempts.audioKey });
   });
+  await refreshStreak(newId);
   // Recordings live under audio/{userId}/: re-key them so deleting the real account later removes them too. Best effort: a failure leaves the old key working.
   for (const a of moved) {
     if (!a.audioKey?.startsWith(`audio/${anonId}/`)) continue;

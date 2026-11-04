@@ -1,3 +1,4 @@
+import { streakChanged } from '@/lib/streak';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, Lock } from 'lucide-react';
 import { useCallback } from 'react';
@@ -61,6 +62,7 @@ function Live() {
   const { source, mock } = Route.useSearch();
   const onFinished = useCallback(
     (sessionId: string, [first, ...rest]: string[]) => {
+      streakChanged(); // each live part counted as practice
       if (mock) {
         // Mock test: tie the live session to the mock, then go back to it (it shows the Speaking row being marked).
         if (first) rememberSession(sessionId, [first, ...rest]);

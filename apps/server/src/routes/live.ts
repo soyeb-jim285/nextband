@@ -5,6 +5,7 @@ import { HTTPException } from 'hono/http-exception';
 import { newState, sessionScript, type LiveState } from '../ai/examiner';
 import { keyCtx } from '../ai/keyctx';
 import { currentUser, requireUser } from '../auth';
+import { recordActivity } from '../streaks';
 import { db } from '../db/client';
 import { attempts, liveSessions } from '../db/schema';
 import { clientIpHash } from '../ip';
@@ -99,6 +100,7 @@ async function addParts(c: Context<AppEnv>, s: LiveState, userId: string, list: 
     return { inserted, all };
   });
   if (!out) return null;
+  await recordActivity(userId, { tests: out.inserted.length });
   for (const r of out.inserted) void runAnalysis(r.id);
   return out.all.filter((r) => only == null || r.part === only).map((r) => r.id);
 }
