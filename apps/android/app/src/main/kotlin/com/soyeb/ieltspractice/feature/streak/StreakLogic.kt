@@ -51,7 +51,8 @@ private val LEVEL_WORDS = listOf("no practice", "drills", "a test", "a test and 
 
 /** "Sun 4 Oct: a test and drills" for one heatmap square (its TalkBack label and the line a tap shows). */
 fun dayDescription(d: StreakDay, today: String?): String {
-    val name = date(d.day)?.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)) ?: d.day
+    // US short names: en-GB says "Sept".
+    val name = date(d.day)?.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US)) ?: d.day
     val what = when {
         d.level > 0 -> LEVEL_WORDS[d.level.coerceAtMost(3)]
         d.frozen -> "kept by a freeze"
