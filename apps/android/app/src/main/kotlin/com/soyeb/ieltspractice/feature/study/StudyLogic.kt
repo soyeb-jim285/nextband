@@ -37,7 +37,7 @@ internal fun promptOf(c: DueCard): Pair<String?, String> {
     val cut = if (c.source == "fix") c.front.indexOf("\n\n") else -1
     if (cut > 0) return c.front.substring(0, cut) to c.front.substring(cut + 2)
     // server lr.ts spellingCards: "🎧 Listening · spell the word you heard: 'p__k' (4 letters)"
-    Regex("""^(?:🎧|📖) (.+?): '(.+)'(.*)$""").find(c.front)?.let { m ->
+    Regex("""^(?:🎧|📖) (.+?): '(.+?)'([\s\S]*)$""").find(c.front)?.let { m ->
         return m.groupValues[1].replaceFirstChar { it.uppercase() } to m.groupValues[2] + m.groupValues[3]
     }
     return null to c.front.trim().removePrefix("🎧").removePrefix("📖").trim().removeSurrounding("Fix: \"", "\"")

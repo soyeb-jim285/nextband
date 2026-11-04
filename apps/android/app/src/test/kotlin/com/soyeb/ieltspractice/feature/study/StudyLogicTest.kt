@@ -47,6 +47,8 @@ class StudyLogicTest {
         assertEquals("Listening · spell the word you heard" to "s______t (8 letters)", promptOf(spell))
         assertEquals("sediment" to "You wrote: sedement", answerOf(spell.back))
         assertTrue(isHeard(spell))
+        // older cards: the hint on a second line
+        assertEquals("Listening · spell the word you heard" to "p__k\nHint: 4 letters", promptOf(card(front = "🎧 Listening · spell the word you heard: 'p__k'\nHint: 4 letters")))
         assertFalse(isHeard(card(front = "plain", category = "spelling")))
     }
 
