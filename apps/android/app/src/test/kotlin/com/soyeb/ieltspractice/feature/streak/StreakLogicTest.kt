@@ -24,6 +24,11 @@ class StreakLogicTest {
         assertEquals(6, cols[1].count { it == null })
         assertTrue(cols.all { it.size == 7 })
         assertEquals(1, heatColumns(days, weeks = 1).size)
+        // A short history still fills the asked width: empty weeks on the left, the newest on the right.
+        val thirteen = heatColumns(days, weeks = 13)
+        assertEquals(13, thirteen.size)
+        assertTrue(thirteen.take(11).flatten().all { it == null })
+        assertEquals("2026-10-05", thirteen.last()[0]?.day)
         assertTrue(heatColumns(emptyList()).isEmpty())
     }
 
@@ -51,8 +56,13 @@ class StreakLogicTest {
         assertEquals("Back-to-back days! 2 in a row", celebrationLine(2))
         assertEquals("7-day milestone. Brilliant work", celebrationLine(7))
         assertTrue(celebrationLine(12).contains("12"))
-        assertEquals("1 freeze saved · next one at day 14", freezeLine(Streak(current = 12, freezes = 1)))
-        assertEquals("No freezes yet · you earn one at day 7", freezeLine(Streak(current = 3)))
+        assertEquals("next at day 14", freezeNote(Streak(current = 12, freezes = 1)))
+        assertEquals("next at day 7", freezeNote(Streak(current = 3)))
+        assertEquals("the most you can hold", freezeNote(Streak(current = 30, freezes = 2)))
+        assertEquals("Sat 3 Oct: a test and drills", dayDescription(day("2026-10-03", 3), "2026-10-04"))
+        assertEquals("Wed 30 Sep: kept by a freeze", dayDescription(day("2026-09-30", frozen = true), "2026-10-04"))
+        assertEquals("Today, Sun 4 Oct: not practised yet", dayDescription(day("2026-10-04"), "2026-10-04"))
+        assertEquals("Fri 2 Oct: no practice", dayDescription(day("2026-10-02"), "2026-10-04"))
         assertEquals("Bring back your 12-day streak: practise today and tomorrow", repairLine(12, 0))
         assertEquals("12 day streak, practised today", flameDescription(Streak(current = 12, today = "done")))
         assertEquals("Wednesday, kept by a freeze", weekDayDescription("2026-09-30", "frozen"))
@@ -70,6 +80,21 @@ class StreakLogicTest {
         val days = (0 until 60).map { day(java.time.LocalDate.of(2026, 8, 20).plusDays(it.toLong()).toString()) }
         val labels = monthLabels(heatColumns(days)).filterNotNull()
         assertEquals(listOf("Aug", "Sep", "Oct"), labels)
+        // The 13-week phone view starting on 6 Jul: Jul on the first column, then each month on the column holding its 1st.
+        val demo = AppJson.decodeFromString(Streak.serializer(), DemoToday.streak())
+        val cols = heatColumns(demo.days, weeks = 13)
+        val m = monthLabels(cols)
+        assertEquals(13, m.size)
+        assertEquals(listOf("Jul", "Aug", "Sep", "Oct"), m.filterNotNull())
+        assertEquals("Oct", m.last()) // 1 Oct sits in this week's column
+        // A first column late in its month gives way to the next month's label.
+        val late = (0 until 20).map { day(java.time.LocalDate.of(2026, 8, 24).plusDays(it.toLong()).toString()) }
+        assertEquals(listOf(null, "Sep", null), monthLabels(heatColumns(late)))
+    }
+
+    @Test fun thisMonth() {
+        val s = Streak(days = listOf(day("2026-09-30", 3), day("2026-10-01", 1), day("2026-10-02"), day("2026-10-03", 2)))
+        assertEquals(2, practisedThisMonth(s))
     }
 
     @Test fun celebratesOnceWhenTheDayTurnsDone() {

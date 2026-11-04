@@ -40,6 +40,6 @@ Status: done / partial / missing. Verified by unit tests (models against the sha
 | Accessibility (content descriptions, 48dp targets, reduced motion) | partial | no TalkBack pass on a device |
 | Offline use | partial | pending recordings queue; screens need the network |
 | In-app updates (bell on every tab) | done | results, failed markings, cards due, open mock, exam countdown; refreshes on resume and while marking; read state per account (`UpdatesLogicTest`) |
-| Streaks (local-day streak, freezes, repair, 6-month heatmap, daily celebration) | done | `feature/streak/`; Today card, streak screen, celebration sheet (once per local day, prefs `streak:celebrated`); rules unit-tested (`StreakLogicTest`); milestone confetti and share card not built yet |
+| Streaks (local-day streak, freezes, repair, heatmap, daily celebration) | done | `feature/streak/`; Today card (12 weeks, first on Today), streak screen (13 tappable weeks, no cards), celebration sheet (once per local day, prefs `streak:celebrated`); rules unit-tested (`StreakLogicTest`); milestone confetti and share card not built yet |
 | Push notifications / reminders | missing | not in web or iOS either; planned: one opt-in daily "Study reminders" channel, POST_NOTIFICATIONS asked on API 33+ from a settings toggle, skipped on days already practised |
 | Tablet / landscape layouts | partial | phone layouts scale; Listening & Reading reading and results go two-pane from 600 dp; tab and pushed lists cap at 720 dp centred; no navigation rail yet |

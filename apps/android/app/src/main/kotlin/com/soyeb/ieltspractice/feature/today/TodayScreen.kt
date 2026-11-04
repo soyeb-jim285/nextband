@@ -220,9 +220,10 @@ private fun LazyListScope.readyItems(nav: Nav, d: TodayData, me: Me?, target: Do
 
     if (days != null) item { Box(Modifier.rise(0)) { ExamChip(days) } }
     if (nudge) item { Box(Modifier.rise(0)) { GoalNudge(nav) } }
+    // The streak sits first so it's seen without scrolling; the greeting's subtitle drops the count while it shows.
+    if (streak != null) item { Box(Modifier.rise(1)) { StreakCard(streak, nav) } }
     item { Box(Modifier.rise(1)) { MockHero(nav, d.mock, d.lastMock, target) } }
     item { Box(Modifier.rise(2)) { Section("Your bands") { BandsCard(nav, bands, target) } } }
-    if (streak != null) item { Box(Modifier.rise(3)) { StreakCard(streak, nav) } }
     item { Box(Modifier.rise(3)) { Section("Up next") { UpNextCard(nav, next, testType) } } }
     item { Box(Modifier.rise(4)) { Section("Study tools") { ToolsGrid(nav, d.due) } } }
     item {
@@ -491,6 +492,7 @@ private fun GuestToday(nav: Nav) {
         actions = { com.soyeb.ieltspractice.feature.updates.UpdatesBell(nav); Avatar(null, onClick = { nav.go(You) }) },
         refreshing = loader.refreshing, onRefresh = if (session) loader.reload else null,
     ) {
+        streak?.let { s -> item { StreakCard(s, nav) } }
         item {
             BrandHero { ink ->
                 Text("Full mock tests", style = NB.type.label, color = ink.muted)
@@ -507,7 +509,6 @@ private fun GuestToday(nav: Nav) {
                 NbButton("Start full mock", { nav.requireAccount("Create a free account to take a full mock") { nav.go(MockStart) } }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
             }
         }
-        streak?.let { s -> item { StreakCard(s, nav) } }
         item {
             Section("Or practise one test") {
                 RowGroup {

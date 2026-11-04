@@ -3,6 +3,7 @@ package com.soyeb.ieltspractice.feature.streak
 import com.soyeb.ieltspractice.data.model.Streak
 import com.soyeb.ieltspractice.data.model.StreakDay
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -25,36 +26,45 @@ private fun date(s: String): LocalDate? = runCatching { LocalDate.parse(s) }.get
 
 /**
  * The heatmap as week columns, Monday at the top. The first column is padded with nulls before the oldest day, the last
- * after today. [weeks] keeps only the newest columns (the Today card shows 5).
+ * after today. [weeks] keeps exactly that many of the newest columns, padding empty ones on the left when history is short.
  */
 fun heatColumns(days: List<StreakDay>, weeks: Int? = null): List<List<StreakDay?>> {
     val first = days.firstOrNull()?.let { date(it.day) } ?: return emptyList()
     val lead = first.dayOfWeek.value - 1 // Monday = 0
     val cells: List<StreakDay?> = List(lead) { null } + days
     val cols = cells.chunked(7).map { it + List(7 - it.size) { null } }
-    return if (weeks != null) cols.takeLast(weeks) else cols
+    if (weeks == null) return cols
+    return List((weeks - cols.size).coerceAtLeast(0)) { List<StreakDay?>(7) { null } } + cols.takeLast(weeks)
 }
 
-/** A month name over the first column where that month starts ("Oct"), else null. Same length as [cols]. */
-fun monthLabels(cols: List<List<StreakDay?>>): List<String?> {
-    var last: Int? = null
-    return cols.map { col ->
-        val d = col.firstNotNullOfOrNull { it?.let { c -> date(c.day) } } ?: return@map null
-        // A column that holds the 1st of a month labels that month; the first column labels its own month.
-        val start = col.mapNotNull { it?.let { c -> date(c.day) } }.firstOrNull { it.dayOfMonth == 1 } ?: d
-        val m = start.monthValue
-        if (m == last) null else { last = m; start.month.getDisplayName(TextStyle.SHORT, Locale.US) }
+/**
+ * A month name over the column that holds the 1st of that month ("Oct"), else null. Same length as [cols]. The first
+ * column names its own month only when it starts before the 22nd, so its label never runs into the next month's.
+ */
+fun monthLabels(cols: List<List<StreakDay?>>): List<String?> = cols.mapIndexed { i, col ->
+    val days = col.mapNotNull { it?.let { c -> date(c.day) } }
+    val start = days.firstOrNull { it.dayOfMonth == 1 } ?: days.firstOrNull()?.takeIf { i == 0 && it.dayOfMonth < 22 }
+    start?.month?.getDisplayName(TextStyle.SHORT, Locale.US)
+}
+
+private val LEVEL_WORDS = listOf("no practice", "drills", "a test", "a test and drills")
+
+/** "Sun 4 Oct: a test and drills" for one heatmap square (its TalkBack label and the line a tap shows). */
+fun dayDescription(d: StreakDay, today: String?): String {
+    val name = date(d.day)?.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)) ?: d.day
+    val what = when {
+        d.level > 0 -> LEVEL_WORDS[d.level.coerceAtMost(3)]
+        d.frozen -> "kept by a freeze"
+        d.day == today -> "not practised yet"
+        else -> LEVEL_WORDS[0]
     }
+    return "${if (d.day == today) "Today, " else ""}$name: $what"
 }
 
-/** TalkBack summary of one week column: "Week of 28 Sep: 5 practice days, 1 frozen". */
-fun columnDescription(col: List<StreakDay?>): String {
-    val days = col.filterNotNull()
-    val start = days.firstOrNull()?.let { date(it.day) } ?: return ""
-    val practised = days.count { it.level > 0 }
-    val frozen = days.count { it.level <= 0 && it.frozen }
-    val head = "Week of ${start.dayOfMonth} ${start.month.getDisplayName(TextStyle.SHORT, Locale.US)}: $practised practice ${plural(practised, "day")}"
-    return if (frozen > 0) "$head, $frozen frozen" else head
+/** Practice days so far in today's calendar month. */
+fun practisedThisMonth(s: Streak): Int {
+    val month = localToday(s)?.take(7) ?: return 0
+    return s.days.count { it.day.startsWith(month) && it.level > 0 }
 }
 
 fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
@@ -67,15 +77,8 @@ fun practisedLine(s: Streak, risk: Boolean): String =
     if (risk) "Ends at midnight: a 2-minute drill saves it"
     else "You practised ${s.practicedLast35} of the last 35 days · Longest ${s.longest}"
 
-/** "1 freeze saved · next one at day 14". One freeze per 7 days in a row, at most 2 held. */
-fun freezeLine(s: Streak): String {
-    val next = (s.current / 7 + 1) * 7
-    return when {
-        s.freezes >= 2 -> "2 freezes saved, the most you can hold"
-        s.freezes == 1 -> "1 freeze saved · next one at day $next"
-        else -> "No freezes yet · you earn one at day $next"
-    }
-}
+/** Under the freeze count: "next at day 14". One freeze per 7 days in a row, at most 2 held. */
+fun freezeNote(s: Streak): String = if (s.freezes >= 2) "the most you can hold" else "next at day ${(s.current / 7 + 1) * 7}"
 
 /** Progress from the last milestone passed to the next one, 0..1; 1 past the last milestone. */
 fun milestoneFraction(current: Int, next: Int?): Float {

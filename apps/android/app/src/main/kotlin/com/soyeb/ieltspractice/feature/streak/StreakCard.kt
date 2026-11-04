@@ -1,12 +1,17 @@
 package com.soyeb.ieltspractice.feature.streak
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,10 +26,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -34,8 +41,10 @@ import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.data.model.Streak
 import com.soyeb.ieltspractice.data.model.StreakDay
 import com.soyeb.ieltspractice.data.model.StreakWeekDay
+import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.NbColors
+import com.soyeb.ieltspractice.design.NbMotion
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
@@ -56,7 +65,8 @@ internal val NbColors.ice: Color get() = if (isDark) Color(0xFF7DD3FC) else Colo
 internal fun heatFill(role: HeatRole): Color {
     val c = NB.colors
     return when (role) {
-        HeatRole.Empty -> c.surface2
+        // Dark: surface2 all but vanishes on a card, so empty days lift a little towards faint.
+        HeatRole.Empty -> if (c.isDark) lerp(c.surface2, c.faint, 0.22f) else c.surface2
         HeatRole.Low -> lerp(c.brandSoft, c.brand, 0.3f)
         HeatRole.Mid -> lerp(c.brandSoft, c.brand, 0.62f)
         HeatRole.Full -> c.brand
@@ -66,52 +76,91 @@ internal fun heatFill(role: HeatRole): Color {
 
 /** The flame: grey until today is done, then the warm warn colour. */
 @Composable
-internal fun Flame(done: Boolean, size: Dp, modifier: Modifier = Modifier) {
-    Icon(Icons.Rounded.LocalFireDepartment, null, modifier.size(size), tint = if (done) NB.colors.warn else NB.colors.faint)
+internal fun Flame(done: Boolean, size: Dp, modifier: Modifier = Modifier, tint: Color = if (done) NB.colors.warn else NB.colors.faint) {
+    Icon(Icons.Rounded.LocalFireDepartment, null, modifier.size(size), tint = tint)
 }
 
 @Composable @ReadOnlyComposable
 internal fun countColor(done: Boolean): Color = if (done) NB.colors.warnText else NB.colors.ink
 
-/** One heatmap square. Today is outlined until it's done. */
+/** One heatmap square. Today is outlined until it's done; a tapped square is ringed in ink. */
 @Composable
-internal fun HeatCell(d: StreakDay?, today: String?, size: Dp) {
-    val shape = RoundedCornerShape(size / 4)
-    if (d == null) { Spacer(Modifier.size(size)); return }
+internal fun HeatCell(d: StreakDay?, today: String?, size: Dp, modifier: Modifier = Modifier, selected: Boolean = false) {
+    val shape = RoundedCornerShape(size * 0.22f)
+    if (d == null) { Spacer(modifier.size(size)); return }
     val role = heatRole(d)
-    val outline = d.day == today && d.level <= 0
+    val edge = when {
+        selected -> 2.dp to NB.colors.ink
+        d.day == today && d.level <= 0 -> 1.5.dp to NB.colors.brand
+        else -> null
+    }
     Box(
-        Modifier.size(size).background(heatFill(role), shape)
-            .let { if (outline) it.border(1.5.dp, NB.colors.brand, shape) else it },
+        modifier.size(size).background(heatFill(role), shape).let { m -> edge?.let { m.border(it.first, it.second, shape) } ?: m },
         contentAlignment = Alignment.Center,
     ) {
-        if (role == HeatRole.Frozen) Icon(Icons.Rounded.AcUnit, null, Modifier.size(size * 0.75f), tint = NB.colors.ice)
+        if (role == HeatRole.Frozen) Icon(Icons.Rounded.AcUnit, null, Modifier.size(size * 0.7f), tint = NB.colors.ice)
     }
 }
 
-/** Week columns, Monday at the top. [describe]: each column carries its own TalkBack summary (the streak screen). */
+private val ROW_LABELS = listOf("Mon", "", "Wed", "", "Fri", "", "")
+private val ROW_LABEL_WIDTH = 30.dp
+private val MONTH_ROW = 16.dp
+
+/**
+ * Week columns (Monday at the top) that share the full width: the cell size comes from the space, so nothing scrolls or
+ * clips. Month names sit over the column holding the 1st. [onSelect] makes each square tappable and gives it its own
+ * TalkBack label (the streak screen); without it the caller labels the whole map.
+ */
 @Composable
-internal fun HeatColumns(cols: List<List<StreakDay?>>, today: String?, cell: Dp, gap: Dp, describe: Boolean, labels: List<String?>? = null) {
-    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-        cols.forEachIndexed { i, col ->
-            val m = if (describe) Modifier.clearAndSetSemantics { contentDescription = columnDescription(col) } else Modifier
-            Column(m, verticalArrangement = Arrangement.spacedBy(gap)) {
-                if (labels != null) Box(Modifier.width(cell).height(16.dp)) {
-                    labels.getOrNull(i)?.let {
-                        // Wider than its column: it runs over the next (empty) label slots.
-                        Text(it, style = NB.type.caption, color = NB.colors.muted, softWrap = false, modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true))
+internal fun Heatmap(
+    cols: List<List<StreakDay?>>,
+    today: String?,
+    gap: Dp,
+    modifier: Modifier = Modifier,
+    rowLabels: Boolean = false,
+    selected: String? = null,
+    onSelect: ((StreakDay) -> Unit)? = null,
+) {
+    if (cols.isEmpty()) return
+    val months = monthLabels(cols)
+    val caption = NB.type.caption
+    val muted = NB.colors.muted
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val lead = if (rowLabels) ROW_LABEL_WIDTH + gap else 0.dp
+        // ponytail: half a dp of slack so rounding never pushes the last column a pixel past the edge.
+        val cell = ((maxWidth - lead - gap * (cols.size - 1) - 0.5.dp) / cols.size).coerceAtMost(32.dp)
+        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+            if (rowLabels) Column(Modifier.width(ROW_LABEL_WIDTH).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(gap)) {
+                Spacer(Modifier.height(MONTH_ROW))
+                ROW_LABELS.forEach { Box(Modifier.height(cell), contentAlignment = Alignment.CenterStart) { Text(it, style = caption, color = muted) } }
+            }
+            cols.forEachIndexed { i, col ->
+                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                    Box(Modifier.width(cell).height(MONTH_ROW).clearAndSetSemantics {}) {
+                        months[i]?.let {
+                            // Wider than its column, it runs over the next ones; the last column's label ends at the edge instead.
+                            val align = if (i == cols.lastIndex) Alignment.End else Alignment.Start
+                            Text(it, style = caption, color = muted, softWrap = false, modifier = Modifier.align(Alignment.TopStart).wrapContentWidth(align, unbounded = true))
+                        }
+                    }
+                    col.forEach { d ->
+                        val m = if (onSelect != null && d != null) Modifier
+                            .clickable(role = Role.Button, onClickLabel = "Show this day") { onSelect(d) }
+                            .clearAndSetSemantics { contentDescription = dayDescription(d, today) }
+                        else Modifier
+                        HeatCell(d, today, cell, m, selected = d != null && d.day == selected)
                     }
                 }
-                col.forEach { HeatCell(it, today, cell) }
             }
         }
     }
 }
 
-/** Monday to Sunday, one circle each. One TalkBack summary for the row. */
+/** Monday to Sunday, one circle each. One TalkBack summary for the row. A day that turns done fills in softly. */
 @Composable
 internal fun WeekStrip(week: List<StreakWeekDay>, modifier: Modifier = Modifier) {
     val c = NB.colors
+    val reduced = LocalReducedMotion.current
     val summary = "This week: " + week.joinToString(", ") { weekDayDescription(it.day, it.state) }
     Row(modifier.clearAndSetSemantics { contentDescription = summary }, horizontalArrangement = Arrangement.SpaceBetween) {
         week.forEach { d ->
@@ -121,14 +170,18 @@ internal fun WeekStrip(week: List<StreakWeekDay>, modifier: Modifier = Modifier)
                     weekLetter(d.day), style = NB.type.caption,
                     color = if (isToday) c.brandText else c.muted, fontWeight = if (isToday) FontWeight.Bold else null,
                 )
-                val look: Pair<Color, Pair<Dp, Color>?> = when (d.state) {
-                    "done" -> c.brand to null
-                    "frozen" -> c.iceSoft to null
-                    "missed" -> c.surface2 to null
-                    "today" -> Color.Transparent to (2.dp to c.brand)
-                    else -> Color.Transparent to (1.dp to c.line)
+                val target = when (d.state) {
+                    "done" -> c.brand
+                    "frozen" -> c.iceSoft
+                    "missed" -> c.surface2
+                    else -> Color.Transparent
                 }
-                val (bg, edge) = look
+                val bg by animateColorAsState(target, tween(if (reduced) 0 else NbMotion.SLOW, easing = NbMotion.EaseOut), label = "dot")
+                val edge = when (d.state) {
+                    "today" -> 2.dp to c.brand
+                    "future" -> 1.dp to c.line
+                    else -> null
+                }
                 Box(
                     Modifier.size(32.dp).background(bg, CircleShape).let { m -> edge?.let { m.border(it.first, it.second, CircleShape) } ?: m },
                     contentAlignment = Alignment.Center,
@@ -161,40 +214,34 @@ internal fun FreezeCount(n: Int) {
 }
 
 /**
- * The Today card: flame and count, freezes, the last 5 weeks, and the practised line. At risk (after 18:00, nothing done,
- * a streak of 2+) the line warns and a Drill button saves it. The whole card opens the streak screen.
+ * The Today card: flame and count with the freezes, the practised line, and 12 weeks of practice across the full width.
+ * At risk (after 18:00, nothing done, a streak of 2+) the line warns and a Drill button saves it. The card opens the streak screen.
  */
 @Composable
 fun StreakCard(s: Streak, nav: Nav, hour: Int = hourNow()) {
     val risk = atRisk(s, hour)
-    val today = localToday(s)
     NbCard(onClick = { nav.go(StreakRoute) }) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    Modifier.semantics(mergeDescendants = true) { contentDescription = flameDescription(s) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Flame(s.done, 28.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("${s.current}", style = NB.type.headline.copy(fontFeatureSettings = "tnum"), color = countColor(s.done))
-                    Spacer(Modifier.width(8.dp))
-                    Text("day streak", style = NB.type.title3, color = NB.colors.ink)
-                }
-                Spacer(Modifier.height(6.dp))
-                FreezeCount(s.freezes)
-                Spacer(Modifier.height(10.dp))
-                Text(practisedLine(s, risk), style = NB.type.bodySmall, color = if (risk) NB.colors.ink else NB.colors.muted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = flameDescription(s) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Flame(s.done, 28.dp)
+                Spacer(Modifier.width(6.dp))
+                Text("${s.current}", style = NB.type.headline.copy(fontFeatureSettings = "tnum"), color = countColor(s.done))
+                Spacer(Modifier.width(8.dp))
+                Text("day streak", style = NB.type.title3, color = NB.colors.ink)
             }
-            Spacer(Modifier.width(12.dp))
-            val cols = heatColumns(s.days, weeks = 5)
-            val n = cols.flatten().count { it != null && it.level > 0 }
-            Box(Modifier.semantics { contentDescription = "Last 5 weeks: $n practice ${plural(n, "day")}" }) {
-                HeatColumns(cols, today, cell = 12.dp, gap = 3.dp, describe = false)
-            }
+            FreezeCount(s.freezes)
         }
+        Spacer(Modifier.height(4.dp))
+        Text(practisedLine(s, risk), style = NB.type.bodySmall, color = if (risk) NB.colors.ink else NB.colors.muted)
+        Spacer(Modifier.height(14.dp))
+        val cols = heatColumns(s.days, weeks = 12)
+        val n = cols.flatten().count { it != null && it.level > 0 }
+        Heatmap(cols, localToday(s), gap = 4.dp, modifier = Modifier.clearAndSetSemantics { contentDescription = "Last 12 weeks: $n practice ${plural(n, "day")}" })
         if (risk) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             NbButton("Drill", { nav.requireAccount("Create an account to drill your mistakes.") { nav.go(Review()) } }, kind = BtnKind.Secondary, fill = true)
         }
     }

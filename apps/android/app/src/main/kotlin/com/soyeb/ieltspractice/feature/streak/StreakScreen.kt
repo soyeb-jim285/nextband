@@ -1,17 +1,15 @@
 package com.soyeb.ieltspractice.feature.streak
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.Restore
@@ -21,11 +19,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,10 +43,8 @@ import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.LoadContent
 import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.NbButton
-import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.PushedList
 import com.soyeb.ieltspractice.design.components.PushedScreen
-import com.soyeb.ieltspractice.design.components.SectionHeader
 import com.soyeb.ieltspractice.design.components.rememberLoad
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Review
@@ -51,7 +54,10 @@ import kotlinx.coroutines.coroutineScope
 
 private class StreakPage(val streak: Streak, val due: Int)
 
-/** The streak page: count, this week, freezes, milestone, longest, 6 months of practice and one thing to do next. */
+/**
+ * The streak page, open on the surface (no cards): the count and this week, one ruled block of facts, the last 3 months
+ * (tap a square for that day), and one button for what to do next.
+ */
 @Composable
 fun StreakScreen(nav: Nav) {
     val g = LocalGraph.current
@@ -66,16 +72,11 @@ fun StreakScreen(nav: Nav) {
         LoadContent(loader, Modifier.padding(pad)) { page ->
             val s = page.streak
             PushedList(pad) {
-                item { Hero(s) }
                 s.repair?.let { r -> item { Banner(repairLine(r.target, r.daysDone), Icons.Rounded.Restore) } }
-                item { WeekCard(s) }
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SectionHeader("Last 6 months")
-                        NbCard { SixMonths(s) }
-                    }
-                }
-                item { NextCard(nav, page.due) }
+                item { Hero(s) }
+                item { Facts(s) }
+                item { LastThreeMonths(s) }
+                item { Next(nav, page.due) }
             }
         }
     }
@@ -83,98 +84,141 @@ fun StreakScreen(nav: Nav) {
 
 @Composable
 private fun Hero(s: Streak) {
-    Column(
-        Modifier.fillMaxWidth().padding(top = 12.dp).semantics(mergeDescendants = true) { contentDescription = flameDescription(s); heading() },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Flame(s.done, 56.dp)
-        Text("${s.current}", style = NB.type.display, color = countColor(s.done))
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            Modifier.semantics(mergeDescendants = true) { contentDescription = flameDescription(s); heading() },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Flame(s.done, 52.dp)
+            Spacer(Modifier.width(6.dp))
+            Text("${s.current}", style = NB.type.display.copy(fontFeatureSettings = "tnum"), color = countColor(s.done))
+        }
         Text("day streak", style = NB.type.title3, color = NB.colors.muted)
         // A broken streak with nothing to repair: calm, not a loss screen.
         if (s.current == 0 && s.repair == null && s.longest > 0) Text(
             "New streak, fresh start. Your longest is ${s.longest}.", style = NB.type.bodySmall, color = NB.colors.muted,
             textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp),
         )
+        if (s.week.isNotEmpty()) WeekStrip(s.week, Modifier.fillMaxWidth().padding(top = 24.dp))
     }
 }
 
+/** Longest · Freezes / Next milestone · This month, between hairlines. */
 @Composable
-private fun WeekCard(s: Streak) {
+private fun Facts(s: Streak) {
     val c = NB.colors
-    NbCard {
-        if (s.week.isNotEmpty()) {
-            WeekStrip(s.week, Modifier.fillMaxWidth())
-            HorizontalDivider(Modifier.padding(vertical = 14.dp), color = c.line)
-        }
-        Row(Modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.AcUnit, null, Modifier.size(18.dp), tint = c.ice)
-            Spacer(Modifier.width(8.dp))
-            Text(freezeLine(s), style = NB.type.bodySmall, color = c.ink)
-        }
-        Spacer(Modifier.height(14.dp))
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        HorizontalDivider(color = c.line)
+        FactRow(
+            { Fact("Longest") { Value("${s.longest} ${plural(s.longest, "day")}") } },
+            {
+                Fact("Freezes", "${s.freezes} ${plural(s.freezes, "freeze")} saved, ${freezeNote(s)}") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.AcUnit, null, Modifier.size(18.dp), tint = c.ice)
+                        Spacer(Modifier.width(6.dp))
+                        Value("${s.freezes}")
+                    }
+                    Text(freezeNote(s), style = NB.type.caption, color = c.muted)
+                }
+            },
+        )
+        HorizontalDivider(color = c.line)
         val next = s.nextMilestone
-        Column(Modifier.semantics(mergeDescendants = true) {}) {
-            Text(
-                if (next != null) "Next milestone: $next days" else "Every milestone reached",
-                style = NB.type.label, color = c.ink,
-            )
-            Meter(milestoneFraction(s.current, next).toDouble(), max = 1.0, height = 8.dp)
-        }
-        Spacer(Modifier.height(6.dp))
-        Text("Longest: ${s.longest} ${plural(s.longest, "day")}", style = NB.type.bodySmall, color = c.muted)
+        FactRow(
+            {
+                if (next != null) Fact("Next milestone", "Next milestone: $next days, ${next - s.current} to go") {
+                    Value("$next days")
+                    Meter(milestoneFraction(s.current, next).toDouble(), Modifier.widthIn(max = 140.dp), max = 1.0, height = 4.dp)
+                } else Fact("Milestones") { Value("All reached") }
+            },
+            { practisedThisMonth(s).let { n -> Fact("This month") { Value("$n practice ${plural(n, "day")}") } } },
+        )
+        HorizontalDivider(color = c.line)
     }
 }
 
-/** 26 week columns with month labels, scrolled to today (reverse scrolling starts at the end), weekday labels pinned left. */
 @Composable
-private fun SixMonths(s: Streak) {
-    val cols = heatColumns(s.days)
-    val cell = 14.dp
-    val gap = 4.dp
-    Row {
-        Column(Modifier.padding(top = 16.dp + gap).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(gap)) {
-            listOf("Mon", "", "Wed", "", "Fri", "", "").forEach {
-                Box(Modifier.height(cell), contentAlignment = Alignment.CenterStart) { Text(it, style = NB.type.caption, color = NB.colors.muted) }
-            }
-        }
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.weight(1f).horizontalScroll(rememberScrollState(), reverseScrolling = true)) {
-            HeatColumns(cols, localToday(s), cell, gap, describe = true, labels = monthLabels(cols))
-        }
+private fun FactRow(start: @Composable ColumnScope.() -> Unit, end: @Composable ColumnScope.() -> Unit) {
+    val line = NB.colors.line
+    // The vertical hairline is drawn, not a VerticalDivider: IntrinsicSize can't measure the Meter (BoxWithConstraints).
+    Row(Modifier.fillMaxWidth().drawBehind { drawLine(line, Offset(size.width / 2, 0f), Offset(size.width / 2, size.height), 1.dp.toPx()) }) {
+        Column(Modifier.weight(1f).padding(top = 14.dp, bottom = 14.dp, end = 16.dp), content = start)
+        Column(Modifier.weight(1f).padding(top = 14.dp, bottom = 14.dp, start = 16.dp), content = end)
     }
-    Spacer(Modifier.height(12.dp))
-    Legend()
 }
 
-/** Less ▢▢▢▢ More · ❄ frozen. The scale reads by fill strength, the freeze by its marker. */
+/** A caption label over its value. [spoken] replaces the pieces for TalkBack when they don't read well on their own. */
 @Composable
-private fun Legend() {
+private fun ColumnScope.Fact(label: String, spoken: String? = null, value: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().let { m -> if (spoken != null) m.clearAndSetSemantics { contentDescription = spoken } else m.semantics(mergeDescendants = true) {} },
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(label, style = NB.type.caption, color = NB.colors.muted)
+        value()
+    }
+}
+
+@Composable
+private fun Value(text: String) {
+    Text(text, style = NB.type.title2.copy(fontFeatureSettings = "tnum"), color = NB.colors.ink)
+}
+
+/** 13 weeks across the full width; tapping a square names the day and what was done on the line below. */
+@Composable
+private fun LastThreeMonths(s: Streak) {
+    val today = localToday(s)
+    val cols = heatColumns(s.days, weeks = 13)
+    val n = cols.flatten().count { it != null && it.level > 0 }
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
+    val day = picked?.let { p -> s.days.firstOrNull { it.day == p } }
+    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Last 3 months", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
+            Text("$n practice ${plural(n, "day")}", style = NB.type.caption, color = NB.colors.muted)
+        }
+        Heatmap(cols, today, gap = 3.dp, rowLabels = true, selected = picked, onSelect = { d: StreakDay -> picked = if (picked == d.day) null else d.day })
+        Text(
+            day?.let { dayDescription(it, today) } ?: "Tap a square to see that day",
+            style = NB.type.bodySmall, color = if (day != null) NB.colors.ink else NB.colors.muted,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        Legend(today)
+    }
+}
+
+/** Less ▢▢▢▢ More · ❄ Freeze · ▢ Today. The scale reads by fill strength, the freeze by its marker. */
+@Composable
+private fun Legend(today: String?) {
+    val cap = NB.type.caption
+    val muted = NB.colors.muted
     Row(
         Modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = "Darker squares mean more practice: drills, a test, or a test and drills. Snowflake squares were kept by a freeze."
+            contentDescription = "Darker squares mean more practice: drills, a test, or a test and drills. Snowflake squares were kept by a freeze. Today is outlined until you practise."
         },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("Less", style = NB.type.caption, color = NB.colors.muted)
+        Text("Less", style = cap, color = muted)
         listOf(0, 1, 2, 3).forEach { HeatCell(StreakDay("", it), null, 12.dp) }
-        Text("More", style = NB.type.caption, color = NB.colors.muted)
+        Text("More", style = cap, color = muted)
         Spacer(Modifier.weight(1f))
         HeatCell(StreakDay("", 0, frozen = true), null, 12.dp)
-        Text("Frozen", style = NB.type.caption, color = NB.colors.muted)
+        Text("Freeze", style = cap, color = muted)
+        Spacer(Modifier.width(10.dp))
+        HeatCell(StreakDay(today ?: "today", 0), today ?: "today", 12.dp)
+        Text("Today", style = cap, color = muted)
     }
 }
 
-/** One thing to do: drills when some are due, else a practice test. */
+/** One thing to do: drills when some are due, else a practice test. A plain button, no card. */
 @Composable
-private fun NextCard(nav: Nav, due: Int) {
-    NbCard {
+private fun Next(nav: Nav, due: Int) {
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            if (due > 0) "Keep it going: $due ${plural(due, "drill")} ${if (due == 1) "is" else "are"} waiting" else "A practice test keeps your streak going",
-            style = NB.type.title3, color = NB.colors.ink,
+            (if (due > 0) "$due ${plural(due, "drill")} ${if (due == 1) "is" else "are"} waiting. " else "") +
+                "One test part, 5 drills or 10 minutes of Listening or Reading counts as a day.",
+            style = NB.type.bodySmall, color = NB.colors.muted,
         )
-        Spacer(Modifier.height(4.dp))
-        Text("Five drills, one test part or ten minutes of listening or reading counts as a day.", style = NB.type.bodySmall, color = NB.colors.muted)
-        Spacer(Modifier.height(14.dp))
         if (due > 0) NbButton("Drill now", { nav.go(Review()) }, fill = true, size = BtnSize.Large, haptic = true)
         else NbButton("Start a practice test", { nav.openTab(Tab.Listening) }, fill = true, size = BtnSize.Large, haptic = true)
     }
