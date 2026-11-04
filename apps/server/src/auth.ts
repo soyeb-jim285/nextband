@@ -12,6 +12,7 @@ import { ApiError } from './errors';
 import { linkGuest } from './link';
 import { replayPrefix } from './replay';
 import { storage } from './storage';
+import { sendWelcomeEmail } from './upgrade-emails';
 import type { AppEnv } from './types';
 
 const ORIGINS = [env.WEB_ORIGIN, env.BETTER_AUTH_URL, ...env.EXTRA_ORIGINS];
@@ -40,20 +41,16 @@ export const auth = betterAuth({
     // No link-based reset (POST /api/auth/request-password-reset): it skipped the per-address email cooldown, and every client resets with the email-OTP code.
   },
   // Verification uses the OTP plugin's code (see below). Links already emailed still verify through GET /api/auth/verify-email.
-  emailVerification: { sendOnSignUp: !IS_TEST, autoSignInAfterVerification: true },
+  emailVerification: {
+    sendOnSignUp: !IS_TEST,
+    autoSignInAfterVerification: true,
+    // Free accounts get one welcome explaining Free vs Pro; in the background so verifying never waits on the email provider.
+    afterEmailVerification: async (u) => void sendWelcomeEmail(u.id),
+  },
   user: {
     deleteUser: {
       enabled: true,
-      // The DB cascades attempts and sessions; voice recordings in R2 must go too.
-      beforeDelete: async (u) => {
-        const sessions = await db.select({ id: schema.liveSessions.id }).from(schema.liveSessions).where(eq(schema.liveSessions.userId, u.id));
-        await storage.deletePrefix(`audio/${u.id}/`);
-        for (const { id } of sessions) await storage.deletePrefix(`live/${id}/`);
-        const replays = await db.select().from(schema.replaySessions).where(eq(schema.replaySessions.userId, u.id));
-        for (const r of replays) await storage.deletePrefix(replayPrefix(r));
-        await db.delete(schema.replaySessions).where(eq(schema.replaySessions.userId, u.id));
-        await db.delete(schema.aiLogs).where(eq(schema.aiLogs.userId, u.id)); // prompts hold their answers; guests need none (logs go after 14 days, guests after 30)
-      },
+      beforeDelete: (u) => purgeUserData(u.id),
     },
   },
   plugins: [
@@ -127,6 +124,17 @@ export const sessionMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   c.set('user', user);
   await next();
 });
+
+/** The DB cascades attempts and sessions on user delete; voice recordings in R2, replays and AI logs must go too. */
+export async function purgeUserData(userId: string) {
+  const sessions = await db.select({ id: schema.liveSessions.id }).from(schema.liveSessions).where(eq(schema.liveSessions.userId, userId));
+  await storage.deletePrefix(`audio/${userId}/`);
+  for (const { id } of sessions) await storage.deletePrefix(`live/${id}/`);
+  const replays = await db.select().from(schema.replaySessions).where(eq(schema.replaySessions.userId, userId));
+  for (const r of replays) await storage.deletePrefix(replayPrefix(r));
+  await db.delete(schema.replaySessions).where(eq(schema.replaySessions.userId, userId));
+  await db.delete(schema.aiLogs).where(eq(schema.aiLogs.userId, userId)); // prompts hold their answers; guests need none (logs go after 14 days, guests after 30)
+}
 
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   if (!c.get('user')) throw new HTTPException(401, { message: 'Sign in required' });

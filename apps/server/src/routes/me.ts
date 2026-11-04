@@ -1,5 +1,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { currentUser, isCambridgeAllowed, isOwner, requireUser } from '../auth';
+import { eq } from 'drizzle-orm';
+import { clearBearerCache, currentUser, isCambridgeAllowed, isOwner, purgeUserData, requireUser } from '../auth';
+import { db } from '../db/client';
+import { user as users } from '../db/schema';
+import { ApiError } from '../errors';
 import { clientIpHash } from '../ip';
 import { payerOf, quotaSnapshot } from '../quota';
 import { QuotaFields } from './community';
@@ -48,6 +52,30 @@ export function register(app: App) {
         },
         200,
       );
+    },
+  );
+
+  // Guests have no password, and Better Auth's delete-user wants one or a session younger than a day: this deletes a guest outright.
+  app.openapi(
+    createRoute({
+      method: 'delete',
+      path: '/api/me/guest',
+      tags: ['Account'],
+      summary: 'Delete the current guest and all its data (guests only)',
+      security: [{ bearer: [] }],
+      middleware: [requireUser] as const,
+      responses: {
+        200: { description: 'Deleted', content: { 'application/json': { schema: z.object({ ok: z.literal(true) }) } } },
+        403: { description: 'Not a guest: accounts delete with their password' },
+      },
+    }),
+    async (c) => {
+      const me = currentUser(c);
+      if (!me.isAnonymous) throw new ApiError(403, { error: 'Accounts are deleted with their password.', code: 'not_guest' });
+      await purgeUserData(me.id);
+      await db.delete(users).where(eq(users.id, me.id)); // cascades sessions, attempts, cards, settings
+      clearBearerCache(); // the deleted guest's token must stop working at once
+      return c.json({ ok: true as const }, 200);
     },
   );
 }

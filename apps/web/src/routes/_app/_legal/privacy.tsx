@@ -5,7 +5,7 @@ export const Route = createFileRoute('/_app/_legal/privacy')({ component: Privac
 
 function Privacy() {
   return (
-    <LegalPage title="Privacy policy" updated="29 October 2026">
+    <LegalPage title="Privacy policy" updated="5 November 2026">
         <Section title="Who we are">
           <p>{COMPANY.product} is run by {COMPANY.name}, {COMPANY.country}. {COMPANY.name} is responsible for the data described here.</p>
         </Section>
@@ -33,6 +33,17 @@ function Privacy() {
             <li>audio. Session recording captures no sound at all. The microphone is used only for the speaking test itself.</li>
           </List>
           <p>Recordings are deleted automatically after 14 days. Only the site owner can view them, and we use them only to fix bugs and improve the site.</p>
+          <p>Session recording is used on the website only. The Android app does not record your session.</p>
+        </Section>
+
+        <Section title="The Android app">
+          <List>
+            <li>The app uses the same account and keeps the same data as the website, described above.</li>
+            <li>Microphone: asked for only when you start a speaking test, and used only to record your answers. You can turn it off in your phone&apos;s settings at any time.</li>
+            <li>On your phone, the app keeps your sign-in (encrypted with a key held by Android), unsent speaking recordings, essay drafts and your settings. Unsent recordings belong to the account that made them and are deleted when you sign out without sending them. None of this is included in phone backups or transferred to a new phone.</li>
+            <li>The app does not use advertising IDs, does not show ads and does not track you across other apps.</li>
+            <li>If we add notifications, the app will ask for permission first, and you can turn each kind off in Settings. To send them we keep a notification token for your device, which is deleted with your account.</li>
+          </List>
         </Section>
 
         <Section title="Other services we send data to">
@@ -48,7 +59,7 @@ function Privacy() {
         <Section title="How long we keep it">
           <List>
             <li>Session recordings: 14 days.</li>
-            <li>Guest data: 30 days.</li>
+            <li>Guest data: 30 days, or straight away if you choose &quot;Delete my guest data&quot; in Settings.</li>
             <li>Everything else: until you delete your account. Deleting it (Settings, Danger zone) removes your tests, recordings, results and review cards.</li>
           </List>
         </Section>

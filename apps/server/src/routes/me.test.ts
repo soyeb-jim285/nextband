@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { req, testUser } from '../test/helpers';
+import { guestUser, req, testUser } from '../test/helpers';
 import { DEFAULT_SETTINGS } from '../settings';
 import { db } from '../db/client';
 import { aiLogs, liveSessions, replaySessions } from '../db/schema';
@@ -39,4 +39,14 @@ it('deleting the account also deletes its recordings', async () => {
   expect(await storage.size(rkey)).toBeNull();
   expect(await db.select().from(replaySessions).where(eq(replaySessions.id, rid))).toHaveLength(0);
   expect(await db.select().from(aiLogs).where(eq(aiLogs.userId, user.id))).toHaveLength(0); // AI logs hold their answers
+});
+
+it('a guest deletes itself without a password; an account cannot use the guest route', async () => {
+  const g = await guestUser();
+  await storage.put(`audio/${g.user.id}/x.webm`, new Uint8Array([1]), 'audio/webm');
+  expect((await req('/api/me/guest', { method: 'DELETE', headers: g.headers })).status).toBe(200);
+  expect((await req('/api/me', { headers: g.headers })).status).toBe(401);
+  expect(await storage.size(`audio/${g.user.id}/x.webm`)).toBeNull();
+  const { headers } = await testUser();
+  expect((await req('/api/me/guest', { method: 'DELETE', headers })).status).toBe(403);
 });

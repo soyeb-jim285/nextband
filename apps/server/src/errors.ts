@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'too_many_requests' // 429
   | 'otp_locked' // 429: too many wrong email codes for this address (auth-email.ts); `retryAfterSeconds` says when to try again
   | 'account_required' // 403
+  | 'not_guest' // 403: DELETE /api/me/guest is for guests; accounts delete with their password
   | 'cambridge_required' // 403: Listening & Reading are for Cambridge-allow-listed users
   | 'mock_open' // 409: the person already has an open full mock test (`mockId` says which)
   | 'mock_closed' // 409: the mock is finished or closed
