@@ -47,6 +47,31 @@ fun monthLabels(cols: List<List<StreakDay?>>): List<String?> = cols.mapIndexed {
     start?.month?.getDisplayName(TextStyle.SHORT, Locale.US)
 }
 
+/**
+ * Where each month label starts, in the units of [pitch] (null = dropped). A label starts over its column; one that would
+ * run past [total] ends at the edge instead. A label that would start before the previous one's end plus [minGap] is
+ * dropped, so wide labels at large font sizes never touch ("JulAug").
+ */
+fun monthLabelStarts(widths: List<Float?>, pitch: Float, total: Float, minGap: Float): List<Float?> {
+    var lastEnd = Float.NEGATIVE_INFINITY
+    return widths.mapIndexed { i, w ->
+        if (w == null) return@mapIndexed null
+        val x = (i * pitch).coerceAtMost(total - w).coerceAtLeast(0f)
+        if (x < lastEnd + minGap) null else x.also { lastEnd = x + w }
+    }
+}
+
+/**
+ * One cell per week for the Today card's one-row map: its fill comes from the practice days that week (1–2 low, 3–4 mid,
+ * 5+ full); a week with no practice but a freeze shows the freeze. Padding weeks stay empty (null).
+ */
+fun weekCells(cols: List<List<StreakDay?>>): List<List<StreakDay?>> = cols.map { col ->
+    val days = col.filterNotNull()
+    val first = days.firstOrNull() ?: return@map listOf(null)
+    val n = days.count { it.level > 0 }
+    listOf(StreakDay(first.day, when { n == 0 -> 0; n <= 2 -> 1; n <= 4 -> 2; else -> 3 }, frozen = n == 0 && days.any { it.frozen }))
+}
+
 private val LEVEL_WORDS = listOf("no practice", "drills", "a test", "a test and drills")
 
 /** "Sun 4 Oct: a test and drills" for one heatmap square (its TalkBack label and the line a tap shows). */

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -115,7 +116,8 @@ private val ROW_LABELS = listOf("Mon", "", "Wed", "", "Fri", "", "")
 
 /**
  * Week columns (Monday at the top) that share the width up to [maxCell] a square, centred when capped: nothing scrolls.
- * Month names sit over the column holding the 1st. The label sizes come from the text, so large fonts don't clip.
+ * Month names sit over the column holding the 1st ([months], one per column); one that would touch the label before it is
+ * dropped. The label sizes come from the text, so large fonts don't clip. A column may hold fewer than 7 squares.
  * [onSelect]: a tap anywhere on the grid picks the nearest square (one target, not 91 tiny ones). TalkBack reads one
  * summary per week; the caller can clear that and label the whole map instead.
  */
@@ -128,10 +130,10 @@ internal fun Heatmap(
     maxCell: Dp = 32.dp,
     rowLabels: Boolean = false,
     selected: String? = null,
+    months: List<String?> = remember(cols) { monthLabels(cols) },
     onSelect: ((StreakDay) -> Unit)? = null,
 ) {
     if (cols.isEmpty()) return
-    val months = remember(cols) { monthLabels(cols) }
     val weeks = remember(cols, today) { cols.map { weekDescription(it, today) } }
     val caption = NB.type.caption
     val muted = NB.colors.muted
@@ -157,15 +159,20 @@ internal fun Heatmap(
                     }
                 }
             }
+            val grid = cell * cols.size + gap * (cols.size - 1)
+            // Wider than its column, a label runs over the next ones; near the edge it ends there instead.
+            val starts = remember(months, caption, density, cell, gap) {
+                with(density) {
+                    val widths = months.map { m -> m?.let { measurer.measure(it, caption, softWrap = false).size.width.toFloat() } }
+                    monthLabelStarts(widths, (cell + gap).toPx(), grid.toPx(), 4.dp.toPx()).map { it?.toDp() }
+                }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                Row(Modifier.clearAndSetSemantics {}, horizontalArrangement = Arrangement.spacedBy(gap)) {
+                Box(Modifier.width(grid).height(monthRow).clearAndSetSemantics {}) {
                     months.forEachIndexed { i, month ->
-                        Box(Modifier.width(cell).height(monthRow)) {
-                            month?.let {
-                                // Wider than its column, it runs over the next ones; the last column's label ends at the edge instead.
-                                val align = if (i == cols.lastIndex) Alignment.End else Alignment.Start
-                                Text(it, style = caption, color = muted, softWrap = false, modifier = Modifier.align(Alignment.TopStart).wrapContentWidth(align, unbounded = true))
-                            }
+                        val x = starts[i]
+                        if (month != null && x != null) {
+                            Text(month, style = caption, color = muted, softWrap = false, modifier = Modifier.offset(x = x).wrapContentWidth(Alignment.Start, unbounded = true))
                         }
                     }
                 }
@@ -173,7 +180,7 @@ internal fun Heatmap(
                     detectTapGestures { p ->
                         val pitch = (cell + gap).toPx()
                         val c = ((p.x + gap.toPx() / 2) / pitch).toInt().coerceIn(0, cols.lastIndex)
-                        val r = ((p.y + gap.toPx() / 2) / pitch).toInt().coerceIn(0, 6)
+                        val r = ((p.y + gap.toPx() / 2) / pitch).toInt().coerceIn(0, cols[c].lastIndex)
                         cols[c][r]?.let(onSelect)
                     }
                 }
@@ -253,8 +260,8 @@ internal fun FreezeCount(n: Int) {
 }
 
 /**
- * The Today card: flame and count with the freezes, the practised line, and a compact 12 weeks (squares capped at 16dp so
- * the mock hero below stays in view).
+ * The Today card: flame and count with the freezes, the practised line, and 12 weeks as one row of squares (one per week,
+ * darker = more practice days) so the mock hero below stays in view; the streak page keeps the day-by-day grid.
  * At risk (after 18:00, nothing done, a streak of 2+) the line warns and a Drill button saves it. The card opens the streak screen.
  */
 @Composable
@@ -262,6 +269,8 @@ fun StreakCard(s: Streak, nav: Nav, hour: Int = hourNow()) {
     val risk = atRisk(s, hour)
     val cols = remember(s.days) { heatColumns(s.days, weeks = 12) }
     val n = remember(cols) { cols.sumOf { col -> col.count { it != null && it.level > 0 } } }
+    val weeks = remember(cols) { weekCells(cols) }
+    val months = remember(cols) { monthLabels(cols) }
     NbCard(onClick = { nav.go(StreakRoute) }, onClickLabel = "Open your streak") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(
@@ -280,7 +289,7 @@ fun StreakCard(s: Streak, nav: Nav, hour: Int = hourNow()) {
         Text(practisedLine(s, risk, n), style = NB.type.bodySmall, color = if (risk) NB.colors.ink else NB.colors.muted)
         Spacer(Modifier.height(14.dp))
         // The line above already says it for TalkBack.
-        Heatmap(cols, localToday(s), gap = 4.dp, maxCell = 16.dp, modifier = Modifier.clearAndSetSemantics {})
+        Heatmap(weeks, localToday(s), gap = 4.dp, maxCell = 24.dp, months = months, modifier = Modifier.clearAndSetSemantics {})
         if (risk) {
             Spacer(Modifier.height(14.dp))
             NbButton("Drill", { nav.requireAccount("Create an account to drill your mistakes.") { nav.go(Review()) } }, kind = BtnKind.Secondary, fill = true)

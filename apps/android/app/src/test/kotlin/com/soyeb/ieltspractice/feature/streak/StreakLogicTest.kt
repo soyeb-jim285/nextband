@@ -103,6 +103,26 @@ class StreakLogicTest {
         assertEquals(listOf(null, "Sep", null), monthLabels(heatColumns(late)))
     }
 
+    @Test fun monthLabelsNeverTouch() {
+        // pitch 15, labels 30 wide (large font), 4 apart: "Aug" 2 columns after "Jul" would touch, so it's dropped.
+        assertEquals(listOf(0f, null, null, 45f, null), monthLabelStarts(listOf(30f, null, 30f, 30f, null), 15f, 100f, 4f))
+        // Room enough: both stay. Near the edge a label ends at the edge.
+        assertEquals(listOf(0f, 40f), monthLabelStarts(listOf(30f, 30f), 40f, 80f, 4f))
+        assertEquals(listOf(null, 70f), monthLabelStarts(listOf(null, 30f), 80f, 100f, 4f))
+    }
+
+    @Test fun weekCellsSummariseEachWeek() {
+        val days = (0 until 14).map { i ->
+            val d = java.time.LocalDate.of(2026, 10, 5).plusDays(i.toLong()).toString() // Mon 5 Oct
+            if (i < 7) day(d, if (i < 3) 1 else 0) else day(d, 0, frozen = i == 9)
+        }
+        val cols = listOf(List<StreakDay?>(7) { null }) + heatColumns(days)
+        val w = weekCells(cols)
+        assertEquals(listOf(null), w[0])
+        assertEquals(StreakDay("2026-10-05", 2), w[1].single()) // 3 practice days → mid
+        assertEquals(HeatRole.Frozen, heatRole(w[2].single()!!))
+    }
+
     @Test fun thisMonth() {
         val s = Streak(days = listOf(day("2026-09-30", 3), day("2026-10-01", 1), day("2026-10-02"), day("2026-10-03", 2)))
         assertEquals(2, practisedThisMonth(s))

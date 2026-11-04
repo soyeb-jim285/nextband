@@ -177,8 +177,9 @@ private fun LastThreeMonths(s: Streak) {
     val onSelect = remember { { d: StreakDay -> picked = if (picked == d.day) null else d.day } }
     val day = picked?.let { p -> s.days.firstOrNull { it.day == p } }
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Last 3 months", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
+        // The count sits under the heading, not beside it, so a long count or a large font can't run into it.
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Last 3 months", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.semantics { heading() })
             Text("$n practice ${plural(n, "day")}", style = NB.type.caption, color = NB.colors.muted)
         }
         Heatmap(cols, today, gap = 3.dp, rowLabels = true, selected = picked, onSelect = onSelect)
