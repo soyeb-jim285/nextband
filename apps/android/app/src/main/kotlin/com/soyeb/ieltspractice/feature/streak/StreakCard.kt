@@ -121,13 +121,14 @@ internal fun WeekStrip(week: List<StreakWeekDay>, modifier: Modifier = Modifier)
                     weekLetter(d.day), style = NB.type.caption,
                     color = if (isToday) c.brandText else c.muted, fontWeight = if (isToday) FontWeight.Bold else null,
                 )
-                val (bg, edge): Pair<Color, Pair<Dp, Color>?> = when (d.state) {
+                val look: Pair<Color, Pair<Dp, Color>?> = when (d.state) {
                     "done" -> c.brand to null
                     "frozen" -> c.iceSoft to null
                     "missed" -> c.surface2 to null
                     "today" -> Color.Transparent to (2.dp to c.brand)
                     else -> Color.Transparent to (1.dp to c.line)
                 }
+                val (bg, edge) = look
                 Box(
                     Modifier.size(32.dp).background(bg, CircleShape).let { m -> edge?.let { m.border(it.first, it.second, CircleShape) } ?: m },
                     contentAlignment = Alignment.Center,
