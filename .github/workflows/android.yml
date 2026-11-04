@@ -16,6 +16,9 @@ concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write # the screens/APK release below
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -34,6 +37,19 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Build, test and record screenshots
         run: ./gradlew assembleDebug assembleRelease recordRoborazziDebug --stacktrace --continue
+      # Also a rolling pre-release per branch: release files don't count against the Actions artifact storage quota.
+      - name: Publish screens and APKs to the branch's rolling release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: android-${{ github.ref_name }}-latest
+        run: |
+          [ -d screenshots ] && (cd screenshots && zip -qr ../android-screens.zip .) || true
+          files=$(ls android-screens.zip app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release.apk 2>/dev/null || true)
+          [ -z "$files" ] && exit 0
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --target "$GITHUB_SHA" --title "$TAG" --notes "Rolling build from ${{ github.ref_name }}"
+          gh release edit "$TAG" --notes "Rolling build from ${{ github.ref_name }} at $GITHUB_SHA"
+          gh release upload "$TAG" $files --clobber
       - uses: actions/upload-artifact@v4
         if: always()
         with:

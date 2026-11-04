@@ -109,7 +109,7 @@ class SessionModel(
     private var prepEnd = 0L
     private var starting = false
     private var finishing = false // the recording is being closed off the main thread
-    private var away by mutableStateOf(false)
+    private var hidden by mutableStateOf(false)
 
     val current: Prompt? get() = items.getOrNull(index)
     val mockId: String? get() = route.mockId
@@ -297,7 +297,7 @@ class SessionModel(
 
     /** The screen left the foreground (a call, another app): hold the recording so it doesn't fill with silence; it continues on return. */
     fun setAway(away: Boolean) {
-        this.away = away
+        hidden = away
         recorder.away = away
         // The mic check holds the microphone for nothing while the screen is hidden: close it, and open it again on return.
         if (phase == Phase.MicCheck) { if (away) micCheck.stop() else retryMicCheck() }
@@ -406,7 +406,7 @@ class SessionModel(
     /** Ten times a second: copy the meters for the screen, and stop the recording at its hard limit. */
     private suspend fun tick() {
         // Wakes only while a meter is on screen and the app is in front; otherwise it sleeps until that changes.
-        snapshotFlow { !away && (phase == Phase.MicCheck || phase == Phase.Recording) }.collectLatest { on ->
+        snapshotFlow { !hidden && (phase == Phase.MicCheck || phase == Phase.Recording) }.collectLatest { on ->
             while (on) {
                 tickOnce()
                 delay(100)
