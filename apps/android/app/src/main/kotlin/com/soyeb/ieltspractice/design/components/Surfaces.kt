@@ -57,6 +57,7 @@ fun NbCard(
     tone: CardTone = CardTone.Default,
     tint: Color? = null,
     onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
     padding: PaddingValues = PaddingValues(NB.space.cardPad),
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -73,7 +74,7 @@ fun NbCard(
         val src = remember { MutableInteractionSource() }
         Surface(
             modifier = modifier.fillMaxWidth().pressScale(src, 0.985f).clip(NB.shape.card)
-                .clickable(src, PressWash, role = Role.Button, onClick = onClick),
+                .clickable(src, PressWash, onClickLabel = onClickLabel, role = Role.Button, onClick = onClick),
             shape = NB.shape.card, color = bg, contentColor = c.ink, border = border, content = inner,
         )
     }

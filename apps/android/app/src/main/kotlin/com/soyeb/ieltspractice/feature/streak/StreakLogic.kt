@@ -62,6 +62,18 @@ fun dayDescription(d: StreakDay, today: String?): String {
     return "${if (d.day == today) "Today, " else ""}$name: $what"
 }
 
+/**
+ * One TalkBack stop per heatmap week: "Week of 4 Aug, 2 practice days. Mon 4 Aug: drills. Wed 6 Aug: a test", naming only
+ * the days with something to say (practice, a freeze, today). Empty for a padding column.
+ */
+fun weekDescription(col: List<StreakDay?>, today: String?): String {
+    val days = col.filterNotNull()
+    val monday = days.firstOrNull()?.let { date(it.day) }?.let { it.minusDays(it.dayOfWeek.value - 1L) } ?: return ""
+    val n = days.count { it.level > 0 }
+    val notes = days.filter { it.level > 0 || it.frozen || it.day == today }.map { dayDescription(it, today) }
+    return (listOf("Week of ${monday.format(DateTimeFormatter.ofPattern("d MMM", Locale.US))}, $n practice ${plural(n, "day")}") + notes).joinToString(". ")
+}
+
 /** Practice days so far in today's calendar month. */
 fun practisedThisMonth(s: Streak): Int {
     val month = localToday(s)?.take(7) ?: return 0
@@ -73,10 +85,10 @@ fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
 /** After 18:00 local with nothing done today, a streak worth keeping (2+) is at risk. */
 fun atRisk(s: Streak, hour: Int): Boolean = !s.done && s.current >= 2 && hour >= 18
 
-/** The Today card line. */
-fun practisedLine(s: Streak, risk: Boolean): String =
+/** The Today card line. [days]: practice days in the card's 12-week map, so the line matches what it shows. */
+fun practisedLine(s: Streak, risk: Boolean, days: Int): String =
     if (risk) "Ends at midnight: a 2-minute drill saves it"
-    else "You practised ${s.practicedLast35} of the last 35 days · Longest ${s.longest}"
+    else "$days practice ${plural(days, "day")} in the last 12 weeks · Longest ${s.longest}"
 
 /** Under the freeze count: "next at day 14". One freeze per 7 days in a row, at most 2 held. */
 fun freezeNote(s: Streak): String = if (s.freezes >= 2) "the most you can hold" else "next at day ${(s.current / 7 + 1) * 7}"

@@ -2,6 +2,7 @@ package com.soyeb.ieltspractice.feature.streak
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,17 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -164,49 +164,61 @@ private fun Value(text: String) {
     Text(text, style = NB.type.title2.copy(fontFeatureSettings = "tnum"), color = NB.colors.ink)
 }
 
-/** 13 weeks across the full width; tapping a square names the day and what was done on the line below. */
+/**
+ * 13 weeks across the full width; tapping the grid names the nearest day on the line below. TalkBack reads one summary per
+ * week instead (13 stops, not 91), so the line isn't a live region and nothing is announced twice.
+ */
 @Composable
 private fun LastThreeMonths(s: Streak) {
     val today = localToday(s)
-    val cols = heatColumns(s.days, weeks = 13)
-    val n = cols.flatten().count { it != null && it.level > 0 }
+    val cols = remember(s.days) { heatColumns(s.days, weeks = 13) }
+    val n = remember(cols) { cols.sumOf { col -> col.count { it != null && it.level > 0 } } }
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
+    val onSelect = remember { { d: StreakDay -> picked = if (picked == d.day) null else d.day } }
     val day = picked?.let { p -> s.days.firstOrNull { it.day == p } }
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text("Last 3 months", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
             Text("$n practice ${plural(n, "day")}", style = NB.type.caption, color = NB.colors.muted)
         }
-        Heatmap(cols, today, gap = 3.dp, rowLabels = true, selected = picked, onSelect = { d: StreakDay -> picked = if (picked == d.day) null else d.day })
+        Heatmap(cols, today, gap = 3.dp, rowLabels = true, selected = picked, onSelect = onSelect)
         Text(
             day?.let { dayDescription(it, today) } ?: "Tap a square to see that day",
             style = NB.type.bodySmall, color = if (day != null) NB.colors.ink else NB.colors.muted,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
-        Legend(today)
+        Legend(today, s.done)
     }
 }
 
-/** Less ▢▢▢▢ More · ❄ Freeze · ▢ Today. The scale reads by fill strength, the freeze by its marker. */
+/**
+ * Less ▢▢▢▢ More · ❄ Freeze · ▢ Today. The scale reads by fill strength, the freeze by its marker. Two groups that wrap
+ * at large font sizes; "Today" shows only while today's square is outlined (not done yet).
+ */
 @Composable
-private fun Legend(today: String?) {
+private fun Legend(today: String?, done: Boolean) {
     val cap = NB.type.caption
     val muted = NB.colors.muted
-    Row(
+    FlowRow(
         Modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = "Darker squares mean more practice: drills, a test, or a test and drills. Snowflake squares were kept by a freeze. Today is outlined until you practise."
+            contentDescription = "Darker squares mean more practice: drills, a test, or a test and drills. Snowflake squares were kept by a freeze." +
+                if (done) "" else " Today is outlined until you practise."
         },
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Less", style = cap, color = muted)
-        listOf(0, 1, 2, 3).forEach { HeatCell(StreakDay("", it), null, 12.dp) }
-        Text("More", style = cap, color = muted)
-        Spacer(Modifier.weight(1f))
-        HeatCell(StreakDay("", 0, frozen = true), null, 12.dp)
-        Text("Freeze", style = cap, color = muted)
-        Spacer(Modifier.width(10.dp))
-        HeatCell(StreakDay(today ?: "today", 0), today ?: "today", 12.dp)
-        Text("Today", style = cap, color = muted)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Less", style = cap, color = muted)
+            listOf(0, 1, 2, 3).forEach { HeatCell(StreakDay("", it), null, 12.dp) }
+            Text("More", style = cap, color = muted)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            HeatCell(StreakDay("", 0, frozen = true), null, 12.dp)
+            Text("Freeze", style = cap, color = muted)
+            if (!done) {
+                Spacer(Modifier.width(6.dp))
+                HeatCell(StreakDay(today ?: "today", 0), today ?: "today", 12.dp)
+                Text("Today", style = cap, color = muted)
+            }
+        }
     }
 }
 

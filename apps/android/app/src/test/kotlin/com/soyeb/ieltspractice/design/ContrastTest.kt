@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.soyeb.ieltspractice.feature.streak.HeatRole
+import com.soyeb.ieltspractice.feature.streak.heat
 
 /** WCAG AA for every token pair the UI draws: 4.5 for text, 3.0 for icons, fills and control edges. */
 class ContrastTest {
@@ -45,6 +47,11 @@ class ContrastTest {
         need("writing/soft", c.writing, c.writingSoft, 3.0)
         need("speaking/soft", c.speaking, c.speakingSoft, 3.0)
         need("bg/ink (snackbar)", c.bg, c.ink, 4.5)
+        // Streak heatmap: neighbouring levels must differ by fill strength, not only hue (colour-blind reading).
+        val heat = listOf(HeatRole.Empty, HeatRole.Low, HeatRole.Mid, HeatRole.Full)
+        heat.zipWithNext().forEach { (a, b) -> need("heat $a/$b", c.heat(a), c.heat(b), 1.5) }
+        need("streak future ring/surface", c.faint, c.surface, 3.0)
+        need("streak missed dash/surface2", c.muted, c.surface2, 3.0)
         assertTrue(fails.joinToString("\n"), fails.isEmpty())
     }
 

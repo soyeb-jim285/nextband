@@ -47,8 +47,19 @@ class StreakLogicTest {
         assertFalse(atRisk(pending, 17))
         assertFalse(atRisk(pending.copy(today = "done"), 21))
         assertFalse(atRisk(pending.copy(current = 1), 21))
-        assertEquals("Ends at midnight: a 2-minute drill saves it", practisedLine(pending, true))
-        assertEquals("You practised 23 of the last 35 days · Longest 21", practisedLine(Streak(practicedLast35 = 23, longest = 21), false))
+        assertEquals("Ends at midnight: a 2-minute drill saves it", practisedLine(pending, true, 3))
+        assertEquals("23 practice days in the last 12 weeks · Longest 21", practisedLine(Streak(longest = 21), false, 23))
+        assertEquals("1 practice day in the last 12 weeks · Longest 1", practisedLine(Streak(longest = 1), false, 1))
+    }
+
+    @Test fun weekSummaryNamesOnlyDaysWithSomethingToSay() {
+        // Wed 30 Sep 2026 starts the history; the week is Mon 28 Sep .. Sun 4 Oct.
+        val col = heatColumns(listOf(day("2026-09-30", 1), day("2026-10-01"), day("2026-10-02", frozen = true), day("2026-10-03")))[0]
+        assertEquals(
+            "Week of 28 Sep, 1 practice day. Wed 30 Sep: drills. Fri 2 Oct: kept by a freeze. Today, Sat 3 Oct: not practised yet",
+            weekDescription(col, "2026-10-03"),
+        )
+        assertEquals("", weekDescription(List(7) { null }, null))
     }
 
     @Test fun copy() {

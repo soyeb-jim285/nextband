@@ -35,8 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -103,15 +101,14 @@ fun StreakCelebration(s: Streak, onDismiss: () -> Unit) {
     val brand = NB.colors.brand
 
     NbSheet(onDismiss, actions = { NbButton("Keep going", onDismiss, fill = true, size = BtnSize.Large) }) {
-        Column(
-            Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-                contentDescription = "${flameDescription(s)}. ${celebrationLine(s.current)}"
-                liveRegion = LiveRegionMode.Polite
-            },
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        // The sheet takes focus and reads itself, so no live region. Only the flame and count merge, so the cheer line
+        // keeps its own heading node.
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (milestone != null) Tag("$milestone-day milestone", fg = NB.colors.brandText, bg = NB.colors.brandSoft, modifier = Modifier.padding(bottom = 12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.semantics(mergeDescendants = true) { contentDescription = flameDescription(s) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(
                     Modifier.drawBehind {
                         // Read in the draw phase only: the bloom redraws each frame without recomposing.

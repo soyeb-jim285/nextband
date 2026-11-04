@@ -33,6 +33,7 @@ class DeviceScreenshotTest {
     @Test @Config(qualifiers = "w800dp-h360dp-land-xxhdpi") fun signinLandscape() = shot("auth", "auth-land", variant = "SignIn")
     @Test fun welcomeFont200() = shot("welcome", "welcome-font200", fontScale = 2f)
     @Test fun todayFont200() = shot("today", "today-font200", fontScale = 2f)
+    @Test fun streakFont200() = shot("streak", "streak-font200", fontScale = 2f)
     @Test fun writingFont200() = shot("editor", "editor-font200", variant = "Typing", fontScale = 2f)
     @Test @Config(qualifiers = "w1280dp-h800dp-mdpi") fun todayTablet() = shot("today", "today-tablet")
     @Test @Config(qualifiers = "w1280dp-h800dp-mdpi") fun readingTablet() = shot("lr-reading", "lr-reading-tablet", variant = "Passage")
