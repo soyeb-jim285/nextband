@@ -6,7 +6,7 @@ import { userSettings } from './db/schema';
 /** The analysis models: the same for everyone (no per-user choice). */
 export const MODELS = {
   analysis: 'anthropic/claude-haiku-5.5', // writing: proofreading, feedback, image-figure scoring. Falls back to luna (openrouter.ts chat)
-  speaking: 'openai/gpt-6-luna', // speaking feedback and disfluency tags stay on luna until Haiku is checked on real recordings
+  speaking: 'anthropic/claude-haiku-5.5', // speaking feedback, scoring, disfluency tags: house Anthropic key (BYOK), falls back to luna like writing
   stt: 'elevenlabs/scribe-v2', // Scribe v2 through OpenRouter (spec §5.2), falling back to Whisper on error
 };
 export type Models = typeof MODELS;
