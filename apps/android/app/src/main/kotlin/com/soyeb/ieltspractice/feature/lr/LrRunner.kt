@@ -209,7 +209,7 @@ private fun lrPalette(scheme: String): NbColors? {
         bg = Color(bg), surface = Color(bg), surface2 = Color(well), surface3 = Color(well), ink = Color(fg), muted = Color(fg), faint = Color(fg), line = Color(fg),
         brand = Color(fg), onBrand = Color(bg), brandSoft = Color(soft), brandText = Color(fg),
         good = b.good, goodText = b.goodText, goodSoft = b.goodSoft, warn = b.warn, warnText = b.warnText, warnSoft = b.warnSoft,
-        bad = b.bad, badText = b.badText, badSoft = b.badSoft,
+        bad = b.bad, badText = b.badText, badSoft = b.badSoft, onBad = b.onBad,
         listening = Color(fg), listeningSoft = Color(soft), reading = Color(fg), readingSoft = Color(soft),
         writing = b.writing, writingSoft = b.writingSoft, speaking = b.speaking, speakingSoft = b.speakingSoft,
         scrim = b.scrim, isDark = scheme == "yb",
