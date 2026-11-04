@@ -3,15 +3,18 @@ package com.soyeb.ieltspractice.feature.study
 import com.soyeb.ieltspractice.data.model.DueCard
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class StudyLogicTest {
-    private fun card(front: String = "f", back: String = "b", source: String? = null, ease: Double? = null, interval: Double? = null, reps: Int? = null) =
-        DueCard("c", front, back, source, ease, interval, reps)
+    private fun card(front: String = "f", back: String = "b", source: String? = null, ease: Double? = null, interval: Double? = null, reps: Int? = null, category: String? = null) =
+        DueCard("c", front, back, source, ease, interval, reps, category)
 
     @Test fun againAlwaysComesBackNextDay() {
         assertEquals(1, nextInterval(card(reps = 5, interval = 30.0), 1))
-        assertEquals("This session", hint(card(), 1))
+        assertEquals("tomorrow", gotItHint(card(reps = 0)))
+        assertEquals("in 6 days", gotItHint(card(reps = 1)))
     }
 
     @Test fun firstAndSecondRepetitionsAreFixed() {
@@ -34,15 +37,46 @@ class StudyLogicTest {
     }
 
     @Test fun fixCardsSplitTheirTitle() {
-        assertEquals("Fix the tense" to "I go yesterday.", splitFixCard(card(front = "Fix the tense\n\nI go yesterday.", source = "fix")))
-        assertEquals(null to "a\n\nb", splitFixCard(card(front = "a\n\nb", source = "mistake")))
+        assertEquals("Fix the tense" to "I go yesterday.", promptOf(card(front = "Fix the tense\n\nI go yesterday.", source = "fix")))
+        assertEquals(null to "a\n\nb", promptOf(card(front = "a\n\nb", source = "mistake")))
+        assertEquals(null to "in the society", promptOf(card(front = "Fix: \"in the society\"", source = "mistake")))
     }
 
-    @Test fun spellingCardsKeepTheWordOnTheBack() {
-        val spell = card(front = "🎧 Listening · spell the word you heard", back = "sediment\nrock layers")
-        assertEquals("sediment", heardWord(spell))
-        assertEquals("Listening · spell the word you heard", cleanFront(spell).second)
-        assertNull(heardWord(card(front = "plain")))
+    @Test fun spellingCardsShowTheirHint() {
+        val spell = card(front = "🎧 Listening · spell the word you heard: 's______t' (8 letters)", back = "sediment\nYou wrote: sedement", category = "spelling")
+        assertEquals("Listening · spell the word you heard" to "s______t (8 letters)", promptOf(spell))
+        assertEquals("sediment" to "You wrote: sedement", answerOf(spell.back))
+        assertTrue(isHeard(spell))
+        assertFalse(isHeard(card(front = "plain", category = "spelling")))
+    }
+
+    @Test fun answersSplitFromTheirReason() {
+        assertEquals("do research" to "Uncountable.", answerOf("do research — Uncountable."))
+        assertEquals("do research" to "Uncountable.", answerOf("do research\n\nUncountable."))
+        assertEquals("do research" to "", answerOf(" do research "))
+    }
+
+    @Test fun answersMatchIgnoringCaseAndPunctuation() {
+        assertTrue(sameAnswer("I have lived there since 2015", "I have lived there since 2015."))
+        assertTrue(sameAnswer("  i HAVE lived  there since 2015 ", "I have lived there since 2015"))
+        assertFalse(sameAnswer("I lived there since 2015", "I have lived there since 2015"))
+    }
+
+    @Test fun diffShowsWhatToRemoveAndAdd() {
+        assertEquals(
+            listOf(Change.Same to "I", Change.Gone to "living", Change.Added to "have", Change.Added to "lived", Change.Same to "there"),
+            wordDiff("I living there", "I have lived there"),
+        )
+        assertEquals(listOf(Change.Added to "word"), wordDiff("", "word"))
+    }
+
+    @Test fun recurringAndTrendLinesRead() {
+        assertEquals("also in your last test", seenLine(1, 1))
+        assertEquals("also in all of your last 4 tests", seenLine(4, 4))
+        assertEquals("also in 2 of your last 5 tests", seenLine(2, 5))
+        assertEquals("Down to 1.3 a test from 3", trendLine(1.3, 3.0))
+        assertNull(trendLine(0.0, 0.0))
+        assertNull(trendLine(null, 2.0))
     }
 
     @Test fun neighboursWithTheSameKeyShareARun() {

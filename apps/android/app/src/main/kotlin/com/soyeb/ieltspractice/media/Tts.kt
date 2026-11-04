@@ -28,6 +28,9 @@ class Tts(context: Context) {
         }.also { engine = it }
     }
 
+    /** The engine started and failed: no voice on this device, [speak] says nothing. */
+    val unavailable: Boolean get() = ready.isCompleted && !ok
+
     /** Says [text] now, cutting off any word still being spoken. [accent]: "uk" (default) or "us". A little slow (0.85). */
     fun speak(text: String, accent: String = "uk") {
         val t = start()

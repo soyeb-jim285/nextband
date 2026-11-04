@@ -20,11 +20,11 @@ pattern, so the bar never needs a sixth slot.
 
 | Where | What lives there |
 |---|---|
-| **Today** (tab) | greeting + streak · **Full mock hero** (start / resume / last mock band) · predicted bands (4 skills + overall vs target) · "Up next" (coach next step or weakest skill) · Study tools row: **Review** (due badge), **Mistakes**, **Coach**, **History** · recent results · exam countdown when an exam date is set |
+| **Today** (tab) | greeting + streak · **Full mock hero** (start / resume / last mock band) · predicted bands (4 skills + overall vs target) · "Up next" (coach next step or weakest skill) · Study tools row: **Drill** (due badge), **Patterns**, **Your plan** (coach), **History** · recent results · exam countdown when an exam date is set |
 | **Listening / Reading** (tabs) | mock strip · continue-unfinished card · Academic/General switch (reading) · Cambridge books + original tests grouped · per-test best band · single part / passage practice · spelling drill (listening) |
 | **Writing** (tab) | mock strip · full test (T1+T2, 60 min) · Task 1 (Academic chart / General letter) · Task 2 · prompt bank entry · drafts · recent results |
 | **Speaking** (tab) | mock strip · **Live examiner** hero (when `me.live`) · full recorded test · Part 1 / 2 / 3 practice · pending uploads · prompt bank entry · recent results |
-| **You** (avatar on every tab root, top-right) | profile + plan/tier + tests left · target band, exam date, test type · History · Mistakes · Review deck · Coach · Prompt bank · Settings (appearance, writing options, emails) · Help & legal · Sign out / delete account. Guest: big "Create account to keep your results" card |
+| **You** (avatar on every tab root, top-right) | profile + plan/tier + tests left · target band, exam date, test type · History · Patterns · Drill · Your plan · Prompt bank · Settings (appearance, writing options, emails) · Help & legal · Sign out / delete account. Guest: big "Create account to keep your results" card |
 
 **The full mock is visible everywhere it matters:** hero on Today; a slim "Full mock · 2 h 45 m · L→R→W→S" strip at the top of
 each skill tab (becomes "Resume mock · Reading next" when one is open). A started mock owns the screen: its hub shows the four
@@ -161,8 +161,8 @@ Mock
 - ✓ Mock result (overall + 4 bands)
 
 Study tools & you
-- ✓ Review session (flashcards, flip, grade Again/Hard/Good/Easy, due count, TTS)
-- ✓ Mistakes (grouped by category, add to deck)
+- ✓ Drill (type the fix, check with a word diff, Got it / Not yet, skip for good, one pattern or ahead of schedule, spelling word from the test recording with TTS fallback)
+- ✓ Patterns (what keeps coming back: tests, trend, Drill per pattern; the mistake log under it, add to drills) and "Mistakes you have made before" on results
 - ✓ Coach (report: summary, priorities, plan; "updating" polling; feedback thumbs)
 - ✓ History (bucketed by date, skill filter chips, swipe-to-delete with undo)
 - ✓ Prompt bank (search, skill/part/topic filters)

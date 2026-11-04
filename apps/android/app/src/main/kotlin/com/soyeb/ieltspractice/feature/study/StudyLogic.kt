@@ -3,12 +3,14 @@ package com.soyeb.ieltspractice.feature.study
 import com.soyeb.ieltspractice.data.model.DueCard
 import kotlin.math.roundToInt
 
-// Pure logic for the study tools (no Compose): the review scheduler preview and the card text rules.
+// Pure logic for the study tools (no Compose): the drill scheduler preview and the card text rules.
 
-internal class Grade(val value: Int, val label: String)
+/** The two drill verdicts as the scheduler takes them (SM-2 quality): Not yet comes back this session and tomorrow. */
+internal const val NOT_YET = 1
+internal const val GOT_IT = 4
 
-/** Again, Hard, Good, Easy as the scheduler takes them (SM-2 quality 1, 3, 4, 5). */
-internal val grades = listOf(Grade(1, "Again"), Grade(3, "Hard"), Grade(4, "Good"), Grade(5, "Easy"))
+/** A drill session is this many cards; "Keep going" starts another. */
+internal const val SESSION = 10
 
 /** Port of packages/core srs.ts `review`: the interval in days the card would get for grade [g]. */
 internal fun nextInterval(c: DueCard, g: Int): Int {
@@ -21,33 +23,71 @@ internal fun nextInterval(c: DueCard, g: Int): Int {
 
 internal fun daysLabel(n: Int): String = if (n == 1) "1 day" else if (n < 30) "$n days" else "${(n / 30.0).roundToInt()} mo"
 
-/** What the grade bar shows under a button: Again comes back this session, the rest after [nextInterval] days. */
-internal fun hint(c: DueCard, g: Int): String = if (g < 3) "This session" else daysLabel(nextInterval(c, g))
+/** Under Got it: when the card comes back. */
+internal fun gotItHint(c: DueCard): String = nextInterval(c, GOT_IT).let { if (it == 1) "tomorrow" else "in ${daysLabel(it)}" }
 
-/** Fix cards are "title\n\nsentence" (server fixCard): the title is a label, only the sentence is the thing to improve. */
-internal fun splitFixCard(card: DueCard): Pair<String?, String> {
-    val i = card.front.indexOf("\n\n")
-    return if (card.source == "fix" && i > 0) card.front.substring(0, i) to card.front.substring(i + 2) else null to card.front
+/** What to type, and the why under it. Backs are "correction — why" (server mistakeCard), "correction\n\nwhy" (result pages, fix cards) or "word\nYou wrote: x" (spelling). */
+internal fun answerOf(back: String): Pair<String, String> {
+    val m = Regex(""" — |\n\n|\n(?=You (?:wrote|typed):)""").find(back) ?: return back.trim() to ""
+    return back.substring(0, m.range.first).trim() to back.substring(m.range.last + 1).trim()
 }
 
-private const val HEADPHONES = "🎧" // the server marks Listening spelling cards with this emoji; the app never shows it
-
-/** Listening spelling cards ("<headphones> Listening · spell the word you heard…") keep the word as the first line of the back. */
-internal fun heardWord(card: DueCard): String? =
-    if (card.front.startsWith(HEADPHONES)) card.back.lineSequence().first().trim().ifEmpty { null } else null
-
-/** The question text as shown: no marker emoji, fix-card title split off. */
-internal fun cleanFront(card: DueCard): Pair<String?, String> {
-    val (label, text) = splitFixCard(card)
-    return label to text.removePrefix(HEADPHONES).trim()
+/** The text to correct, with a label: a fix card's title, or "Listening · spell the word you heard" for spelling cards. */
+internal fun promptOf(c: DueCard): Pair<String?, String> {
+    val cut = if (c.source == "fix") c.front.indexOf("\n\n") else -1
+    if (cut > 0) return c.front.substring(0, cut) to c.front.substring(cut + 2)
+    // server lr.ts spellingCards: "🎧 Listening · spell the word you heard: 'p__k' (4 letters)"
+    Regex("""^(?:🎧|📖) (.+?): '(.+)'(.*)$""").find(c.front)?.let { m ->
+        return m.groupValues[1].replaceFirstChar { it.uppercase() } to m.groupValues[2] + m.groupValues[3]
+    }
+    return null to c.front.trim().removePrefix("🎧").removePrefix("📖").trim().removeSurrounding("Fix: \"", "\"")
 }
 
-internal val sourceLabel = mapOf("mistake" to "From your mistakes", "vocab" to "Vocabulary", "fix" to "Fix to practise")
-internal val sourcePrompt = mapOf(
-    "mistake" to "How would you correct this? Say or write it, then turn the card.",
-    "vocab" to "Recall the meaning and use it in a sentence, then turn the card.",
-    "fix" to "How would you improve this sentence? Say or write it, then turn the card.",
-)
+private fun norm(s: String) = s.lowercase().replace(Regex("""[^\p{L}\p{N}' ]+"""), " ").replace(Regex("""\s+"""), " ").trim()
+
+/** Same words, ignoring case, punctuation and spacing. */
+internal fun sameAnswer(typed: String, answer: String) = norm(typed) == norm(answer)
+
+/** A spelling card from the Listening test: its word can be heard. */
+internal fun isHeard(c: DueCard) = c.category == "spelling" && c.front.startsWith("🎧")
+
+internal enum class Change { Same, Gone, Added }
+
+/** Word diff of what was typed against the answer (LCS over words), for "your version, with the changes it needs". */
+internal fun wordDiff(typed: String, answer: String): List<Pair<Change, String>> {
+    val a = typed.trim().split(Regex("""\s+""")).filter { it.isNotEmpty() }
+    val b = answer.trim().split(Regex("""\s+""")).filter { it.isNotEmpty() }
+    val k = Array(a.size + 1) { IntArray(b.size + 1) }
+    for (i in a.indices.reversed()) for (j in b.indices.reversed())
+        k[i][j] = if (a[i].equals(b[j], true)) k[i + 1][j + 1] + 1 else maxOf(k[i + 1][j], k[i][j + 1])
+    val out = mutableListOf<Pair<Change, String>>()
+    var i = 0; var j = 0
+    while (i < a.size || j < b.size) when {
+        i < a.size && j < b.size && a[i].equals(b[j], true) -> { out += Change.Same to b[j]; i++; j++ }
+        // removals before additions, so "~~living~~ have lived" reads in order
+        i < a.size && (j == b.size || k[i + 1][j] >= k[i][j + 1]) -> { out += Change.Gone to a[i]; i++ }
+        else -> { out += Change.Added to b[j]; j++ }
+    }
+    return out
+}
+
+/** "also in 3 of your last 5 tests" for a recurring mistake. */
+internal fun seenLine(before: Int, outOf: Int): String = when {
+    before == outOf && outOf == 1 -> "also in your last test"
+    before == outOf -> "also in all of your last $outOf tests"
+    else -> "also in $before of your last $outOf ${plural(outOf, "test")}"
+}
+
+/** A pattern's trend from mistakes per test, newest 3 tests against the 3 before: null when either is unknown or both are 0. */
+internal fun trendLine(recent: Double?, before: Double?): String? {
+    if (recent == null || before == null || (recent == 0.0 && before == 0.0)) return null
+    val f = { x: Double -> com.soyeb.ieltspractice.data.logic.fmtNum(x) }
+    return when {
+        recent < before -> "Down to ${f(recent)} a test from ${f(before)}"
+        recent > before -> "Up to ${f(recent)} a test from ${f(before)}"
+        else -> "Steady at ${f(recent)} a test"
+    }
+}
 
 internal fun plural(n: Int, one: String, many: String = one + "s") = if (n == 1) one else many
 
@@ -59,8 +99,8 @@ internal fun actionLabel(action: String): String? = when (action) {
     "speak-full" -> "Take a speaking test"
     "listening-test" -> "Take a Listening test"
     "reading-test" -> "Take a Reading test"
-    "see-evidence" -> "See your mistakes"
-    "review-deck" -> "Open your review deck"
+    "see-evidence" -> "See your patterns"
+    "review-deck" -> "Drill your mistakes"
     else -> null
 }
 

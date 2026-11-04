@@ -73,7 +73,7 @@ private suspend fun loadUpdates(api: Api, examDate: String?): List<Update> = cor
         recent.filter { it.status == HStatus.Done && it.band != null }.take(4).forEach { item: HistoryItem ->
             add(Update("d:${item.id}", Icons.Rounded.TaskAlt, item.skill, "${item.skill.label} result: band ${fmtBand(item.band)}", item.title, item.instant) { n -> openItem(n, item) })
         }
-        due.await().takeIf { it > 0 }?.let { add(Update("cards", Icons.Rounded.Style, null, "$it review ${if (it == 1) "card" else "cards"} due", "A few minutes keeps your mistakes from coming back.", null) { n -> n.go(Review) }) }
+        due.await().takeIf { it > 0 }?.let { add(Update("cards", Icons.Rounded.Style, null, "$it drill ${if (it == 1) "card" else "cards"} due", "A few minutes keeps your mistakes from coming back.", null) { n -> n.go(Review()) }) }
         mock.await()?.let { m -> add(Update("mock", Icons.Rounded.WorkspacePremium, null, "Your full mock is waiting", "Pick up where you left off.", null) { n -> n.go(MockHub(m.id)) }) }
         daysToExam(examDate)?.takeIf { it in 0..30 }?.let { d ->
             add(Update("exam", Icons.Rounded.Event, null, if (d == 0) "Your exam is today" else "$d ${if (d == 1) "day" else "days"} to your exam", "A full mock this week shows where you stand.", null) { n -> n.go(com.soyeb.ieltspractice.nav.MockStart) })

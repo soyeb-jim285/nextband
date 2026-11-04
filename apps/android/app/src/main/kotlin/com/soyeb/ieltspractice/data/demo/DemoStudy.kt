@@ -11,6 +11,7 @@ import com.soyeb.ieltspractice.data.model.CoachPlanDay
 import com.soyeb.ieltspractice.data.model.CoachReport
 import com.soyeb.ieltspractice.data.model.CoachSkillFacts
 import com.soyeb.ieltspractice.data.model.CoachWords
+import com.soyeb.ieltspractice.data.model.CardOrigin
 import com.soyeb.ieltspractice.data.model.CurrentMock
 import com.soyeb.ieltspractice.data.model.DueCard
 import com.soyeb.ieltspractice.data.model.DueResponse
@@ -35,6 +36,7 @@ object DemoStudy {
         when {
             screen?.startsWith("mock") == true -> mock(out, screen, tab)
             screen == "review" -> out["/api/cards/due"] = AppJson.encodeToString(DueResponse.serializer(), cards(tab))
+            screen == "mistakes" -> out["/api/mistakes/patterns"] = PATTERNS
             screen == "coach" -> out["/api/coach"] = AppJson.encodeToString(Coach.serializer(), coach(tab))
         }
     }
@@ -94,20 +96,26 @@ object DemoStudy {
 
     // MARK: Review
 
-    private fun card(id: String, front: String, back: String, source: String, reps: Int, interval: Double) =
-        DueCard(id, front, back, source, 2.5, interval, reps)
+    private fun card(id: String, front: String, back: String, source: String, reps: Int, interval: Double, category: String? = null) =
+        DueCard(id, front, back, source, 2.5, interval, reps, category, origin = CardOrigin("writing", 2, "Some people think…", "2026-10-01T09:00:00.000Z").takeIf { category != null && category != "spelling" })
 
-    /** [tab]: Question | Revealed | Done | Empty. */
+    private const val PATTERNS = """{"patterns":[
+        {"category":"grammar.verb-tense","count":14,"tests":5,"outOf":6,"lastAt":"2026-10-02T09:00:00.000Z","recent":1.7,"before":3.0,"example":{"original":"I live there since 2015","correction":"I have lived there since 2015"},"cards":6,"due":3},
+        {"category":"grammar.article","count":9,"tests":4,"outOf":6,"lastAt":"2026-10-01T09:00:00.000Z","recent":2.0,"before":1.0,"example":{"original":"in the society","correction":"in society"},"cards":4,"due":1},
+        {"category":"word-choice","count":6,"tests":3,"outOf":6,"lastAt":"2026-09-28T09:00:00.000Z","recent":null,"before":null,"example":{"original":"make a research","correction":"do research"},"cards":2,"due":0}
+      ],"deck":[{"category":"grammar.verb-tense","cards":6,"due":3},{"category":"grammar.article","cards":4,"due":1},{"category":"word-choice","cards":2,"due":0},{"category":"spelling","cards":3,"due":2}]}"""
+
+    /** [tab]: Question | Checked | Done (nothing due) | Empty. */
     private fun cards(tab: String?): DueResponse = when (tab) {
         "Done" -> DueResponse(cards = emptyList(), total = 0, deck = 14)
         "Empty" -> DueResponse(cards = emptyList(), total = 0, deck = 0)
         else -> DueResponse(
             cards = listOf(
-                card("c1", "I live there since 2015", "I have lived there since 2015\nPresent perfect with \"since\" for something that is still true.", "mistake", 2, 6.0),
+                card("c1", "I live there since 2015", "I have lived there since 2015 — Present perfect with \"since\" for something that is still true.", "mistake", 2, 6.0, "grammar.verb-tense"),
                 card("c2", "meticulous", "Very careful and exact about small details.\nHer meticulous notes made the revision easy.", "vocab", 1, 1.0),
                 card("c3", "Make it stronger\n\nThe graph shows a big increase in sales.", "The graph shows a sharp rise in sales.", "fix", 3, 12.0),
-                card("c4", "🎧 Listening · spell the word you heard (sediment)", "sediment\nYou typed: sedement", "mistake", 0, 0.0),
-                card("c5", "make a research", "do research\n\"Research\" is uncountable and takes \"do\".", "mistake", 2, 6.0),
+                card("c4", "🎧 Listening · spell the word you heard: 's______t' (8 letters)", "sediment\nYou wrote: sedement", "mistake", 0, 0.0, "spelling"),
+                card("c5", "make a research", "do research — \"Research\" is uncountable and takes \"do\".", "mistake", 2, 6.0, "word-choice"),
                 card("c6", "really changed", "transformed, reshaped\nStronger verbs for band 7 and above.", "vocab", 4, 20.0),
             ),
             total = 6, deck = 14,

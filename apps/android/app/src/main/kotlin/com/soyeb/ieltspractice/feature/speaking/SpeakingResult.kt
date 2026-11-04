@@ -89,6 +89,7 @@ import com.soyeb.ieltspractice.feature.result.CriteriaCard
 import com.soyeb.ieltspractice.feature.result.FixCard
 import com.soyeb.ieltspractice.feature.result.NoSpeechState
 import com.soyeb.ieltspractice.feature.result.ResultHero
+import com.soyeb.ieltspractice.feature.study.SeenBefore
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.SpeakingSession
 import kotlinx.coroutines.CancellationException
@@ -156,8 +157,8 @@ fun SpeakingResult(attempts: List<Attempt>, nav: Nav) {
     fun addMistake(err: AnalysisError) {
         scope.launch {
             val msg = try {
-                graph.api.addCard(err.original.ifBlank { categoryText(err) }, listOf(err.correction, err.explanation).filter { it.isNotBlank() }.joinToString("\n\n"), "mistake")
-                "Added to your review deck"
+                graph.api.addCard(err.original.ifBlank { categoryText(err) }, listOf(err.correction, err.explanation).filter { it.isNotBlank() }.joinToString(" — "), "mistake", err.category)
+                "Added to your drills"
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -172,7 +173,7 @@ fun SpeakingResult(attempts: List<Attempt>, nav: Nav) {
             val msg = try {
                 graph.api.addCards(fixes.map { CardInput("${it.title}\n\n${it.before}".trim(), "${it.after}\n\n${it.why}".trim(), "fix") })
                 addedFixes = true
-                "Added ${fixes.size} ${if (fixes.size == 1) "card" else "cards"} to your review deck"
+                "Added ${fixes.size} ${if (fixes.size == 1) "fix" else "fixes"} to your drills"
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -241,6 +242,7 @@ fun SpeakingResult(attempts: List<Attempt>, nav: Nav) {
                                         })
                                     }
                                     item { Notes(r, target) }
+                                    item { SeenBefore(attempt.id, nav, Modifier.padding(horizontal = NB.space.gutter)) }
                                 }
                                 "Transcript" -> item {
                                     TranscriptPanel(
@@ -263,7 +265,7 @@ fun SpeakingResult(attempts: List<Attempt>, nav: Nav) {
                                     r.topFixes.forEachIndexed { i, f -> item { FixCard(i + 1, f) } }
                                     if (r.topFixes.isNotEmpty()) item {
                                         NbButton(
-                                            if (addedFixes) "Added to your review deck" else "Add fixes to review", ::addFixes, kind = BtnKind.Secondary,
+                                            if (addedFixes) "Added to your drills" else "Add fixes to drills", ::addFixes, kind = BtnKind.Secondary,
                                             enabled = !addedFixes, fill = true,
                                         )
                                     }

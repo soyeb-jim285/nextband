@@ -389,7 +389,7 @@ private fun runAct(nav: Nav, act: NextAct, testType: String) {
         is NextAct.OpenTab -> nav.openTab(skillTab(act.skill))
         is NextAct.LrTest -> nav.go(LrTestRoute(act.id, act.skill))
         is NextAct.Result -> nav.go(AttemptResult.of(act.id))
-        NextAct.ReviewDeck -> nav.requireAccount("Create an account to build and review your deck.") { nav.go(Review) }
+        NextAct.ReviewDeck -> nav.requireAccount("Create an account to build and review your deck.") { nav.go(Review()) }
         NextAct.OpenCoach -> nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) }
     }
 }
@@ -420,13 +420,13 @@ private class Tool(val title: String, val sub: String, val icon: ImageVector, va
 @Composable
 private fun ToolsGrid(nav: Nav, due: Int) {
     val tools = listOf(
-        Tool("Review", if (due > 0) "$due cards due" else "All caught up", Icons.Rounded.Style, if (due > 0) "$due" else null) {
-            nav.requireAccount("Create an account to build and review your deck.") { nav.go(Review) }
+        Tool("Drill", if (due > 0) "$due ${if (due == 1) "card" else "cards"} due" else "All caught up", Icons.Rounded.Style, if (due > 0) "$due" else null) {
+            nav.requireAccount("Create an account to drill your mistakes.") { nav.go(Review()) }
         },
-        Tool("Mistakes", "From your results", Icons.Rounded.ErrorOutline, null) {
+        Tool("Patterns", "Mistakes that repeat", Icons.Rounded.ErrorOutline, null) {
             nav.requireAccount("Create an account to see your mistakes.") { nav.go(Mistakes()) }
         },
-        Tool("Coach", "Your plan and focus", Icons.Rounded.AutoAwesome, null) {
+        Tool("Your plan", "Coach and focus", Icons.Rounded.AutoAwesome, null) {
             nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) }
         },
         Tool("History", "All your results", Icons.Rounded.HistoryIcon, null) {
@@ -512,7 +512,7 @@ private fun GuestToday(nav: Nav) {
             NbCard {
                 Text("Create a free account to keep your results", style = NB.type.title2, color = NB.colors.ink)
                 Spacer(Modifier.height(4.dp))
-                Text("Save your bands, watch your progress and unlock History, Mistakes, Review and your coach.", style = NB.type.bodySmall, color = NB.colors.muted)
+                Text("Save your bands, watch your progress and unlock History, your patterns, drills and your coach.", style = NB.type.bodySmall, color = NB.colors.muted)
                 Spacer(Modifier.height(16.dp))
                 NbButton("Create free account", { nav.go(Auth("signup")) }, kind = BtnKind.Secondary, fill = true)
                 NbButton("I have an account", { nav.go(Auth("signin")) }, kind = BtnKind.Text, fill = true)

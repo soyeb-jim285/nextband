@@ -1,9 +1,7 @@
 package com.soyeb.ieltspractice.feature.study
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,97 +11,117 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.data.logic.categoryLabel
+import com.soyeb.ieltspractice.data.logic.formatDate
 import com.soyeb.ieltspractice.data.model.DueCard
 import com.soyeb.ieltspractice.data.net.Api
-import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
-import com.soyeb.ieltspractice.design.Tone
-import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.EmptyState
 import com.soyeb.ieltspractice.design.components.ErrorState
 import com.soyeb.ieltspractice.design.components.IconTile
+import com.soyeb.ieltspractice.design.components.LocalSnack
 import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
+import com.soyeb.ieltspractice.design.components.NbTextField
 import com.soyeb.ieltspractice.design.components.Overline
 import com.soyeb.ieltspractice.design.components.PushedScreen
+import com.soyeb.ieltspractice.design.components.RowDivider
+import com.soyeb.ieltspractice.design.components.RowGroup
 import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.StickyActionBar
-import com.soyeb.ieltspractice.design.components.Stat
-import com.soyeb.ieltspractice.design.components.Tag
+import com.soyeb.ieltspractice.design.components.rememberLoad
+import com.soyeb.ieltspractice.media.AudioPlayer
+import com.soyeb.ieltspractice.nav.CoachRoute
 import com.soyeb.ieltspractice.nav.Mistakes
 import com.soyeb.ieltspractice.nav.Nav
-import com.soyeb.ieltspractice.nav.Tab
+import com.soyeb.ieltspractice.nav.Review
+import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Everything the review session remembers: the due batch, where we are, and what was graded. */
+/**
+ * One drill session: up to [SESSION] due cards (one pattern, or ahead of schedule), each typed and checked, then Got it / Not yet.
+ * Not yet re-queues the card at the end (a learning step); only "Keep going" fetches more.
+ */
 @Stable
-internal class ReviewSession(
-    private val api: Api,
-    private val scope: CoroutineScope,
-    private val revealOnLoad: Boolean = false,
-    reviewed0: Int = 0,
-) {
+internal class DrillSession(private val api: Api, private val scope: CoroutineScope, private val route: Review) {
     var loading by mutableStateOf(true)
     var error by mutableStateOf<String?>(null)
+    /** The batch the server sent (up to 50). */
+    var batch by mutableStateOf<List<DueCard>>(emptyList())
+    var dueTotal by mutableIntStateOf(0)
+    var deck by mutableIntStateOf(0)
     var queue by mutableStateOf<List<DueCard>>(emptyList())
     var index by mutableIntStateOf(0)
-    var dueTotal by mutableIntStateOf(0)
-    var batch by mutableIntStateOf(0)
-    var deck by mutableStateOf<Int?>(null)
-    /** Graded this visit, so the end state can say so after the refetch comes back empty. */
-    var reviewed by mutableIntStateOf(reviewed0)
-    var revealed by mutableStateOf(false)
-    var grading by mutableStateOf(false)
-    var gradeError by mutableStateOf<String?>(null)
+    /** Every verdict this session, in order (a re-queued card appears again). */
+    var done by mutableStateOf<List<Pair<DueCard, Boolean>>>(emptyList())
+    var ended by mutableStateOf(false)
+    var typed by mutableStateOf("")
+    var checked by mutableStateOf(false)
+    var busy by mutableStateOf(false)
 
-    val card: DueCard? get() = queue.getOrNull(index)
-    /** Cards in this session: what is due, plus every Again that came back round. */
-    val total: Int get() = maxOf(1, dueTotal + queue.size - batch)
+    val card: DueCard? get() = if (ended) null else queue.getOrNull(index)
+    val finished: Boolean get() = card == null && done.isNotEmpty()
+    /** Ahead of schedule every card counts, so "more" is what this visit has not drilled yet. */
+    val more: Int get() = if (route.ahead) batch.count { c -> done.none { it.first.id == c.id } } else dueTotal
 
-    suspend fun load() {
+    suspend fun load(skip: Set<String> = emptySet()) {
         loading = queue.isEmpty()
         try {
-            val r = api.dueCards()
-            queue = r.list; batch = r.list.size; dueTotal = r.dueTotal; deck = r.deck
-            index = 0; revealed = revealOnLoad; error = null
+            val r = api.dueCards(route.pattern, route.ahead)
+            batch = r.list; dueTotal = r.dueTotal; deck = r.deck ?: 0
+            queue = r.list.filter { it.id !in skip }.take(SESSION); index = 0; error = null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -112,69 +130,143 @@ internal class ReviewSession(
         loading = false
     }
 
-    fun grade(g: Int) {
+    /** After the last card: the due count again, so "Keep going" is honest. */
+    suspend fun refreshCount() {
+        try { dueTotal = api.dueCards(route.pattern, route.ahead).dueTotal } catch (e: CancellationException) { throw e } catch (e: Exception) { }
+    }
+
+    fun keepGoing() {
+        val drilled = if (route.ahead) done.map { it.first.id }.toSet() else emptySet()
+        done = emptyList(); ended = false; queue = emptyList()
+        scope.launch { load(drilled) }
+    }
+
+    private fun next() { typed = ""; checked = false }
+
+    fun grade(got: Boolean, onError: (String) -> Unit) {
         val c = card ?: return
-        if (grading) return
-        grading = true
-        gradeError = null
+        if (busy) return
+        busy = true
         scope.launch {
             try {
-                api.reviewCard(c.id, g)
-                revealed = false; reviewed++; index++
-                // Again goes to the back of this session (a learning step); otherwise ask again once the batch runs out.
-                if (g == 1) queue = queue + c else if (index >= queue.size) load()
+                val updated = api.reviewCard(c.id, if (got) GOT_IT else NOT_YET)
+                done = done + (c to got)
+                if (!got) queue = queue + c.copy(ease = updated.ease, interval = updated.interval, reps = updated.reps)
+                index++; next()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                gradeError = e.message?.takeIf { it.isNotBlank() } ?: "Couldn't save that grade. Try again."
+                onError("Couldn't save that: ${e.message ?: "try again."}")
             } finally {
-                grading = false
+                busy = false
+            }
+        }
+    }
+
+    fun skip(onDone: (String) -> Unit) {
+        val c = card ?: return
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                api.skipCard(c.id)
+                queue = queue.filterIndexed { k, _ -> k != index }; next()
+                onDone("Skipped. That card won't come back.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onDone("Couldn't skip it: ${e.message ?: "try again."}")
+            } finally {
+                busy = false
             }
         }
     }
 }
 
 @Composable
-fun ReviewScreen(nav: Nav) {
+fun ReviewScreen(nav: Nav, route: Review) {
     val g = LocalGraph.current
     val account by g.api.hasAccount.collectAsState()
     val tab = LocalDemo.current?.tab
     val scope = rememberCoroutineScope()
-    val s = remember { ReviewSession(g.api, scope, revealOnLoad = tab == "Revealed", reviewed0 = if (tab == "Done") 24 else 0) }
-    LaunchedEffect(account) { if (account) s.load() }
+    val snack = LocalSnack.current
+    val s = remember(route) { DrillSession(g.api, scope, route) }
+    val say: (String) -> Unit = { m -> scope.launch { snack.currentSnackbarData?.dismiss(); snack.showSnackbar(m) } }
+    LaunchedEffect(account, route) {
+        if (!account) return@LaunchedEffect
+        s.load()
+        // Screenshots: a checked answer with a wrong attempt.
+        if (tab == "Checked" && s.card != null) { s.typed = "I living there since 2015"; s.checked = true }
+    }
+    LaunchedEffect(s.finished) { if (s.finished) s.refreshCount() }
 
     PushedScreen(
-        "Review", nav::back,
+        route.pattern?.let(::categoryLabel) ?: "Drill", nav::back,
+        actions = {
+            if (s.card != null && s.done.isNotEmpty()) NbButton("End", { s.ended = true }, kind = BtnKind.Text, size = BtnSize.Small)
+        },
         bottomBar = {
-            if (account && !s.loading && s.error == null) {
-                if (s.card != null) GradeBar(s) else if (s.reviewed > 0 || (s.deck ?: 0) > 0) DoneBar(nav)
+            val card = s.card
+            if (account && card != null) VerdictBar(s, card, say)
+            else if (account && s.finished) StickyActionBar {
+                if (s.more > 0) NbButton("Keep going · ${if (route.ahead) "${s.more} more" else "${s.more} ${plural(s.more, "card")} due"}", s::keepGoing, fill = true, size = BtnSize.Large)
+                NbButton("Back to your plan", { nav.go(CoachRoute) }, kind = if (s.more > 0) BtnKind.Text else BtnKind.Primary, fill = true, size = if (s.more > 0) BtnSize.Medium else BtnSize.Large)
             }
         },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             val card = s.card
             when {
-                !account -> GuestGate(Icons.Rounded.Style, "Your review deck", "Create an account to turn your corrections into flashcards that come back when you are about to forget them.", nav, "Create an account to build your review deck")
+                !account -> GuestGate(Icons.Rounded.Style, "Your drills", "Create an account and the mistakes worth practising from each test become short drills that come back just before you would forget them.", nav, "Create an account to drill your mistakes")
                 s.loading && card == null -> SkeletonList()
                 s.error != null && card == null -> ErrorState(s.error.orEmpty(), { scope.launch { s.load() } })
-                card != null -> CardStage(s, card)
-                s.reviewed == 0 && (s.deck ?: 0) == 0 -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    EmptyState(
-                        Icons.Rounded.Style, "No cards yet",
-                        "Cards come from your results. Open Mistakes and tap Add to review deck on the corrections you want to remember. They come back here on a spaced schedule.",
-                        action = "Open mistakes", onAction = { nav.go(Mistakes()) },
-                    )
-                }
-                else -> DoneStage(s)
+                card != null -> key(card.id, s.index) { CardStage(s, card, say) }
+                s.finished -> Summary(s.done)
+                else -> NothingDue(nav, route, s.deck)
             }
         }
     }
 }
 
+private val ASK = mapOf(
+    "spelling" to "Type the word, spelt correctly.",
+    "mistake" to "Rewrite it correctly.",
+    "fix" to "How would you improve this sentence?",
+    "vocab" to "Give a better word or phrase.",
+)
+
 @Composable
-private fun CardStage(s: ReviewSession, card: DueCard) {
+private fun CardStage(s: DrillSession, card: DueCard, say: (String) -> Unit) {
     val g = LocalGraph.current
-    val left = maxOf(0, s.total - s.index)
+    val demo = LocalDemo.current
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val (label, text) = promptOf(card)
+    val (answer, note) = answerOf(card.back)
+    val spelling = card.category == "spelling"
+    val heard = isHeard(card)
+    val tried = s.checked && s.typed.isNotBlank()
+    val right = tried && sameAnswer(s.typed, answer)
+    // The word in the test speaker's voice, cut from the recording; the device voice when it can't be located.
+    val clip = rememberLoad(card.id) { if (heard && card.attemptId != null && demo == null) g.api.cardClip(card.id) else null }
+    val player = remember { if (heard && demo == null) AudioPlayer(context) else null }
+    DisposableEffect(player) { onDispose { player?.release() } }
+
+    fun hear() {
+        scope.launch {
+            val c = clip.value
+            if (player != null && c != null) {
+                player.load(c.url); player.seekTo((c.from * 1000).toLong()); player.play()
+                delay(((c.to - c.from) * 1000).toLong()); player.pause()
+                return@launch
+            }
+            g.tts.speak(answer)
+            delay(1500)
+            if (g.tts.unavailable) say("This phone has no English voice to read the word. Use the letters shown, or replay the recording from the test's review.")
+        }
+    }
+
+    val left = s.queue.size - s.index
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = NB.space.md),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
@@ -182,76 +274,89 @@ private fun CardStage(s: ReviewSession, card: DueCard) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("$left ${plural(left, "card")} left", style = NB.type.label, color = NB.colors.ink, modifier = Modifier.weight(1f))
-                Text("${s.index} of ${s.total}", style = NB.type.num, color = NB.colors.muted)
+                Text("${s.index} of ${s.queue.size}", style = NB.type.num, color = NB.colors.muted)
             }
-            Meter(s.index.toDouble(), Modifier.fillMaxWidth().semantics { contentDescription = "Session progress" }, max = s.total.toDouble(), height = 6.dp)
+            Meter(s.index.toDouble(), Modifier.fillMaxWidth().semantics { contentDescription = "Session progress" }, max = maxOf(1, s.queue.size).toDouble(), height = 6.dp)
         }
-        Flashcard(card, s.revealed, onFlip = { s.revealed = !s.revealed }, onHear = { g.tts.speak(it) })
-        s.gradeError?.let { Banner("Couldn't save that grade. $it", Icons.Rounded.Info, tone = Tone.Bad) }
+        NbCard {
+            Column(Modifier.fillMaxWidth().heightIn(min = 240.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val origin = card.origin?.let { o -> "${if (o.skill == "writing") "Writing Task" else "Speaking Part"} ${o.part}, ${formatDate(o.at)}" }
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = NB.colors.ink, fontWeight = FontWeight.Medium)) {
+                                append(card.category?.let(::categoryLabel) ?: if (card.source == "fix") "Fix from your results" else "Vocabulary")
+                            }
+                            origin?.let { append(" · $it") }
+                        },
+                        style = NB.type.caption, color = NB.colors.muted, maxLines = 2, modifier = Modifier.weight(1f),
+                    )
+                    NbButton("Skip", { s.skip(say) }, kind = BtnKind.Text, size = BtnSize.Small, enabled = !s.busy)
+                }
+                Text(ASK[if (spelling) "spelling" else card.source ?: "mistake"] ?: ASK.getValue("mistake"), style = NB.type.bodySmall, color = NB.colors.muted)
+                label?.let { Text(it, style = NB.type.label, color = NB.colors.brandText) }
+                Text(text, style = if (text.length > 90) NB.type.reading else NB.type.readingTitle, color = NB.colors.ink)
+                if (heard) NbButton("Hear the word", ::hear, kind = BtnKind.Secondary, icon = Icons.AutoMirrored.Rounded.VolumeUp)
+                NbTextField(
+                    s.typed, { s.typed = it }, if (spelling) "Your spelling" else "Your correction (optional)",
+                    singleLine = spelling, enabled = !s.checked,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, // the keyboard must not fix it for them
+                        imeAction = if (spelling) ImeAction.Done else ImeAction.Default,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { s.checked = true }),
+                )
+                AnimatedVisibility(s.checked, enter = fadeIn()) {
+                    Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        RowDivider()
+                        if (right) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Check, null, Modifier.size(18.dp), tint = NB.colors.goodText)
+                            Text("That's it.", style = NB.type.label, color = NB.colors.goodText)
+                        } else if (tried) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Overline("Your version, with the changes it needs")
+                            Text(diffText(s.typed, answer), style = NB.type.reading, color = NB.colors.ink)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Overline("Correction")
+                            Text(answer, style = NB.type.reading.copy(fontWeight = FontWeight.Medium), color = NB.colors.ink)
+                        }
+                        if (note.isNotEmpty()) Text(note, style = NB.type.body, color = NB.colors.muted)
+                    }
+                }
+            }
+        }
         Text(
-            if (s.revealed) "Be honest: cards you find hard come back sooner. Again shows the card once more before you finish."
-            else "Say or write your answer first, then turn the card.",
-            style = NB.type.bodySmall, color = NB.colors.muted,
+            "Type your fix, or think it through and show the answer. Be honest: Not yet brings the card back before you finish, and tomorrow.",
+            style = NB.type.caption, color = NB.colors.muted,
         )
     }
 }
 
-/** The card. Turns around on tap (rotationY); with "remove animations" on it crossfades instead. */
+/** Deleted words struck through in the bad tone, added words underlined in the good tone. */
 @Composable
-private fun Flashcard(card: DueCard, revealed: Boolean, onFlip: () -> Unit, onHear: (String) -> Unit) {
-    val reduced = LocalReducedMotion.current
-    val density = LocalDensity.current.density
-    val click = Modifier.clickable(role = Role.Button, onClickLabel = if (revealed) "Show the question" else "Show the answer", onClick = onFlip)
-    if (reduced) {
-        Crossfade(revealed, Modifier.fillMaxWidth().then(click), animationSpec = tween(150), label = "card") { back ->
-            NbCard { Face(card, back, onHear) }
-        }
-    } else {
-        val rot by animateFloatAsState(if (revealed) 180f else 0f, tween(380), label = "flip")
-        Box(Modifier.fillMaxWidth().graphicsLayer { rotationY = rot; cameraDistance = 14f * density }.then(click)) {
-            // Past 90 degrees the back is showing: turn it once more so its text is not mirrored.
-            NbCard(Modifier.graphicsLayer { rotationY = if (rot > 90f) 180f else 0f }) { Face(card, rot > 90f, onHear) }
+private fun diffText(typed: String, answer: String) = buildAnnotatedString {
+    wordDiff(typed, answer).forEachIndexed { i, (kind, w) ->
+        if (i > 0) append(' ')
+        when (kind) {
+            Change.Same -> append(w)
+            Change.Gone -> withStyle(SpanStyle(color = NB.colors.badText, textDecoration = TextDecoration.LineThrough)) { append(w) }
+            Change.Added -> withStyle(SpanStyle(color = NB.colors.goodText, textDecoration = TextDecoration.Underline, fontWeight = FontWeight.Medium)) { append(w) }
         }
     }
 }
 
 @Composable
-private fun Face(card: DueCard, back: Boolean, onHear: (String) -> Unit) {
-    val (label, front) = cleanFront(card)
-    Column(Modifier.fillMaxWidth().heightIn(min = 280.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        sourceLabel[card.source]?.let { Tag(it) }
-        if (!back) {
-            sourcePrompt[card.source]?.let { Text(it, style = NB.type.bodySmall, color = NB.colors.muted) }
-            label?.let { Text(it, style = NB.type.label, color = NB.colors.brandText) }
-            Text(front, style = NB.type.readingTitle, color = NB.colors.ink)
-            // The spelling stays hidden until the card is turned.
-            heardWord(card)?.let { w -> NbButton("Hear the word", { onHear(w) }, kind = BtnKind.Secondary, icon = Icons.AutoMirrored.Rounded.VolumeUp) }
-            Spacer(Modifier.weight(1f))
-            Text("Tap the card to show the answer", style = NB.type.caption, color = NB.colors.muted)
-        } else {
-            Overline("Answer")
-            Text(card.back, style = NB.type.reading, color = NB.colors.ink)
-            Spacer(Modifier.weight(1f))
-            Overline("Question")
-            Text(front, style = NB.type.readingSmall, color = NB.colors.muted)
-        }
-    }
-}
-
-@Composable
-private fun GradeBar(s: ReviewSession) {
+private fun VerdictBar(s: DrillSession, card: DueCard, say: (String) -> Unit) {
     val hf = LocalHapticFeedback.current
-    val card = s.card ?: return
     StickyActionBar {
-        if (!s.revealed) {
-            NbButton("Show answer", { s.revealed = true }, fill = true, size = BtnSize.Large)
+        if (!s.checked) {
+            NbButton(if (s.typed.isBlank()) "Show answer" else "Check", { s.checked = true }, fill = true, size = BtnSize.Large)
         } else {
-            Row(Modifier.fillMaxWidth().semantics { contentDescription = "How well did you remember?" }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                grades.forEach { gr ->
-                    val tone = when (gr.value) { 1 -> NB.colors.badText; 3 -> NB.colors.warnText; 4 -> NB.colors.goodText; else -> NB.colors.brandText }
-                    GradeButton(gr.label, hint(card, gr.value), tone, !s.grading, Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth().semantics { contentDescription = "Did you get it?" }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(Triple(false, "Not yet", "again this session"), Triple(true, "Got it", gotItHint(card))).forEach { (got, label, sub) ->
+                    VerdictButton(label, sub, if (got) NB.colors.goodText else NB.colors.badText, !s.busy, Modifier.weight(1f)) {
                         hf.performHapticFeedback(HapticFeedbackType.LongPress)
-                        s.grade(gr.value)
+                        s.grade(got, say)
                     }
                 }
             }
@@ -259,12 +364,12 @@ private fun GradeBar(s: ReviewSession) {
     }
 }
 
-/** One grade: the word in its tone, the next interval under it. Neutral fill so the bar has no second primary. */
+/** One verdict: the word in its tone, when the card comes back under it. Neutral fill so the bar has no second primary. */
 @Composable
-private fun GradeButton(label: String, next: String, tone: Color, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun VerdictButton(label: String, next: String, tone: Color, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick, enabled = enabled, shape = NB.shape.tile, color = NB.colors.surface2, contentColor = NB.colors.ink,
-        modifier = modifier.heightIn(min = 56.dp).semantics { contentDescription = "$label, next review ${next.lowercase()}" },
+        modifier = modifier.heightIn(min = 56.dp).semantics { contentDescription = "$label, $next" },
     ) {
         Column(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text(label, style = NB.type.label, color = tone, maxLines = 1)
@@ -273,34 +378,53 @@ private fun GradeButton(label: String, next: String, tone: Color, enabled: Boole
     }
 }
 
+/** End of a session: first-try score overall and per pattern (a card's re-runs are practice). */
 @Composable
-private fun DoneStage(s: ReviewSession) {
+private fun Summary(done: List<Pair<DueCard, Boolean>>) {
+    val first = done.distinctBy { it.first.id }
+    val got = first.count { it.second }
+    val byPattern = first.groupBy { it.first.category?.let(::categoryLabel) ?: "Other" }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(Icons.Rounded.Check, NB.colors.goodText, NB.colors.goodSoft, 80.dp)
-        Spacer(Modifier.padding(top = 20.dp))
-        Text("All caught up", style = NB.type.headline, color = NB.colors.ink, textAlign = TextAlign.Center)
+        IconTile(Icons.Rounded.CheckCircle, NB.colors.goodText, NB.colors.goodSoft, 72.dp)
+        Text("Session done", style = NB.type.headline, color = NB.colors.ink, textAlign = TextAlign.Center)
         Text(
-            if (s.reviewed > 0) "${s.reviewed} reviewed" else "Nothing is due right now",
-            style = NB.type.title3, color = NB.colors.goodText, textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp),
+            "You knew $got of ${first.size} ${plural(first.size, "card")} first time. Each one comes back just before you would forget it.",
+            style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center,
         )
-        Text(
-            "Your cards come back when they are due, so a short session tomorrow keeps them fresh. Add more from Mistakes any time.",
-            style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp),
-        )
-        s.deck?.takeIf { it > 0 }?.let {
-            Stat("$it", "${plural(it, "card")} in your deck", Modifier.padding(top = 20.dp))
+        Spacer(Modifier.size(8.dp))
+        RowGroup(Modifier.fillMaxWidth()) {
+            byPattern.entries.forEachIndexed { i, (k, v) ->
+                if (i > 0) RowDivider()
+                Row(Modifier.fillMaxWidth().padding(horizontal = NB.space.lg, vertical = 14.dp)) {
+                    Text(k, style = NB.type.body, color = NB.colors.ink, modifier = Modifier.weight(1f), maxLines = 1)
+                    Text("${v.count { it.second }} / ${v.size} first time", style = NB.type.num, color = NB.colors.muted)
+                }
+            }
         }
     }
 }
 
+/** Nothing to drill: an empty deck says what fills it; nothing due offers the same cards ahead of schedule. */
 @Composable
-private fun DoneBar(nav: Nav) {
-    StickyActionBar {
-        NbButton("Back to Today", { nav.openTab(Tab.Today) }, fill = true, size = BtnSize.Large)
-        NbButton("Open mistakes", { nav.go(Mistakes()) }, kind = BtnKind.Text, fill = true)
+private fun NothingDue(nav: Nav, route: Review, deck: Int) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+        if (deck == 0) EmptyState(
+            Icons.Rounded.Style, "No drill cards yet",
+            "After each Speaking or Writing test, the mistakes worth practising become drill cards here. A few minutes a day is enough.",
+            action = "Write an essay", onAction = { nav.startTest("writing") { nav.go(WritingTask("task2")) } },
+        )
+        else {
+            val name = route.pattern?.let { categoryLabel(it).lowercase() }
+            EmptyState(
+                Icons.Rounded.CheckCircle,
+                if (route.ahead) "No ${name?.let { "$it " } ?: ""}cards to drill" else "Nothing ${name?.let { "in $it " } ?: ""}due right now",
+                if (route.ahead) "Every card in this pattern was skipped." else "Each card comes back just before you would forget it. You can drill ahead of schedule; it counts as a normal review.",
+                action = if (route.ahead) "See your patterns" else "Drill anyway",
+                onAction = { if (route.ahead) nav.go(Mistakes()) else nav.replace(route.copy(ahead = true)) },
+            )
+        }
     }
 }

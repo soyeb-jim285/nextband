@@ -10,7 +10,7 @@ import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Review
 
 fun NavGraphBuilder.studyGraph(nav: Nav) {
-    composable<Review> { ReviewScreen(nav) }
+    composable<Review> { entry -> ReviewScreen(nav, entry.toRoute<Review>()) }
     composable<Mistakes> { entry -> MistakesScreen(nav, entry.toRoute<Mistakes>()) }
     composable<CoachRoute> { CoachScreen(nav) }
     composable<Bank> { entry -> BankScreen(nav, entry.toRoute<Bank>()) }

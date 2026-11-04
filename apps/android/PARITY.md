@@ -23,8 +23,8 @@ Status: done / partial / missing. Verified by unit tests (models against the sha
 | Result: speaking Overview, Transcript, Fluency (pace chart, markers, pauses), Language, Improve | done | audio player with seek and speed |
 | Result: writing Overview, Essay, Structure, Language, Improve | done | |
 | Result states: analysing, failed (retry), no speech, session (multi-part) | done | |
-| Spaced-repetition review (due cards, grading) | done | |
-| Mistakes log, add to deck | done | |
+| Drill (type the fix, Got it / Not yet, skip, per pattern, ahead of schedule, spelling clip) | done | Cards are chosen by the server after each test |
+| Patterns (trend, drill per pattern), mistake log, add to drills, "made before" on results | done | |
 | History (bucketed by date, filters) | done | |
 | Prompt bank (search, part, topic filters) | done | |
 | Community mode: guest sessions (bearer, started at the first test), 1 test per week as a guest and per day signed in, tests left under Start, Home and Settings summary | done | `core/Community.kt`, `ui/community/`; copy from docs/community.md; unit-tested (`CommunityTest`) |

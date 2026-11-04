@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -43,6 +44,8 @@ import com.soyeb.ieltspractice.data.logic.categoryLabel
 import com.soyeb.ieltspractice.data.logic.clock
 import com.soyeb.ieltspractice.data.logic.formatDate
 import com.soyeb.ieltspractice.data.model.CategoryCount
+import com.soyeb.ieltspractice.data.model.DeckCategory
+import com.soyeb.ieltspractice.data.model.MistakePattern
 import com.soyeb.ieltspractice.data.model.Mistake
 import com.soyeb.ieltspractice.data.model.LrSpellingItem
 import com.soyeb.ieltspractice.design.NB
@@ -66,12 +69,13 @@ import com.soyeb.ieltspractice.design.components.rememberLoad
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.Mistakes
 import com.soyeb.ieltspractice.nav.Nav
+import com.soyeb.ieltspractice.nav.Review
 import com.soyeb.ieltspractice.nav.Spelling
 import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-/** Every correction from the learner's results, grouped by attempt, filtered by category; tap one for the explanation and to add it to the review deck. */
+/** Patterns: the mistake categories that keep coming back (with their drills), then every correction grouped by attempt; tap one for the explanation and to add it to the drills. */
 @Composable
 fun MistakesScreen(nav: Nav, route: Mistakes) {
     val g = LocalGraph.current
@@ -87,6 +91,7 @@ fun MistakesScreen(nav: Nav, route: Mistakes) {
     var adding by remember { mutableStateOf(false) }
     val pager = remember { Pager<Mistake>(scope) }
     val spelling = rememberLoad(account) { if (account) api.lrSpelling().items else emptyList() }
+    val patterns = rememberLoad(account) { if (account) api.mistakePatterns() else null }
 
     LaunchedEffect(account, category) {
         if (account) {
@@ -107,7 +112,7 @@ fun MistakesScreen(nav: Nav, route: Mistakes) {
             val msg = try {
                 api.mistakeToCard(m.id)
                 pager.update { if (it.id == m.id) it.copy(inDeck = true) else it }
-                "Added to your review deck"
+                "Added to your drills"
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -118,11 +123,11 @@ fun MistakesScreen(nav: Nav, route: Mistakes) {
         }
     }
 
-    PushedScreen("Mistakes", nav::back) { pad ->
+    PushedScreen("Patterns", nav::back) { pad ->
         if (!account) {
             GuestGate(
-                Icons.Rounded.CheckCircle, "Your mistake log",
-                "Create an account to see the errors you repeat, grouped by type, and turn them into review cards.",
+                Icons.Rounded.CheckCircle, "Your patterns",
+                "Create an account to see the mistakes you repeat, grouped by type, and drill them until they stop.",
                 nav, "Create an account to keep your mistake log", Modifier.padding(pad),
             )
             return@PushedScreen
@@ -145,12 +150,25 @@ fun MistakesScreen(nav: Nav, route: Mistakes) {
             ) {
                 item {
                     Text(
-                        if (all > 0) "$all ${plural(all, "correction")} from your results, grouped so patterns stand out."
+                        if (all > 0) "$all ${plural(all, "correction")} from your results. The ones that keep coming back are at the top."
                         else "Every correction from your results, grouped so patterns stand out.",
                         style = NB.type.bodySmall, color = NB.colors.muted,
                     )
                 }
-                if (category == null && spellItems.isNotEmpty()) item(key = "spelling") { SpellingGroup(spellItems, nav) }
+                val pat = patterns.value
+                val deckOf = { c: String -> pat?.deck?.firstOrNull { it.category == c } }
+                if (category == null && !pat?.patterns.isNullOrEmpty()) item(key = "patterns") {
+                    PatternGroup(pat!!.patterns.take(5), { category = it }, { c, due -> nav.go(Review(c, ahead = due == 0)) })
+                }
+                category?.let { c -> deckOf(c)?.takeIf { it.cards > 0 } }?.let { d ->
+                    item(key = "drill-this") {
+                        NbButton(
+                            if (d.due > 0) "Drill this pattern · ${d.due} due" else "Drill this pattern", { nav.go(Review(d.category, ahead = d.due == 0)) },
+                            kind = BtnKind.Secondary, fill = true,
+                        )
+                    }
+                }
+                if (category == null && spellItems.isNotEmpty()) item(key = "spelling") { SpellingGroup(spellItems, nav, deckOf("spelling")) }
                 pager.error?.let { msg -> item(key = "error") { ErrorState(msg, { pager.more() }) } }
                 if (!pager.loaded && pager.loading) {
                     items(3) { Skeleton(Modifier.fillMaxWidth(), height = 96.dp, corner = 20.dp) }
@@ -195,7 +213,7 @@ fun MistakesScreen(nav: Nav, route: Mistakes) {
             subtitle = sourceLine(m) + (m.time?.let { ", at ${clock(it.toInt())}" } ?: ""),
             actions = {
                 NbButton(
-                    if (m.inDeck) "In your review deck" else "Add to review deck", { add(m) },
+                    if (m.inDeck) "In your drills" else "Add to drills", { add(m) },
                     kind = if (m.inDeck) BtnKind.Secondary else BtnKind.Primary, size = BtnSize.Large, fill = true,
                     enabled = !m.inDeck, loading = adding, icon = if (m.inDeck) Icons.Rounded.Check else null, haptic = true,
                 )
@@ -231,7 +249,7 @@ private fun MistakeRow(m: Mistake, showCategory: Boolean, onClick: () -> Unit) {
     ) {
         if (showCategory || m.inDeck) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (showCategory) Tag(categoryLabel(m.category))
-            if (m.inDeck) Tag("In deck", fg = NB.colors.goodText, bg = NB.colors.goodSoft, icon = Icons.Rounded.Check)
+            if (m.inDeck) Tag("In drills", fg = NB.colors.goodText, bg = NB.colors.goodSoft, icon = Icons.Rounded.Check)
         }
         if (same) {
             Text(m.explanation, style = NB.type.bodySmall, color = NB.colors.ink, maxLines = 3)
@@ -250,9 +268,11 @@ private fun MistakeRow(m: Mistake, showCategory: Boolean, onClick: () -> Unit) {
 
 /** Words misspelt or wrongly pluralised in Listening and Reading gap answers, most frequent first. */
 @Composable
-private fun SpellingGroup(items: List<LrSpellingItem>, nav: Nav) {
+private fun SpellingGroup(items: List<LrSpellingItem>, nav: Nav, deck: DeckCategory?) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SectionHeader("Spelling and plurals", action = "Practise", onAction = { nav.go(Spelling) })
+        // Drill the spelling cards when there are some; the older spelling practice otherwise.
+        if (deck != null && deck.cards > 0) SectionHeader("Spelling and plurals", action = "Drill", onAction = { nav.go(Review("spelling", ahead = deck.due == 0)) })
+        else SectionHeader("Spelling and plurals", action = "Practise", onAction = { nav.go(Spelling) })
         RowGroup {
             items.take(4).forEachIndexed { i, w ->
                 if (i > 0) RowDivider()
@@ -260,6 +280,28 @@ private fun SpellingGroup(items: List<LrSpellingItem>, nav: Nav) {
                     title = w.word,
                     subtitle = w.typed.take(2).joinToString(", ").takeIf { it.isNotEmpty() }?.let { "You typed $it" },
                     trailing = { Tag(if (w.kind == "plural") "Plural ×${w.count}" else "×${w.count}") },
+                )
+            }
+        }
+    }
+}
+
+/** The mistakes that keep coming back: how often, the trend, and a Drill button when there are cards behind it. Tap a row to filter the log. */
+@Composable
+private fun PatternGroup(items: List<MistakePattern>, onOpen: (String) -> Unit, onDrill: (String, Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SectionHeader("What keeps coming back")
+        RowGroup {
+            items.forEachIndexed { i, p ->
+                if (i > 0) RowDivider()
+                val drill: (@Composable RowScope.() -> Unit)? = if (p.cards == 0) null else {
+                    { NbButton(if (p.due > 0) "Drill · ${p.due}" else "Drill", { onDrill(p.category, p.due) }, kind = BtnKind.Secondary, size = BtnSize.Small) }
+                }
+                NbListRow(
+                    title = categoryLabel(p.category),
+                    subtitle = listOfNotNull("In ${p.tests} of your last ${p.outOf} ${plural(p.outOf, "test")}", trendLine(p.recent, p.before)).joinToString(" · "),
+                    onClick = { onOpen(p.category) },
+                    trailing = drill, chevron = drill == null,
                 )
             }
         }

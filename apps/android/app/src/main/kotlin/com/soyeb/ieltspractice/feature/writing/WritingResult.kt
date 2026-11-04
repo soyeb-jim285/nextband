@@ -71,6 +71,7 @@ import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.feature.result.ResultHero
+import com.soyeb.ieltspractice.feature.study.SeenBefore
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.WritingTask
@@ -214,21 +215,21 @@ fun WritingResult(attempts: List<Attempt>, nav: Nav) {
                 stickyHeader { NbTabs(tabNames, tab, { tab = it }) }
                 item {
                     when (tab) {
-                        0 -> OverviewPanel(
+                        0 -> Column { OverviewPanel(
                             r, score, target, { criterionSheet = it }, { nav.go(AttemptResult.of(it)) },
                             onAddFixes = {
-                                nav.requireAccount("Create an account to keep a review deck") {
+                                nav.requireAccount("Create an account to drill your mistakes") {
                                     scope.launch {
                                         try {
                                             api.addCards(r.topFixes.map { CardInput("${it.title}\n\n${it.before}", "${it.after}\n\n${it.why}", "fix") })
                                             added = true
-                                            say("Added ${r.topFixes.size} ${if (r.topFixes.size == 1) "card" else "cards"} to your review deck")
+                                            say("Added ${r.topFixes.size} ${if (r.topFixes.size == 1) "fix" else "fixes"} to your drills")
                                         } catch (e: CancellationException) { throw e } catch (e: Exception) { say(e.message ?: "Couldn't add the cards.") }
                                     }
                                 }
                             },
                             fixesInDeck = added || a.topFixesInDeck, modifier = gut,
-                        )
+                        ); SeenBefore(a.id, nav, gut.padding(top = NB.space.lg)) }
                         1 -> if (essay.isBlank()) EmptyState(Icons.Rounded.Warning, "No essay text", "Nothing was written for this task.")
                         else EssayPanel(r, essay, lean, { lean = null }, { errorSheet = it }, gut)
                         2 -> r.structure?.let { StructurePanel(it, gut) }
@@ -244,13 +245,13 @@ fun WritingResult(attempts: List<Attempt>, nav: Nav) {
             SheetOrInline(
                 onDismiss = { errorSheet = null }, title = errorTitle(x.category),
                 actions = {
-                    NbButton("Add to review deck", {
+                    NbButton("Add to drills", {
                         errorSheet = null
-                        nav.requireAccount("Create an account to keep a review deck") {
+                        nav.requireAccount("Create an account to drill your mistakes") {
                             scope.launch {
                                 try {
-                                    api.addCard(x.original, "${x.correction}\n\n${x.explanation}", "mistake")
-                                    say("Added to your review deck")
+                                    api.addCard(x.original, "${x.correction} — ${x.explanation}", "mistake", x.category)
+                                    say("Added to your drills")
                                 } catch (e: CancellationException) { throw e } catch (e: Exception) { say(e.message ?: "Couldn't add the card.") }
                             }
                         }

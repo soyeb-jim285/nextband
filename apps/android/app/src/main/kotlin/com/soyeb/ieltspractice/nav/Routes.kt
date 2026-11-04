@@ -19,7 +19,8 @@ import kotlinx.serialization.Serializable
 // Study tools
 @Serializable data class History(val skill: String? = null)       // feature/history
 @Serializable data class Mistakes(val category: String? = null)   // feature/study
-@Serializable data object Review                                  // feature/study
+/** The drill. [pattern]: one mistake category; [ahead]: cards not yet due too (a drill on demand). */
+@Serializable data class Review(val pattern: String? = null, val ahead: Boolean = false) // feature/study
 @Serializable data object CoachRoute                              // feature/study
 /** Prompt bank. [skill]: speaking | writing. */
 @Serializable data class Bank(val skill: String = "speaking", val part: Int? = null) // feature/study

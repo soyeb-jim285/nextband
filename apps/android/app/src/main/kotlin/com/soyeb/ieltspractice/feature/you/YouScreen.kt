@@ -188,11 +188,11 @@ fun YouScreen(nav: Nav) {
                     RowGroup {
                         StudyRow("History", Icons.Rounded.History) { nav.requireAccount("Create an account to keep your history.") { nav.go(History()) } }
                         RowDivider()
-                        StudyRow("Mistakes", Icons.Rounded.ErrorOutline) { nav.requireAccount("Create an account to see your mistakes.") { nav.go(Mistakes()) } }
+                        StudyRow("Patterns", Icons.Rounded.ErrorOutline) { nav.requireAccount("Create an account to see your mistakes.") { nav.go(Mistakes()) } }
                         RowDivider()
-                        StudyRow("Review deck", Icons.Rounded.Style) { nav.requireAccount("Create an account to build and review your deck.") { nav.go(Review) } }
+                        StudyRow("Drill", Icons.Rounded.Style) { nav.requireAccount("Create an account to drill your mistakes.") { nav.go(Review()) } }
                         RowDivider()
-                        StudyRow("Coach", Icons.Rounded.AutoAwesome) { nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) } }
+                        StudyRow("Your plan", Icons.Rounded.AutoAwesome) { nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) } }
                         RowDivider()
                         StudyRow("Prompt bank", Icons.Rounded.Search) { nav.go(Bank()) }
                     }
@@ -286,7 +286,7 @@ private fun GuestHero(nav: Nav) {
         Text("Create your free account", style = NB.type.title1, color = NB.colors.ink)
         Spacer(Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Keep every result and watch your bands climb", "History, Mistakes, Review and your coach", "More tests every week").forEach { b ->
+            listOf("Keep every result and watch your bands climb", "History, your patterns, drills and coach", "More tests every week").forEach { b ->
                 Row(Modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.Top) {
                     Icon(Icons.Rounded.Check, null, Modifier.size(20.dp).padding(top = 2.dp), tint = NB.colors.brandText)
                     Spacer(Modifier.width(10.dp))

@@ -109,7 +109,7 @@ fun CoachScreen(nav: Nav) {
     }
 
     PushedScreen(
-        "Coach", nav::back,
+        "Your plan", nav::back,
         bottomBar = {
             if (account && coach != null && !coach.ready) StickyActionBar {
                 NbButton("Take a full mock", { nav.go(MockStart) }, fill = true, size = BtnSize.Large)
@@ -313,7 +313,7 @@ private fun Evidence(nav: Nav, cand: CoachCandidate) {
         val ev = cand.evidence
         ev.attemptIds.firstOrNull()?.let { id -> NbButton("Open an example", { nav.go(AttemptResult.of(id)) }, kind = BtnKind.Text, size = BtnSize.Small) }
         ev.lr.firstOrNull()?.let { ref -> NbButton("Open an example question", { nav.go(LrResult(ref.attemptId)) }, kind = BtnKind.Text, size = BtnSize.Small) }
-        if (ev.mistakeIds.isNotEmpty()) NbButton("See these in Mistakes", { nav.go(Mistakes()) }, kind = BtnKind.Text, size = BtnSize.Small)
+        if (ev.mistakeIds.isNotEmpty()) NbButton("See these in Patterns", { nav.go(Mistakes()) }, kind = BtnKind.Text, size = BtnSize.Small)
     }
 }
 
@@ -382,6 +382,6 @@ private fun openAction(nav: Nav, scope: CoroutineScope, variant: suspend () -> S
         "listening-test" -> nav.openTab(Tab.Listening)
         "reading-test" -> nav.openTab(Tab.Reading)
         "see-evidence" -> nav.go(Mistakes())
-        "review-deck" -> nav.go(Review)
+        "review-deck" -> nav.go(Review())
     }
 }

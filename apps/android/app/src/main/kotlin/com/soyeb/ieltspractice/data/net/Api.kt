@@ -508,9 +508,9 @@ class Api(
     /** POST /api/mistakes/{id}/card */
     suspend fun mistakeToCard(id: String) { raw("POST", "/api/mistakes/${enc(id)}/card") }
 
-    /** POST /api/cards. [source] is mistake | vocab | fix. */
-    suspend fun addCard(front: String, back: String, source: String) {
-        raw("POST", "/api/cards", buildJsonObject { put("front", front); put("back", back); put("source", source) })
+    /** POST /api/cards. [source] is mistake | vocab | fix; [category] lets drills group it. */
+    suspend fun addCard(front: String, back: String, source: String, category: String? = null) {
+        raw("POST", "/api/cards", buildJsonObject { put("front", front); put("back", back); put("source", source); category?.let { put("category", it) } })
     }
 
     /** POST /api/cards/bulk (1 to 50 cards). */
@@ -518,8 +518,21 @@ class Api(
         raw("POST", "/api/cards/bulk", buildJsonObject { put("cards", AppJson.encodeToJsonElement(ListSerializer(CardInput.serializer()), cards)) })
     }
 
-    /** GET /api/cards/due */
-    suspend fun dueCards(): DueResponse = get("/api/cards/due")
+    /** GET /api/cards/due. [category] narrows to one pattern; [ahead] includes cards not yet due (soonest first). */
+    suspend fun dueCards(category: String? = null, ahead: Boolean = false): DueResponse =
+        get("/api/cards/due", mapOf("category" to category, "practice" to if (ahead) "1" else null))
+
+    /** POST /api/cards/{id}/skip: the card never comes back. */
+    suspend fun skipCard(id: String) { raw("POST", "/api/cards/${enc(id)}/skip") }
+
+    /** GET /api/mistakes/patterns */
+    suspend fun mistakePatterns(): MistakePatterns = get("/api/mistakes/patterns")
+
+    /** GET /api/mistakes/recurring/{attemptId} */
+    suspend fun recurring(attemptId: String): Recurring = get("/api/mistakes/recurring/${enc(attemptId)}")
+
+    /** GET /api/lr/cards/{id}/clip (404 when the word can't be located in the recording). */
+    suspend fun cardClip(id: String): CardClip = get("/api/lr/cards/${enc(id)}/clip")
 
     /** POST /api/cards/{id}/review: [grade] 0-5 (the card comes back rescheduled). */
     suspend fun reviewCard(id: String, grade: Int): DueCard = send("POST", "/api/cards/${enc(id)}/review", buildJsonObject { put("grade", grade) })

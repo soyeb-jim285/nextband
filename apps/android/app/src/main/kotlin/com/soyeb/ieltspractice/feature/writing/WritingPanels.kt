@@ -102,7 +102,7 @@ internal fun OverviewPanel(
             SectionHeader(if (r.topFixes.size == 1) "One thing to fix next" else "${r.topFixes.size} things to fix next", Modifier.padding(top = 12.dp))
             r.topFixes.forEachIndexed { i, f -> FixCard(i + 1, f) }
             NbButton(
-                if (fixesInDeck) "Fixes are in your review deck" else "Add top fixes to review", onAddFixes,
+                if (fixesInDeck) "Fixes are in your drills" else "Add top fixes to drills", onAddFixes,
                 fill = true, kind = BtnKind.Secondary, enabled = !fixesInDeck,
             )
         }
