@@ -49,7 +49,7 @@ export async function settle(invoice: string): Promise<'paid' | 'failed' | 'pend
     return 'failed';
   }
   // Docs say "success"; the live sandbox answers "successful" (seen 2026-11-01). Accept both.
-  if ((s !== 'success' && s !== 'successful') || Number(t!.payment_amount) < p.amount) return 'pending'; // processing, or short: leave for a person to look at
+  if ((s !== 'success' && s !== 'successful') || !(Number(t!.payment_amount) >= p.amount)) return 'pending'; // processing, or short: leave for a person to look at
 
   const days = PAID_PLANS[p.plan].days;
   const until = await db.transaction(async (tx) => {
