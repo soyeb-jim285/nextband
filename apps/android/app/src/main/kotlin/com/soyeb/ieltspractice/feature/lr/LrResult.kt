@@ -1,5 +1,7 @@
 package com.soyeb.ieltspractice.feature.lr
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +97,7 @@ import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.rememberLoad
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.feature.result.ResultHero
 import com.soyeb.ieltspractice.nav.LrResult
 import com.soyeb.ieltspractice.nav.LrRun
@@ -112,7 +115,7 @@ fun LrResultScreen(route: LrResult, nav: Nav) {
     val flags by produceState(emptySet<Int>(), route.attemptId) { value = parseFlags(graph.prefs.getString("flags:${route.attemptId}")) }
     when (val s = load.state) {
         Load.Loading -> PushedScreen("Result", nav::back) { pad -> SkeletonList(Modifier.padding(pad)) }
-        is Load.Failed -> PushedScreen("Result", nav::back) { pad -> ErrorState(s.message, load.reload, Modifier.padding(pad)) }
+        is Load.Failed -> PushedScreen("Result", nav::back) { pad -> ErrorState(s.message, load.reload, Modifier.padding(pad).verticalScroll(rememberScrollState())) }
         is Load.Ready -> {
             val a = s.value
             if (!a.submitted || a.marks == null) {
@@ -247,7 +250,7 @@ private fun OverviewTab(
     val wrongCount = flat.count { marks[it.n]?.correct != true }
     val st = a.stats
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().readable(),
         contentPadding = PaddingValues(start = NB.space.gutter, end = NB.space.gutter, top = 16.dp, bottom = pad.calculateBottomPadding() + 24.dp),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
@@ -360,7 +363,7 @@ private fun AnswersTab(
             if (filter == 2) "Nothing flagged" else "No wrong answers",
             if (filter == 2) "Questions you flag during a test show up here." else "Every answer was correct.",
         ) else LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().readable(),
             contentPadding = PaddingValues(start = NB.space.gutter, end = NB.space.gutter, bottom = pad.calculateBottomPadding() + 24.dp),
             verticalArrangement = Arrangement.spacedBy(NB.space.lg),
         ) {
@@ -502,7 +505,7 @@ private fun TextTab(
             Modifier.padding(vertical = 10.dp),
         )
         LazyColumn(
-            Modifier.fillMaxSize(), state = state,
+            Modifier.fillMaxSize().readable(), state = state,
             contentPadding = PaddingValues(start = NB.space.gutter, end = NB.space.gutter, bottom = pad.calculateBottomPadding() + 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

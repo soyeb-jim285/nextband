@@ -12,6 +12,8 @@ val youScreens: List<ScreenSpec> = listOf(
     ScreenSpec("guest-you", You),
     ScreenSpec("settings", SettingsRoute),
     ScreenSpec("settings-delete", SettingsRoute, listOf("Delete")),
-    ScreenSpec("plan", Plan),
-    ScreenSpec("plan-checkout", Plan, listOf("Checkout")),
+    // Debug renders the web channel (WEB_CHECKOUT true: prices and PayStation), so these are named "-web": never use them for
+    // the Play listing or review. The store Plan screen: record with -Pnextband.channel=play.
+    ScreenSpec("plan-web", Plan),
+    ScreenSpec("plan-web-checkout", Plan, listOf("Checkout")),
 )

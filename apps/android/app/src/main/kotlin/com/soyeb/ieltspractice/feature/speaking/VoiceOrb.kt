@@ -10,7 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -30,20 +29,16 @@ enum class OrbMode { Idle, Connecting, Speaking, Listening, Thinking }
  * it carries the meaning. Static under reduced motion.
  */
 @Composable
-fun VoiceOrb(mode: OrbMode, level: Float, modifier: Modifier = Modifier, orbSize: Dp = 220.dp) {
+fun VoiceOrb(mode: OrbMode, level: () -> Float, modifier: Modifier = Modifier, orbSize: Dp = 220.dp) {
     val reduced = LocalReducedMotion.current
     val brand = NB.colors.brand
     val soft = NB.colors.brandText
-    val pulse = if (reduced) 0.5f else rememberInfiniteTransition(label = "orb").animateFloat(
+    // The pulse and the level are read in the draw lambda, so the orb (and the screen around it) never recomposes per frame.
+    val pulseState = if (reduced) null else rememberInfiniteTransition(label = "orb").animateFloat(
         0f, 1f, infiniteRepeatable(tween(if (mode == OrbMode.Idle) 3200 else 1500, easing = LinearEasing), RepeatMode.Reverse), label = "pulse",
-    ).value
-    // The examiner's audio level isn't available, so while it talks the orb swells on its own beat (at least).
-    val target = when (mode) {
-        OrbMode.Speaking -> maxOf(level, 0.2f + 0.3f * pulse)
-        OrbMode.Listening -> level
-        else -> 0f
-    }
-    val lv by animateFloatAsState(
+    )
+    val target = if (mode == OrbMode.Speaking || mode == OrbMode.Listening) level() else 0f
+    val lvState = animateFloatAsState(
         target.coerceIn(0f, 1f),
         if (reduced) tween(0) else tween(120), label = "orbLevel",
     )
@@ -53,6 +48,9 @@ fun VoiceOrb(mode: OrbMode, level: Float, modifier: Modifier = Modifier, orbSize
         else -> 0.04f
     }
     Canvas(modifier.size(orbSize).clearAndSetSemantics {}) {
+        val pulse = pulseState?.value ?: 0.5f
+        // The examiner's audio level isn't available, so while it talks the orb swells on its own beat (at least).
+        val lv = if (mode == OrbMode.Speaking) maxOf(lvState.value, 0.2f + 0.3f * pulse) else lvState.value
         val c = Offset(size.width / 2, size.height / 2)
         val base = size.minDimension * 0.25f
         val scale = 1f + breathe * pulse + 0.5f * lv

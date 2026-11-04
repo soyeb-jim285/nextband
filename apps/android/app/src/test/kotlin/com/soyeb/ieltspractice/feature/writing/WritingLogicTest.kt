@@ -7,6 +7,7 @@ import com.soyeb.ieltspractice.data.model.ChartSpec
 import com.soyeb.ieltspractice.data.model.Prompt
 import com.soyeb.ieltspractice.data.model.Series
 import com.soyeb.ieltspractice.data.net.AppJson
+import com.soyeb.ieltspractice.nav.WritingTask
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -88,6 +89,14 @@ class WritingLogicTest {
         val items = listOf(DraftMeta("w2", 2, "Remote work", null, 120, 5L), DraftMeta("w1a", 1, "Energy", "academic", 40, 4L))
         assertEquals(items, decodeIndex(encodeIndex(items)))
         assertEquals(emptyList<DraftMeta>(), decodeIndex(null)); assertEquals(emptyList<DraftMeta>(), decodeIndex("not json"))
+    }
+
+    @Test fun aFullTestDraftResumesBothTasksTask1First() {
+        assertEquals(WritingTask("task2", null, "w2"), resumeRoute(DraftMeta("w2", 2, "Remote work")))
+        assertEquals(WritingTask("full", "academic", "w1a", "w2"), resumeRoute(DraftMeta("w2", 2, "Remote work", "academic", pairId = "w1a")))
+        assertEquals(WritingTask("full", "academic", "w1a", "w2"), resumeRoute(DraftMeta("w1a", 1, "Energy", "academic", pairId = "w2")))
+        val pair = listOf(DraftMeta("w1a", 1, "Energy", pairId = "w2"))
+        assertEquals(pair, decodeIndex(encodeIndex(pair)))
     }
 
     @Test fun agoReadsLikeAPerson() {

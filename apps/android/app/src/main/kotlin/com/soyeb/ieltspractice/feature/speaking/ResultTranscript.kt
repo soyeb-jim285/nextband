@@ -32,7 +32,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -189,7 +192,24 @@ fun TranscriptPanel(
                     Spacer(Modifier.height(10.dp))
                 }
                 // Words flow left-aligned like prose; the spare space at the end of a line stays there (no justified gaps).
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp, androidx.compose.ui.Alignment.Start), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                // One TalkBack stop per answer, not one per word: the prose is read whole, and each mistake, mark and
+                // "play" is a custom action. Pointer taps on the words still work for sighted users.
+                val toks = s.range.map { model.tokens[it] }
+                FlowRow(
+                    Modifier.clearAndSetSemantics {
+                        contentDescription = toks.joinToString(" ") { it.word.w }
+                        customActions = buildList<CustomAccessibilityAction> {
+                            toks.firstOrNull()?.let { t -> add(CustomAccessibilityAction("Play from the start") { player.seek(max(0.0, t.word.start - 0.3)); true }) }
+                            toks.flatMap { t -> t.errors.map { t to it } }.distinctBy { it.second }.forEach { (t, e) ->
+                                add(CustomAccessibilityAction("${t.word.w}: ${categoryLabel(e.category)} mistake") { onSelect(e); true })
+                            }
+                            toks.flatMap { it.marks }.forEach { m ->
+                                add(CustomAccessibilityAction("Hear ${m.detail}") { markDetail = m.detail; player.seek(max(0.0, m.time - 0.3)); true })
+                            }
+                        }
+                    },
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, androidx.compose.ui.Alignment.Start), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
                     for (i in s.range) WordView(
                         model.tokens[i], filter, now, nowPause, focusWord, colors, player, leaned, onSelect,
                     ) { d -> markDetail = if (markDetail == d) null else d }

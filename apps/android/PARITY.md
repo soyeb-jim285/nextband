@@ -5,6 +5,7 @@ Status: done / partial / missing. Verified by unit tests (models against the sha
 | Feature | Android | Notes |
 | --- | --- | --- |
 | Sign in, sign up, email verification code, forgot and reset password | done | `feature/auth/AuthScreen.kt`; guests can browse, sign-in is required for tests and personal data |
+| Plan and buying Pro | done | Build channel `nextband.channel` (play default, web). play: consumption-only per Play Payments policy; Plan and the quota sheet show `GateText.STORE_UPGRADE` as plain text, no checkout. web (APK from the site, never bundleRelease): PayStation checkout as on the web. `/api/me` re-read on foreground so a site purchase unlocks without restart |
 | Bearer token storage | done | Keystore-encrypted DataStore; 401 on a non-auth call signs out |
 | Guest home | done | |
 | Home dashboard (next up, predicted bands, band trend, streak, criteria) | done | |

@@ -145,6 +145,17 @@ object GateText {
         }
     }
 
+    /**
+     * Play build (consumption-only, no Play Billing): plain, non-clickable text. The app never links to pricing or checkout
+     * (Play Payments policy); Pro bought on the website unlocks after sign-in.
+     */
+    fun storeUpgrade(email: String): String =
+        "Pro isn't sold in the app. Upgrade or renew at nextband.app with ${email.ifBlank { "the same account" }}, and it unlocks here automatically."
+
+    /** The [storeUpgrade] line under a limit panel: only a signed-in free user out of tests, and only when the app can't sell ([canBuy] false). */
+    fun storeNote(code: String, tier: String, canBuy: Boolean, email: String = ""): String? =
+        storeUpgrade(email).takeIf { !canBuy && code == Codes.QUOTA && tier == "community" }
+
     /** One sentence for a place with no panel (an upload that was refused): why, when it resets, and what was kept. */
     fun sentence(e: ApiError, keep: String): String {
         val c = copy(e.code.orEmpty(), e.skill ?: "speaking", e.tier ?: "community", e.resetAt)

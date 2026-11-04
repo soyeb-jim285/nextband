@@ -8,12 +8,12 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import com.soyeb.ieltspractice.AppGraph
 import com.soyeb.ieltspractice.data.AnswerWindow
 import com.soyeb.ieltspractice.data.PendingRecording
-import com.soyeb.ieltspractice.data.currentUserId
 import com.soyeb.ieltspractice.data.UploadState
 import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.logic.newSessionId
@@ -32,6 +32,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -106,6 +108,7 @@ class SessionModel(
     private var prepEnd = 0L
     private var starting = false
     private var finishing = false // the recording is being closed off the main thread
+    private var away by mutableStateOf(false)
 
     val current: Prompt? get() = items.getOrNull(index)
     val mockId: String? get() = route.mockId
@@ -257,10 +260,20 @@ class SessionModel(
         starting = true
         startError = null
         prepJob?.cancel()
-        micCheck.stop()
-        store.prepare()
-        val ok = recorder.start(store.audioFile(recId), startPaused = current?.part != 2)
-        starting = false
+        val file = store.audioFile(recId)
+        val startPaused = current?.part != 2
+        scope.launch { begin(file, startPaused) }
+    }
+
+    /** Opening the encoder and the microphone blocks for a moment: off the main thread, with [starting] held until it is done. */
+    private suspend fun begin(file: java.io.File, startPaused: Boolean) {
+        val ok = try {
+            withContext(NonCancellable + Dispatchers.IO) { micCheck.stop(); store.prepare(); recorder.start(file, startPaused = startPaused) }
+        } finally { starting = false }
+        if (!currentCoroutineContext().isActive) { // the screen closed meanwhile: drop what was just opened
+            if (ok) thread(name = "mic-discard") { recorder.stop(); file.delete() }
+            return
+        }
         if (!ok) {
             startError = "Couldn't start recording. Is another app using the microphone?"
             phase = Phase.Ready
@@ -283,6 +296,7 @@ class SessionModel(
 
     /** The screen left the foreground (a call, another app): hold the recording so it doesn't fill with silence; it continues on return. */
     fun setAway(away: Boolean) {
+        this.away = away
         recorder.away = away
         // The mic check holds the microphone for nothing while the screen is hidden: close it, and open it again on return.
         if (phase == Phase.MicCheck) { if (away) micCheck.stop() else retryMicCheck() }
@@ -331,7 +345,8 @@ class SessionModel(
             createdAt = System.currentTimeMillis(), durationMs = r.durationMs, energy = r.energy.take(20000),
             marks = windows.map { it.startMs }.take(200), segments = windows.take(200),
             sessionId = if (isFull) sessionId else null, parentAttemptId = parent, mockId = route.mockId,
-            ownerId = currentUserId(api),
+            // No network call here: the m4a needs its metadata on disk now. Unknown owner is stamped at upload (PendingStore.upload).
+            ownerId = api.me.value?.user?.id,
         )
         withContext(Dispatchers.IO) { store.add(rec) }
         uploads = uploads + UploadItem(rec.id, rec.label)
@@ -389,15 +404,22 @@ class SessionModel(
 
     /** Ten times a second: copy the meters for the screen, and stop the recording at its hard limit. */
     private suspend fun tick() {
-        while (scope.isActive) {
-            if (phase == Phase.MicCheck && micCheck.isRecording) {
-                checkLevel = micCheck.level; checkLoud = micCheck.loud; checkSoft = micCheck.soft
-            } else if (phase == Phase.Recording) {
-                elapsed = recorder.elapsed; level = recorder.level; levels = recorder.levels
-                liveWpm = recorder.liveWpm; silence = recorder.silence
-                if ((examiner != Examiner.Asking && hitLimit(elapsed)) || recorder.failed) finishPart(force = true)
+        // Wakes only while a meter is on screen and the app is in front; otherwise it sleeps until that changes.
+        snapshotFlow { !away && (phase == Phase.MicCheck || phase == Phase.Recording) }.collectLatest { on ->
+            while (on) {
+                tickOnce()
+                delay(100)
             }
-            delay(100)
+        }
+    }
+
+    private fun tickOnce() {
+        if (phase == Phase.MicCheck && micCheck.isRecording) {
+            checkLevel = micCheck.level; checkLoud = micCheck.loud; checkSoft = micCheck.soft
+        } else if (phase == Phase.Recording) {
+            elapsed = recorder.elapsed; level = recorder.level; levels = recorder.levels
+            liveWpm = recorder.liveWpm; silence = recorder.silence
+            if ((examiner != Examiner.Asking && hitLimit(elapsed)) || recorder.failed) finishPart(force = true)
         }
     }
 

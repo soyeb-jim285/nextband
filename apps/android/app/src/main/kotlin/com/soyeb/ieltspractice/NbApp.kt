@@ -68,13 +68,16 @@ import com.soyeb.ieltspractice.feature.study.studyGraph
 import com.soyeb.ieltspractice.feature.today.todayGraph
 import com.soyeb.ieltspractice.feature.writing.writingGraph
 import com.soyeb.ieltspractice.feature.you.youGraph
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.BottomBar
 import com.soyeb.ieltspractice.nav.GateHost
 import com.soyeb.ieltspractice.nav.LocalNav
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.NavHolder
+import com.soyeb.ieltspractice.nav.Plan
 import com.soyeb.ieltspractice.nav.Tab
 import com.soyeb.ieltspractice.nav.TodayTab
 import com.soyeb.ieltspractice.nav.Welcome
@@ -149,9 +152,22 @@ private fun AppShell(graph: AppGraph, start: Any) {
         if (!hasAccount) due = 0
     }
 
+    // Back in the foreground: re-read the plan and limits (/api/me carries the quota), so Pro bought on nextband.app shows
+    // without a restart. Also runs once when the shell first appears; never in demo/screenshot runs (fixtures stay put).
+    val live = LocalDemo.current == null
+    LifecycleResumeEffect(hasAccount) {
+        // Plan runs its own recheck on resume (with a "Checking…" state), so skip it there; skip too when /api/me just
+        // answered (cold start: restoreSession has loaded it).
+        val onPlan = controller.currentBackStackEntry?.destination?.hasRoute(Plan::class) == true
+        if (hasAccount && live && !onPlan) graph.scope.launch { runCatching { graph.api.loadMeIfStale() } }
+        onPauseOrDispose { }
+    }
+
     // The server ended the session (expired account, purged guest): say so instead of quietly flipping to the guest state.
     LaunchedEffect(graph) {
         graph.api.sessionEnded.collect { wasAccount ->
+            // Starting a test already opened sign-in with its own banner (Nav.begin): one signal, not two.
+            if (controller.currentBackStackEntry?.destination?.hasRoute(Auth::class) == true) return@collect
             if (!wasAccount) snack.showSnackbar("Your guest session ended. Your next test starts a new one.")
             else if (snack.showSnackbar(
                     "You were signed out. Sign in again to see your results.", actionLabel = "Sign in", duration = SnackbarDuration.Long,

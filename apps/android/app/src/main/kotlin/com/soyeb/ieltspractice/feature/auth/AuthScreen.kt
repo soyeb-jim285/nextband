@@ -1,5 +1,7 @@
 package com.soyeb.ieltspractice.feature.auth
 
+import com.soyeb.ieltspractice.design.components.heroFill
+import com.soyeb.ieltspractice.design.components.heroInk
 import com.soyeb.ieltspractice.design.components.Logo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -109,7 +111,8 @@ import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.NbTextField
-import com.soyeb.ieltspractice.feature.you.SITE
+import com.soyeb.ieltspractice.BuildConfig
+import com.soyeb.ieltspractice.feature.you.siteUrl
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Onboarding
 import com.soyeb.ieltspractice.nav.TodayTab
@@ -284,9 +287,9 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     }
 
     // Light: deep teal header with white type (7:1). Dark: a teal-tinted night surface, ink type and the bright teal for accents.
-    val hero = if (c.isDark) c.brandSoft else c.brandText
-    val onHero = if (c.isDark) c.ink else Color.White
-    val onHeroMuted = if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f)
+    val hero = heroFill()
+    val onHero = heroInk().fg
+    val onHeroMuted = heroInk().muted
     val keyboard = WindowInsets.isImeVisible
     // Landscape phone or very large text: the full hero would leave the form no room, so use the compact header.
     val compact = keyboard || LocalConfiguration.current.screenHeightDp < 480 || LocalDensity.current.fontScale > 1.5f
@@ -439,7 +442,11 @@ private fun VerifyStep(f: AuthForm, demo: EmailStatus?, onComplete: () -> Unit, 
             style = NB.type.body, color = NB.colors.muted,
         )
         CodeField(f.code, errs ?: f.codeIssue) { f.code = it; f.codeIssue = null; if (it.length == 6) onComplete() }
-        CodeDelivery(f.token, demo) { api.sendOtp(f.address, "email-verification") }
+        Column {
+            CodeDelivery(f.token, demo) { api.sendOtp(f.address, "email-verification") }
+            // A typo in the address: back to the sign-up form with name and email still filled in.
+            if (f.fromSignUp) NbButton("Use a different email", { go(AuthStep.SignUp) }, kind = BtnKind.Text, size = BtnSize.Small)
+        }
         // The server answers a sign-up for a taken address like a new one (no account enumeration) and emails a note instead of a code.
         if (f.fromSignUp) Column {
             Text(
@@ -509,9 +516,9 @@ private fun TermsNote() {
     Text(
         buildAnnotatedString {
             append("By creating an account you agree to the ")
-            withLink(LinkAnnotation.Url("$SITE/terms", link)) { append("terms") }
+            withLink(LinkAnnotation.Url(siteUrl("/terms", BuildConfig.WEB_CHECKOUT), link)) { append("terms") }
             append(" and ")
-            withLink(LinkAnnotation.Url("$SITE/privacy", link)) { append("privacy policy") }
+            withLink(LinkAnnotation.Url(siteUrl("/privacy", BuildConfig.WEB_CHECKOUT), link)) { append("privacy policy") }
             append(".")
         },
         Modifier.fillMaxWidth(), style = NB.type.caption, color = NB.colors.muted, textAlign = TextAlign.Center,

@@ -32,4 +32,21 @@ class PendingStoreTest {
         assertFalse(old.exists())
         assertTrue(fresh.exists())
     }
+
+    @Test fun aLinkedGuestsRecordingsMoveToTheAccountAndStayThereAfterARelaunch() {
+        val dir = Files.createTempDirectory("pending").toFile()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val a = PendingStore(dir, scope)
+        a.prepare()
+        listOf("g1", "x1").forEach { a.audioFile(it).writeBytes(byteArrayOf(1)) }
+        a.add(PendingRecording("g1", "p1", 1, "Part 1", 1L, 1000, emptyList(), emptyList(), ownerId = "guest"))
+        a.add(PendingRecording("x1", "p1", 1, "Part 1", 2L, 1000, emptyList(), emptyList(), ownerId = "other"))
+        PendingStore(dir, scope).reassign("guest", "acctA") // a fresh launch: reassign reads the disk itself
+        val b = PendingStore(dir, scope)
+        b.reload()
+        val g = b.items.value.first { it.id == "g1" }
+        assertTrue(g.belongsTo("acctA"))
+        assertFalse(g.belongsTo("acctB")) // a later account on this device never sees it
+        assertEquals("other", b.items.value.first { it.id == "x1" }.ownerId)
+    }
 }

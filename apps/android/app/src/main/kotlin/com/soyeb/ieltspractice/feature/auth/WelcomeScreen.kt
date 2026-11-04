@@ -26,6 +26,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.R
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
+import com.soyeb.ieltspractice.design.components.heroFill
+import com.soyeb.ieltspractice.design.components.heroInk
 import com.soyeb.ieltspractice.design.components.BandRing
 import com.soyeb.ieltspractice.design.components.Logo
 import com.soyeb.ieltspractice.design.components.BandScale
@@ -50,6 +54,8 @@ import com.soyeb.ieltspractice.design.components.SkillTile
 import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Onboarding
+import com.soyeb.ieltspractice.nav.TodayTab
+import com.soyeb.ieltspractice.LocalGraph
 
 
 /**
@@ -59,9 +65,11 @@ import com.soyeb.ieltspractice.nav.Onboarding
 @Composable
 fun WelcomeScreen(nav: Nav) {
     val c = NB.colors
-    val hero = if (c.isDark) c.brandSoft else c.brandText
-    val onHero = if (c.isDark) c.ink else Color.White
-    val onHeroMuted = if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f)
+    // Back here after signing out: goals are already set, so skip the three setup pages.
+    val onboarded by LocalGraph.current.prefs.onboardingDone.collectAsState(initial = false)
+    val hero = heroFill()
+    val onHero = heroInk().fg
+    val onHeroMuted = heroInk().muted
     // At large text sizes the sample band would squeeze the headline; it is decorative, so drop it.
     val showBand = LocalDensity.current.fontScale < 1.3f
     Column(Modifier.fillMaxSize().background(c.surface)) {
@@ -106,7 +114,7 @@ fun WelcomeScreen(nav: Nav) {
             }
         }
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp)) {
-            NbButton("Start practising free", { nav.go(Onboarding) }, fill = true, size = BtnSize.Large, haptic = true)
+            NbButton("Start practising free", { if (onboarded) nav.reset(TodayTab) else nav.go(Onboarding) }, fill = true, size = BtnSize.Large, haptic = true)
             NbButton("I have an account", { nav.go(Auth("signin")) }, kind = BtnKind.Text, fill = true)
         }
     }

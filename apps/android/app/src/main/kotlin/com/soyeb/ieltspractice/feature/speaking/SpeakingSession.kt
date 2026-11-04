@@ -27,7 +27,6 @@ import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +64,7 @@ import com.soyeb.ieltspractice.data.model.Prompt
 import com.soyeb.ieltspractice.data.net.ApiError
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
@@ -85,6 +85,7 @@ import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.design.components.Stat
 import com.soyeb.ieltspractice.design.components.VDivider
 import com.soyeb.ieltspractice.design.components.clockText
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.design.Tone
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.Nav
@@ -277,7 +278,7 @@ private fun RecordingDock(vm: SessionModel, p: Prompt, onEarly: () -> Unit) {
 @Composable
 private fun PermissionBody(denied: Boolean) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter * 1.2f, vertical = 24.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter * 1.2f, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
         if (denied) IconTile(Icons.Rounded.MicOff, NB.colors.warnText, NB.colors.warnSoft, 80.dp)
@@ -310,7 +311,7 @@ private fun MicCheckBody(vm: SessionModel, onRetry: () -> Unit) {
     val c = NB.colors
     val state = micCheckLevel(vm.checkLoud, vm.checkSoft)
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         Overline("Mic check")
@@ -345,7 +346,7 @@ private fun MicCheckBody(vm: SessionModel, onRetry: () -> Unit) {
 private fun SessionBody(vm: SessionModel, p: Prompt, phase: Phase) {
     val c = NB.colors
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         vm.startError?.let { Banner(it, Icons.Rounded.Warning, tone = Tone.Bad) }
@@ -542,7 +543,7 @@ private fun FinishingBody(vm: SessionModel, stateOf: (UploadItem) -> UploadState
     val total = vm.items.size
     val failed = vm.uploads.filter { stateOf(it) is UploadState.Failed }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -557,10 +558,9 @@ private fun FinishingBody(vm: SessionModel, stateOf: (UploadItem) -> UploadState
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(finishProgress(total, done, failed.size), style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
-            LinearProgressIndicator(
-                progress = { done.toFloat() / maxOf(total, 1) },
-                modifier = Modifier.fillMaxWidth().height(6.dp).semantics { contentDescription = "$done of $total recordings uploaded" },
-                color = if (failed.isEmpty()) c.brand else c.warn, trackColor = c.surface2, drawStopIndicator = {},
+            Meter(
+                done.toDouble(), Modifier.semantics { contentDescription = "$done of $total recordings uploaded" },
+                max = maxOf(total, 1).toDouble(), color = if (failed.isEmpty()) c.brand else c.warn, height = 6.dp,
             )
         }
         RowGroup {

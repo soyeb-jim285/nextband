@@ -1,5 +1,7 @@
 package com.soyeb.ieltspractice.feature.speaking
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,7 +123,7 @@ fun SpeakingResult(attempts: List<Attempt>, nav: Nav) {
     val parts = remember(attempts) { attempts.sortedBy { it.part } }
     if (parts.isEmpty()) {
         PushedScreen("Speaking result", nav::back, scrollBehavior = null) { pad ->
-            EmptyState(Icons.Rounded.Mic, "No result", "This result isn't available.", Modifier.padding(pad))
+            EmptyState(Icons.Rounded.Mic, "No result", "This result isn't available.", Modifier.padding(pad).verticalScroll(rememberScrollState()))
         }
         return
     }

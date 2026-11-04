@@ -106,7 +106,7 @@ fun CoachScreen(nav: Nav) {
     PollWhileVisible(updating && !demo) { loader.reload() }
 
     PushedScreen(
-        "Your plan", nav::back,
+        "Study plan", nav::back,
         bottomBar = {
             if (account && coach != null && !coach.ready) StickyActionBar {
                 NbButton("Take a full mock", { nav.go(MockStart) }, fill = true, size = BtnSize.Large)

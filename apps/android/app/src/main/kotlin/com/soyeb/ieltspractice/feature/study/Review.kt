@@ -55,6 +55,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.logic.categoryLabel
@@ -79,6 +82,7 @@ import com.soyeb.ieltspractice.design.components.RowGroup
 import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.design.components.rememberLoad
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.media.AudioPlayer
 import com.soyeb.ieltspractice.nav.CoachRoute
 import com.soyeb.ieltspractice.nav.Mistakes
@@ -183,6 +187,8 @@ internal class DrillSession(private val api: Api, private val scope: CoroutineSc
     }
 }
 
+class DrillHolder : ViewModel() { internal var session: DrillSession? = null }
+
 @Composable
 fun ReviewScreen(nav: Nav, route: Review) {
     val g = LocalGraph.current
@@ -190,10 +196,12 @@ fun ReviewScreen(nav: Nav, route: Review) {
     val tab = LocalDemo.current?.tab
     val scope = rememberCoroutineScope()
     val snack = LocalSnack.current
-    val s = remember(route) { DrillSession(g.api, scope, route) }
+    // Held by the back-stack entry, so rotating keeps the queue, the typed answer and the checked state.
+    val holder = viewModel<DrillHolder>()
+    val s = holder.session ?: DrillSession(g.api, holder.viewModelScope, route).also { holder.session = it }
     val say: (String) -> Unit = { m -> scope.launch { snack.currentSnackbarData?.dismiss(); snack.showSnackbar(m) } }
     LaunchedEffect(account, route) {
-        if (!account) return@LaunchedEffect
+        if (!account || !s.loading) return@LaunchedEffect // already loaded (a rotation): keep the session as it is
         s.load()
         // Screenshots: a checked answer with a wrong attempt.
         if (tab == "Checked" && s.card != null) { s.typed = "I living there since 2015"; s.checked = true }
@@ -268,7 +276,7 @@ private fun CardStage(s: DrillSession, card: DueCard, say: (String) -> Unit) {
 
     val left = s.queue.size - s.index
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = NB.space.md),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = NB.space.md),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -385,7 +393,7 @@ private fun Summary(done: List<Pair<DueCard, Boolean>>) {
     val got = first.count { it.second }
     val byPattern = first.groupBy { it.first.category?.let(::categoryLabel) ?: "Other" }
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 32.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         IconTile(Icons.Rounded.CheckCircle, NB.colors.goodText, NB.colors.goodSoft, 72.dp)

@@ -72,6 +72,7 @@ import com.soyeb.ieltspractice.design.components.RowDivider
 import com.soyeb.ieltspractice.design.components.RowGroup
 import com.soyeb.ieltspractice.design.components.StickyActionBar
 import com.soyeb.ieltspractice.design.components.clockText
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.media.LiveStage
 import com.soyeb.ieltspractice.media.phaseLabel
 import com.soyeb.ieltspractice.nav.AttemptResult
@@ -110,6 +111,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     })
     val access = rememberMicAccess()
     var confirmEnd by remember { mutableStateOf(false) }
+    var confirmDiscard by remember { mutableStateOf(false) }
     var captions by remember { mutableStateOf(false) }
     KeepScreenOn()
 
@@ -138,12 +140,15 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     val running = stage == LiveStage.Running
     val snack = LocalSnack.current
     // One exit rule for the gesture and the close button: confirm while running, hold (and say why) while uploading.
+    // ponytail: after a failure the recordings live only in this ViewModel (not the pending-upload queue), so leaving loses them: confirm.
+    val unsent = stage is LiveStage.Failed && exam.hasRecordings
     fun leave() {
         if (running) confirmEnd = true
         else if (stage == LiveStage.Uploading) graph.scope.launch { snack.showSnackbar("Saving your recording… one moment.") }
+        else if (unsent) confirmDiscard = true
         else nav.back()
     }
-    BackHandler(enabled = running || stage == LiveStage.Uploading) { leave() }
+    BackHandler(enabled = running || stage == LiveStage.Uploading || unsent) { leave() }
     val now by produceState(SystemClock.elapsedRealtime(), running, demo) {
         value = SystemClock.elapsedRealtime()
         while (running && demo == null) { delay(1000); value = SystemClock.elapsedRealtime() }
@@ -183,7 +188,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
                     // No other examiner to fall back to: score what was recorded, or reconnect (not after a refusal, the limit panel covers that).
                     if (exam.hasRecordings) NbButton("Score what was recorded", exam::scoreRecorded, fill = true, size = BtnSize.Large)
                     else if (stage.error == null) NbButton("Reconnect examiner", exam::start, fill = true, size = BtnSize.Large)
-                    NbButton("Back to speaking", nav::back, kind = BtnKind.Text, fill = true)
+                    NbButton("Back to speaking", ::leave, kind = BtnKind.Text, fill = true)
                 }
                 is LiveStage.Unattached -> StickyActionBar {
                     NbButton("Try again", exam::retryAttach, fill = true, size = BtnSize.Large)
@@ -232,6 +237,12 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
             onConfirm = { confirmEnd = false; exam.endTest() }, onDismiss = { confirmEnd = false }, dismiss = "Keep going", destructive = true,
         )
     }
+    if (confirmDiscard) {
+        ConfirmDialog(
+            "Leave without scoring?", "Your recorded answers haven't been sent yet. If you leave now they are deleted and can't be recovered.", "Leave",
+            onConfirm = { confirmDiscard = false; nav.back() }, onDismiss = { confirmDiscard = false }, dismiss = "Stay", destructive = true,
+        )
+    }
 }
 
 // MARK: Pre-screen
@@ -248,11 +259,11 @@ private val steps = listOf(
 private fun PreScreen(exam: LiveModel, onCheck: () -> Unit) {
     val c = NB.colors
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            VoiceOrb(OrbMode.Idle, 0f, orbSize = 150.dp)
+            VoiceOrb(OrbMode.Idle, { 0f }, orbSize = 150.dp)
             Text("Talk to a live examiner", style = NB.type.headline, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
             Text(
                 "A full speaking test with a voice examiner, about 11–14 minutes, like the real thing.",
@@ -353,12 +364,12 @@ private fun Stage(exam: LiveModel, now: Long, captions: Boolean, connecting: Boo
     }
     val status = if (connecting) "Connecting to your examiner" else exam.statusText
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         PartStepper(exam.phase)
         Text(phaseLabel(exam.phase), style = NB.type.label, color = c.muted, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-        VoiceOrb(mode, exam.level.toFloat(), orbSize = if (part2 && card != null) 170.dp else 240.dp)
+        VoiceOrb(mode, { exam.level.toFloat() }, orbSize = if (part2 && card != null) 170.dp else 240.dp)
         Text(
             status.ifEmpty { " " }, style = NB.type.title1, color = c.ink, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },

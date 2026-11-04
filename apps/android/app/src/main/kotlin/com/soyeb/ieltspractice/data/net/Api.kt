@@ -34,6 +34,8 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.CookieJar
 import okhttp3.Headers
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -126,6 +128,7 @@ class Api(
     /** Tests left per skill and whether the live examiner is set up. Null until first loaded. */
     val quota: StateFlow<Quota?> = _quota.asStateFlow()
     private var quotaAt = 0L
+    private val meLoads = AtomicInteger(0) // /api/me requests in flight
     private val sessionLock = Mutex()
 
     /** False until the stored token has been read at launch, so the UI doesn't flash the guest state for a signed-in user. */
@@ -178,8 +181,9 @@ class Api(
 
     suspend fun <T> request(method: String, path: String, body: JsonElement?, serializer: KSerializer<T>): T {
         val text = raw(method, path, body).body
+        // Off the main thread: callers are often composables, and analyses / transcripts / L&R payloads are large.
         return try {
-            AppJson.decodeFromString(serializer, text)
+            withContext(Dispatchers.Default) { AppJson.decodeFromString(serializer, text) }
         } catch (e: SerializationException) {
             throw ApiError(0, "Unexpected response from the server ($path).")
         } catch (e: IllegalArgumentException) {
@@ -196,7 +200,7 @@ class Api(
     /** A list endpoint: accepts a bare array or `{items|cards|models|data: [...]}`. */
     suspend inline fun <reified T> getList(path: String, query: Map<String, String?> = emptyMap()): List<T> {
         val text = raw("GET", path + queryString(query)).body
-        return decodeListOrThrow(serializer<T>(), text, path)
+        return withContext(Dispatchers.Default) { decodeListOrThrow(serializer<T>(), text, path) }
     }
 
     @PublishedApi internal fun <T> decodeListOrThrow(s: KSerializer<T>, text: String, path: String): List<T> = try {
@@ -214,19 +218,24 @@ class Api(
         return b.build().encodedQuery?.let { "?$it" }.orEmpty()
     }
 
+    /** Storage URLs come from server answers (and a saved recording): only https ones are fetched. */
+    private fun storageUrl(url: String): HttpUrl =
+        url.toHttpUrlOrNull()?.takeIf { it.isHttps } ?: throw ApiError(0, "Unexpected file address from the server.")
+
     /** PUT a file to a presigned URL (no bearer token: it is a signed storage URL). */
     suspend fun upload(url: String, file: File, contentType: String) {
-        val req = Request.Builder().url(url).put(file.asRequestBody(contentType.toMediaType())).build()
+        val req = Request.Builder().url(storageUrl(url)).put(file.asRequestBody(contentType.toMediaType())).build()
         val (status, _, _) = execute(req, "Audio upload failed. Check your connection and retry.")
         if (status !in 200..299) throw ApiError(status, "Audio upload failed. Check your connection and retry.")
     }
 
     suspend fun download(url: String): ByteArray {
+        val target = storageUrl(url)
         inflight.incrementAndGet()
         try {
             return withContext(Dispatchers.IO) {
                 try {
-                    http.newCall(Request.Builder().url(url).build()).await().use {
+                    http.newCall(Request.Builder().url(target).build()).await().use {
                         // An expired or missing presigned URL answers with an XML error body: not the file.
                         if (!it.isSuccessful) throw ApiError(it.code, "Couldn't download the file.")
                         it.body?.bytes() ?: ByteArray(0)
@@ -312,17 +321,19 @@ class Api(
         if (t.isNullOrEmpty()) throw ApiError(0, "Sign-in didn't complete. Please try again.")
         val fromGuest = _me.value?.user?.takeIf { guest && it.isAnonymous }?.id
         setSession(t, false)
+        _me.value = null // the previous session's profile must not stand in for the new account's (local drafts and recordings key on it)
         store.save(t, false)
-        fromGuest?.let { formerGuests += it }
         // Signed in from here on: a failed /api/me must not read as a wrong password or used code. `me` loads again where it's needed.
         loadMeQuietly()
+        if (fromGuest != null) _me.value?.user?.id?.let { onGuestLinked?.invoke(fromGuest, it) }
     }
 
     /**
-     * Guest user ids this launch signed in or up from: the server links a guest's data to the account, so its unsent recordings may follow.
-     * ponytail: in memory only; after a relaunch a former guest's unsent recording shows as another account's (it can still be deleted).
+     * Called with (guest id, account id) when a guest signs in or up: the server links the guest's data to that account, so the
+     * device's unsent guest recordings are re-owned by it (AppGraph -> PendingStore.reassign) and follow no later account.
+     * ponytail: if /api/me failed at sign-in the account id is unknown and the guest's recordings stay the guest's.
      */
-    val formerGuests: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    @Volatile var onGuestLinked: ((guestId: String, accountId: String) -> Unit)? = null
 
     /** Start an anonymous guest session (the first test start, never a page view). The bearer token is the `set-auth-token` header, not the JSON `token`. */
     suspend fun signInAnonymously() {
@@ -342,7 +353,11 @@ class Api(
     suspend fun ensureSession() = sessionLock.withLock { if (_token.value == null) signInAnonymously() }
 
     suspend fun loadMe(): Me {
-        val m = get<Me>("/api/me")
+        meLoads.incrementAndGet()
+        val sent = _token.value
+        val m = try { get<Me>("/api/me") } finally { meLoads.decrementAndGet() }
+        // Signed out or switched account while this was in flight: the answer is the old session's, so it must not overwrite the new state.
+        if (_token.value != sent) return m
         _me.value = m
         m.quota()?.let { _quota.value = it; quotaAt = System.currentTimeMillis() }
         if (_token.value != null && m.user.isAnonymous != guest) {
@@ -369,6 +384,15 @@ class Api(
         return q
     }
 
+    /**
+     * Foreground refresh: skipped while /api/me is already loading (cold start: restoreSession), and when it or /api/quota answered in the
+     * last [maxAgeMs] (a permission dialog, a Custom Tab, a screen's own recheck). A submitted test clears the age, so its count still updates.
+     */
+    suspend fun loadMeIfStale(maxAgeMs: Long = 30_000) {
+        if (meLoads.get() > 0) return
+        if (_quota.value == null || System.currentTimeMillis() - quotaAt >= maxAgeMs) loadMe()
+    }
+
     /** For screens that show the labels: refreshes at most once a minute and stays quiet on failure. */
     suspend fun refreshQuotaIfStale() {
         if (quotaBusy || (_quota.value != null && System.currentTimeMillis() - quotaAt < 60_000)) return
@@ -380,9 +404,18 @@ class Api(
     /** The live examiner is set up on the server (docs/community.md). */
     val liveAvailable: Boolean get() = _quota.value?.live ?: _me.value?.live ?: false
 
-    suspend fun signOut() {
-        runCatching { raw("POST", "/api/auth/sign-out") }
+    /** Signs out here at once, then revokes the old token on the server in the background, so a slow network never stalls the tap. */
+    fun signOut() {
+        val t = _token.value
         signOutLocal()
+        if (t != null) scope.launch {
+            runCatching {
+                execute(
+                    Request.Builder().url(baseUrl + "/api/auth/sign-out").post("{}".toRequestBody(JSON_MEDIA)).header("Authorization", "Bearer $t").build(),
+                    "offline",
+                )
+            }
+        }
     }
 
     /** Deleting needs the account password (Better Auth delete-user), like the web dialog. */

@@ -97,7 +97,7 @@ fun SpeakingTabScreen(nav: Nav) {
     val account by api.hasAccount.collectAsState()
     val allPending by store.items.collectAsState()
     // Only this account's recordings: another user of the device must not hear or retry them into their own results.
-    val pending = if (demo != null) allPending else allPending.filter { it.belongsTo(me?.user?.id, api.formerGuests) }
+    val pending = if (demo != null) allPending else allPending.filter { it.belongsTo(me?.user?.id) }
     val states by store.states.collectAsState()
     val source by graph.prefs.speakingSource.collectAsState("any")
     val quota = quotaNow ?: me?.quota()
@@ -250,7 +250,7 @@ private fun LiveHero(left: String?, checking: Boolean, onStart: () -> Unit) {
                 NbButton("Start live test", onStart, kind = BtnKind.Inverse, icon = Icons.Rounded.Mic, loading = checking, haptic = true)
                 if (left != null) Text(left, style = NB.type.caption, color = ink.muted)
             }
-            VoiceOrb(OrbMode.Speaking, 0.3f, orbSize = 96.dp)
+            VoiceOrb(OrbMode.Speaking, { 0.3f }, orbSize = 96.dp)
         }
     }
 }
@@ -304,7 +304,7 @@ private fun PendingRow(p: PendingRecording, state: UploadState?, onRetry: () -> 
             },
         )
         if (uploading) LinearProgressIndicator(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = NB.space.lg).padding(bottom = 12.dp).semantics { contentDescription = "Uploading" },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NB.space.lg).padding(bottom = 12.dp).height(6.dp).clip(NB.shape.pill).semantics { contentDescription = "Uploading" },
             color = NB.colors.brand, trackColor = NB.colors.surface2,
         )
     }

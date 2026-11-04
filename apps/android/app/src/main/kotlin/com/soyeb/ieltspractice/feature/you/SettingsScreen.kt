@@ -30,6 +30,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -60,8 +62,11 @@ import com.soyeb.ieltspractice.design.components.SectionHeader
 import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Welcome
+import com.soyeb.ieltspractice.data.currentUserId
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val appearances = listOf("system", "light", "dark")
 private val sources = listOf("any", "cambridge", "generated")
@@ -85,11 +90,16 @@ fun SettingsScreen(nav: Nav) {
 
     /** Delete the account (a guest needs no password) and this device's copies of its essays and unsent recordings. Null on success, else the error. */
     suspend fun deleteEverything(password: String?): String? = try {
-        val uid = api.me.value?.user?.id
+        val uid = currentUserId(api) // loads /api/me when it never answered, so the local cleanup below knows whose data to clear
         api.deleteAccount(password)
         if (uid != null) {
             runCatching { DraftStore(graph.prefs) { uid }.clearAll() }
-            graph.pending.items.value.filter { it.ownerId == uid }.forEach { graph.pending.remove(it.id) }
+            withContext(Dispatchers.IO) { graph.pending.reload() }
+            graph.pending.items.value.filter { it.ownerId == uid || it.ownerId == null }.forEach { graph.pending.remove(it.id) }
+        }
+        // Live exam parts still on this device (a test that was never scored): the account they belonged to is gone.
+        withContext(Dispatchers.IO) {
+            graph.app.cacheDir.listFiles { f -> f.name.startsWith("live-") && f.name.endsWith(".m4a") }?.forEach { it.delete() }
         }
         null
     } catch (e: CancellationException) {
@@ -276,6 +286,7 @@ private fun DeleteSheet(onDismiss: () -> Unit, onDelete: suspend (String) -> Str
             visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { go() }),
+            fieldModifier = Modifier.semantics { contentType = ContentType.Password },
             trailing = {
                 NbIconButton(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Hide password" else "Show password", { show = !show })
             },

@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -54,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -67,6 +71,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.soyeb.ieltspractice.AppGraph
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.data.currentUserId
 import com.soyeb.ieltspractice.data.demo.DemoCommunity
 import com.soyeb.ieltspractice.data.logic.clock
 import com.soyeb.ieltspractice.data.logic.minWords
@@ -96,6 +101,7 @@ import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.TimerPill
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.WritingTask
@@ -158,6 +164,7 @@ private suspend fun loadSession(g: AppGraph, r: WritingTask): ExamSession {
     val promptId = r.promptId
     val prompts = when {
         promptId != null && r.task != "full" -> listOf(api.prompt(promptId))
+        r.task == "full" && promptId != null && r.promptId2 != null -> listOf(api.prompt(promptId), api.prompt(r.promptId2))
         r.task == "full" -> listOf(api.randomPrompt("writing", part = 1, variant = variant), api.randomPrompt("writing", part = 2))
         r.task == "task1" -> listOf(api.randomPrompt("writing", part = 1, variant = variant))
         else -> listOf(api.randomPrompt("writing", part = 2))
@@ -171,6 +178,7 @@ private fun ExamScreen(session: ExamSession, nav: Nav) {
     val demo = LocalDemo.current
     val store = remember { DraftStore(graph.prefs) { if (demo != null) "demo" else draftOwner(graph.api) } }
     val drafts by produceState<Map<String, Draft>?>(null, session) {
+        if (demo == null && graph.api.isSignedIn) currentUserId(graph.api) // the drafts are keyed by the account id: know it before loading
         value = session.prompts.mapIndexed { i, p -> p.id to (if (demo != null) demoDraft(demo.screen, demo.tab, i) else store.load(p.id)) }.toMap()
     }
     val d = drafts
@@ -232,7 +240,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     fun persist() {
         if (flags.submitted || demo != null) return
         val items = prompts.map { q ->
-            Triple(q.id, Draft(texts[q.id].orEmpty(), plans[q.id].orEmpty()), DraftMeta(q.id, q.part, q.title, q.variant).takeIf { session.mockId == null })
+            Triple(q.id, Draft(texts[q.id].orEmpty(), plans[q.id].orEmpty()), DraftMeta(q.id, q.part, q.title, q.variant, pairId = prompts.firstOrNull { it.id != q.id }?.id).takeIf { session.mockId == null })
         }
         graph.scope.launch { items.forEach { (id, d, meta) -> store.save(id, d, meta) } }
     }
@@ -326,12 +334,16 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
 
     LaunchedEffect(showSubmit, showExit) { if (showSubmit || showExit) focus.clearFocus() }
     LaunchedEffect(Unit) { if (demo?.screen == "editor-blocked") nav.gate = DemoCommunity.gate("editor-blocked") }
-    BackHandler { if (!submitting) showExit = true }
+    // Nothing to lose on an untouched single test: let Back pop with the system predictive-back animation.
+    val typed = prompts.any { texts[it.id].orEmpty().isNotBlank() || plans[it.id].orEmpty().isNotBlank() }
+    BackHandler(enabled = submitting || typed || session.mockId != null) { if (submitting) toast("Submitting your answer…") else showExit = true }
 
     val idx = prompts.indexOf(p)
     val need = minWords(p.part)
     val scroll = rememberScrollState()
     val density = LocalDensity.current
+    // Landscape phone or very large text with the keyboard up: drop the fixed rows so the essay field keeps some height.
+    val cramped = WindowInsets.isImeVisible && (LocalConfiguration.current.screenHeightDp < 480 || density.fontScale > 1.3f)
     LaunchedEffect(variant) {
         if (variant == "Chart" || demo?.screen?.startsWith("chart-") == true) {
             snapshotFlow { scroll.maxValue }.first { it > 0 }
@@ -364,19 +376,19 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
             },
             bottomBar = {
                 Column {
-                    AccessoryBar(counts[idx].words, need, left, p.part == 2, { showPlan = true }, { showSubmit = true }, submitting)
+                    AccessoryBar(counts[idx].words, need, left, p.part == 2 && !cramped, { showPlan = true }, { showSubmit = true }, submitting, cramped) // Plan stays in the ⋮ menu
                     if (variant == "Keyboard") FakeKeyboard()
                 }
             },
         ) { pad ->
             Box(Modifier.padding(pad).fillMaxSize()) {
-                Column(Modifier.fillMaxSize()) {
-                    if (multi) Segmented(
+                Column(Modifier.fillMaxSize().readable()) {
+                    if (multi && !cramped) Segmented(
                         prompts.mapIndexed { i, q -> "${if (q.part == 1) "Task 1" else "Task 2"} · ${plural(counts[i].words)}" }, task,
                         { i -> task = i; promptOpen = texts[prompts[i].id].orEmpty().isEmpty() },
                         Modifier.padding(horizontal = NB.space.gutter, vertical = 8.dp),
                     )
-                    AnimatedVisibility(!promptOpen) { CollapsedTask(p) { promptOpen = true } }
+                    AnimatedVisibility(!promptOpen && !cramped) { CollapsedTask(p) { promptOpen = true } }
                     submitError?.let { msg ->
                         Banner(msg, Icons.Rounded.ErrorOutline, Modifier.padding(horizontal = NB.space.gutter, vertical = 8.dp), Tone.Bad, "Try again") { submit() }
                     }
@@ -462,7 +474,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
 
 /** The bar that rides above the keyboard: words against the goal with a thin meter, the clock, Plan (Task 2) and Submit. */
 @Composable
-private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean, onPlan: () -> Unit, onSubmit: () -> Unit, submitting: Boolean) {
+private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean, onPlan: () -> Unit, onSubmit: () -> Unit, submitting: Boolean, compact: Boolean = false) {
     val c = NB.colors
     val reached = words >= need
     val l = left.value
@@ -470,12 +482,13 @@ private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean,
         Column {
             HorizontalDivider(color = c.line)
             // Large text: the buttons would squeeze the count and clock to nothing, so they move to a row of their own.
-            val stack = LocalDensity.current.fontScale > 1.3f
+            val stack = LocalDensity.current.fontScale > 1.3f && !compact
             val buttons: @Composable () -> Unit = {
                 if (plan) NbButton("Plan", onPlan, kind = BtnKind.Secondary)
                 NbButton("Submit", onSubmit, enabled = !submitting)
             }
-            Column(Modifier.padding(horizontal = NB.space.gutter, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The scaffold's imePadding already eats the nav-bar inset while the keyboard is up, so this only pads when it is down.
+            Column(Modifier.fillMaxWidth().readable().navigationBarsPadding().padding(horizontal = NB.space.gutter, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(
                     Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "$words of $need words" + if (reached) ", minimum reached" else "" },

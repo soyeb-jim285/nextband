@@ -33,6 +33,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,6 +66,7 @@ import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.SkillTile
 import com.soyeb.ieltspractice.design.components.Tag
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.LrResult
 import com.soyeb.ieltspractice.nav.LrRun
@@ -72,11 +76,14 @@ import com.soyeb.ieltspractice.nav.Nav
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-private enum class Phase { Loading, Ready, Failed }
+internal enum class Phase { Loading, Ready, Failed }
 
 /** The merged, paged list behind History. Speaking and Writing come page by page; Listening and Reading in one request. */
 @Stable
-private class Feed(private val api: Api, private val skill: Skill?) {
+/** The loaded feeds per filter, held by the History entry: opening a result and coming back keeps the pages and the scroll. */
+class HistoryFeeds : ViewModel() { internal val bySkill = HashMap<Skill?, Feed>() }
+
+internal class Feed(private val api: Api, private val skill: Skill?) {
     var items by mutableStateOf<List<HistoryItem>>(emptyList()); private set
     var phase by mutableStateOf(Phase.Loading); private set
     var error by mutableStateOf(""); private set
@@ -84,6 +91,8 @@ private class Feed(private val api: Api, private val skill: Skill?) {
     var loadingMore by mutableStateOf(false); private set
     var hasMore by mutableStateOf(false); private set
     private var page = 1
+    /** More than the first page is loaded: coming back keeps it rather than refreshing to page one. */
+    val paged: Boolean get() = page > 1
     private var sp = emptyList<HistoryItem>()
     private var lr = emptyList<HistoryItem>()
     private var mocks = emptyList<HistoryItem>()
@@ -190,10 +199,12 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
     val me by api.me.collectAsState()
     val target = me?.settings?.targetBand
 
-    var filter by remember { mutableIntStateOf(historyFilters.indexOf(Skill.of(skillArg)).coerceAtLeast(0)) }
+    var filter by rememberSaveable { mutableIntStateOf(historyFilters.indexOf(Skill.of(skillArg)).coerceAtLeast(0)) }
     val skill = historyFilters[filter]
-    val feed = remember(skill) { Feed(api, skill) }
-    LaunchedEffect(feed) { feed.refresh() }
+    val feeds = viewModel<HistoryFeeds>()
+    val feed = feeds.bySkill.getOrPut(skill) { Feed(api, skill) }
+    // First page only: refresh on return (a result may have finished marking). Deeper: keep the pages; pull to refresh.
+    LaunchedEffect(feed) { if (feed.phase != Phase.Ready || !feed.paged) feed.refresh() }
     var hidden by remember { mutableStateOf(emptySet<String>()) }
     val listState = rememberLazyListState()
 
@@ -247,7 +258,7 @@ private fun HistoryBody(nav: Nav, skillArg: String?, pad: PaddingValues) {
                         } else {
                             val groups = visible.groupBy { bucketOf(it.instant) }
                             LazyColumn(
-                                Modifier.fillMaxSize(), state = listState,
+                                Modifier.fillMaxSize().readable(), state = listState,
                                 contentPadding = PaddingValues(start = NB.space.gutter, end = NB.space.gutter, top = 4.dp, bottom = pad.calculateBottomPadding() + 32.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {

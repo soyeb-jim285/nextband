@@ -108,6 +108,18 @@ class CoreTest {
         assertEquals(true, api.sessionEnded.first())
     }
 
+    @Test fun signOutIsLocalAtOnceAndRevokesTheOldTokenInTheBackground() = runBlocking {
+        val revoked = kotlinx.coroutines.CompletableDeferred<String?>()
+        val api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->
+            val r = chain.request()
+            if (r.url.encodedPath == "/api/auth/sign-out") revoked.complete(r.header("Authorization"))
+            Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(200).message("OK").body("{}".toResponseBody()).build()
+        }, initialToken = "old")
+        api.signOut()
+        assertTrue(!api.isSignedIn) // before the network answers
+        assertEquals("Bearer old", kotlinx.coroutines.withTimeout(5_000) { revoked.await() })
+    }
+
     @Test fun signInSucceedsWhenTheProfileFailsToLoad() = runBlocking {
         val demo = DemoInterceptor(fixtures)
         val api = Api("https://demo.ielts.local", MemoryTokenStore(), Interceptor { chain ->

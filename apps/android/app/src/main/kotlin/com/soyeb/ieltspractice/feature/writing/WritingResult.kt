@@ -1,5 +1,7 @@
 package com.soyeb.ieltspractice.feature.writing
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -54,6 +56,7 @@ import com.soyeb.ieltspractice.data.model.Repeated
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.Tone
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BandPill
 import com.soyeb.ieltspractice.design.components.BtnKind
@@ -154,12 +157,12 @@ fun WritingResult(attempts: List<Attempt>, nav: Nav) {
             },
         ) { pad ->
             if (r == null || score == null) {
-                EmptyState(Icons.Rounded.Warning, "No marking yet", "This answer has no analysis.", Modifier.padding(pad))
+                EmptyState(Icons.Rounded.Warning, "No marking yet", "This answer has no analysis.", Modifier.padding(pad).verticalScroll(rememberScrollState()))
                 return@PushedScreen
             }
             val essay = r.text ?: a.text.orEmpty()
             LazyColumn(
-                Modifier.fillMaxSize(),
+                Modifier.fillMaxSize().readable(),
                 contentPadding = PaddingValues(top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 32.dp),
                 verticalArrangement = Arrangement.spacedBy(NB.space.lg),
             ) {
@@ -216,7 +219,7 @@ fun WritingResult(attempts: List<Attempt>, nav: Nav) {
                 item {
                     when (tab) {
                         0 -> Column { OverviewPanel(
-                            r, score, target, { criterionSheet = it }, { nav.go(AttemptResult.of(it)) },
+                            r, score, target, { criterionSheet = it }, { nav.push(AttemptResult.of(it)) },
                             onAddFixes = {
                                 nav.requireAccount("Create an account to drill your mistakes") {
                                     scope.launch {

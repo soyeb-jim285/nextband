@@ -8,9 +8,12 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
+/** createdAt is when the attempt started (a speaking test runs ~15 min), and marking takes a minute or two. */
+val STUCK_MARKING: Duration = Duration.ofHours(1)
+
 enum class UpdateKind { Marking, Failed, Result, Cards, Mock, Exam }
 
-/** One line in the Updates sheet. [item] for attempt rows; [n] = cards due or days to the exam; [mockId] for Mock. */
+/** One line in the Updates sheet. [item] for attempt rows; [n] = cards due or days to the exam; [mockId] for Mock, and on Exam when a mock is already open. */
 data class UpdateRow(val kind: UpdateKind, val key: String, val item: HistoryItem? = null, val n: Int = 0, val mockId: String? = null) {
     /** Results and failed markings light the dot until seen. A marking the learner just started and standing reminders don't. */
     val alerts: Boolean get() = kind == UpdateKind.Result || kind == UpdateKind.Failed
@@ -19,14 +22,19 @@ data class UpdateRow(val kind: UpdateKind, val key: String, val item: HistoryIte
 /** [attempts] newest first (mergeItems). Attempts from the last 3 days; at most 4 results. */
 fun buildUpdates(due: Int, mockId: String?, attempts: List<HistoryItem>, examDate: String?, now: Instant = Clocks.now(), zone: ZoneId = Clocks.zone()): List<UpdateRow> {
     val since = now.minus(Duration.ofDays(3))
-    val recent = attempts.filter { (it.instant ?: Instant.EPOCH) > since }
+    // ponytail: the server never moves a stuck marking to failed, so one older than STUCK_MARKING counts as failed here;
+    // otherwise the bell would poll every 30 s for 3 days. Upgrade path: a server sweep setting stale 'analyzing' to 'failed'.
+    val stuck = now.minus(STUCK_MARKING)
+    val recent = attempts.filter { (it.instant ?: Instant.EPOCH) > since }.map {
+        if (it.status == HStatus.Analysing && (it.instant ?: Instant.EPOCH) < stuck) it.copy(status = HStatus.Failed) else it
+    }
     return buildList {
         recent.filter { it.status == HStatus.Analysing }.forEach { add(UpdateRow(UpdateKind.Marking, "a:${it.id}", it)) }
         recent.filter { it.status == HStatus.Failed }.forEach { add(UpdateRow(UpdateKind.Failed, "f:${it.id}", it)) }
         recent.filter { it.status == HStatus.Done && it.band != null }.take(4).forEach { add(UpdateRow(UpdateKind.Result, "d:${it.id}", it)) }
         if (due > 0) add(UpdateRow(UpdateKind.Cards, "cards", n = due))
         if (mockId != null) add(UpdateRow(UpdateKind.Mock, "mock", mockId = mockId))
-        daysToExam(examDate, now, zone)?.takeIf { it in 0..30 }?.let { add(UpdateRow(UpdateKind.Exam, "exam", n = it)) }
+        daysToExam(examDate, now, zone)?.takeIf { it in 0..30 }?.let { add(UpdateRow(UpdateKind.Exam, "exam", n = it, mockId = mockId)) }
     }
 }
 

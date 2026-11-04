@@ -1,5 +1,6 @@
 package com.soyeb.ieltspractice.feature.lr
 
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Spellcheck
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +65,7 @@ import com.soyeb.ieltspractice.data.net.Api
 import com.soyeb.ieltspractice.data.model.LrAttempt
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
+import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.Avatar
 import com.soyeb.ieltspractice.design.components.BandPill
 import com.soyeb.ieltspractice.design.components.Banner
@@ -138,6 +139,7 @@ fun LrHubScreen(skill: Skill, nav: Nav) {
         val mock = runCatching { api.mockCurrent() }.getOrNull()
         HubData(tests, attempts, mock)
     }
+    ReloadOnPlanChange(me?.tier, me?.subscribedUntil, load.reload)
     val data = load.value
     var sheet by remember { mutableStateOf<LrTestItem?>(null) }
     var restart by remember { mutableStateOf<LrTestItem?>(null) }
@@ -249,11 +251,7 @@ private fun ContinueHero(item: LrTestItem, attempt: LrAttempt?, skill: Skill, on
             "${if (item.mode == "exam") "Exam" else "Practice"} · ${partsLabel(item.skill, item.parts)}$used",
             style = NB.type.bodySmall, color = c.muted, modifier = Modifier.padding(top = 2.dp),
         )
-        LinearProgressIndicator(
-            progress = { (item.answered.toFloat() / total).coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(8.dp).clip(NB.shape.pill),
-            color = c.brand, trackColor = c.surface,
-        )
+        Meter(item.answered.toDouble(), Modifier.padding(top = 10.dp), max = total.toDouble(), height = 6.dp)
         Text("${item.answered} of $total answered", style = NB.type.caption, color = c.muted, modifier = Modifier.padding(top = 6.dp))
         Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NbButton("Continue", onContinue, modifier = Modifier.weight(1f), size = BtnSize.Large, haptic = true)
@@ -381,6 +379,8 @@ private fun TestSheet(item: LrTestItem, nav: Nav, onDismiss: () -> Unit) {
 fun LrTestScreen(testId: String, skill: String, nav: Nav) {
     val api = LocalGraph.current.api
     val load = rememberLoad(testId) { api.lrTests(skill = skill).firstOrNull { it.id == testId } }
+    val me by api.me.collectAsState()
+    ReloadOnPlanChange(me?.tier, me?.subscribedUntil, load.reload)
     val found = load.value
     val plan = remember(found?.id) { found?.let { StartPlan(it) } }
     PushedScreen(
@@ -390,9 +390,9 @@ fun LrTestScreen(testId: String, skill: String, nav: Nav) {
     ) { pad ->
         when (val s = load.state) {
             Load.Loading -> PushedList(pad) { item { Skeleton(Modifier.fillMaxWidth(), height = 240.dp, corner = 20.dp) } }
-            is Load.Failed -> ErrorState(s.message, load.reload, Modifier.padding(pad))
+            is Load.Failed -> ErrorState(s.message, load.reload, Modifier.padding(pad).verticalScroll(rememberScrollState()))
             is Load.Ready -> {
-                if (plan == null) EmptyState(Icons.AutoMirrored.Rounded.MenuBook, "Test not found", "It may have been removed. Go back and pick another.", Modifier.padding(pad))
+                if (plan == null) EmptyState(Icons.AutoMirrored.Rounded.MenuBook, "Test not found", "It may have been removed. Go back and pick another.", Modifier.padding(pad).verticalScroll(rememberScrollState()))
                 else PushedList(pad) { item { TestPlanBody(plan) } }
             }
         }
@@ -478,4 +478,20 @@ private fun ColumnScope.StartButtons(plan: StartPlan, nav: Nav, after: () -> Uni
         NbButton("Continue", { after(); nav.go(LrRun(plan.item.attemptId.orEmpty())) }, size = BtnSize.Large, fill = true, haptic = true)
         NbButton("Start a new attempt", { go(true) }, kind = BtnKind.Secondary, fill = true, loading = plan.busy)
     } else NbButton("Start", { go(false) }, size = BtnSize.Large, fill = true, loading = plan.busy, haptic = true)
+}
+
+/**
+ * Pro bought on nextband.app while a list is open: the foreground /api/me refresh changes the plan, and the Pro-only tests
+ * appear without leaving the screen. Refreshes quietly; the first /api/me after launch (no plan seen yet) doesn't count.
+ */
+@Composable
+private fun ReloadOnPlanChange(tier: String?, until: String?, reload: () -> Unit) {
+    val plan = tier?.let { it to until }
+    var seen by remember { mutableStateOf(plan) }
+    LaunchedEffect(plan) {
+        if (plan != seen) {
+            if (seen != null) reload()
+            seen = plan
+        }
+    }
 }

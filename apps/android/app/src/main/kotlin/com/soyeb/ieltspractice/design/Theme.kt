@@ -1,5 +1,8 @@
 package com.soyeb.ieltspractice.design
 
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,7 +18,11 @@ import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,8 +72,15 @@ private val M3Shapes = Shapes(
 fun NbTheme(dark: Boolean, content: @Composable () -> Unit) {
     val colors = if (dark) DarkColors else LightColors
     val context = LocalContext.current
-    val reduced = remember(context) {
-        runCatching { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+    fun read() = runCatching { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+    var reduced by remember(context) { mutableStateOf(read()) }
+    // Pick up "Remove animations" toggled while the app is open, not only at launch.
+    DisposableEffect(context) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { reduced = read() }
+        }
+        runCatching { context.contentResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer) }
+        onDispose { context.contentResolver.unregisterContentObserver(observer) }
     }
     CompositionLocalProvider(LocalNbColors provides colors, LocalReducedMotion provides reduced) {
         MaterialTheme(colorScheme = schemeFor(colors), typography = NbTypography, shapes = M3Shapes) {

@@ -1,0 +1,7 @@
+HSPLcom/soyeb/ieltspractice/*;->**(**)**
+HSPLcom/soyeb/ieltspractice/nav/**;->**(**)**
+HSPLcom/soyeb/ieltspractice/design/**;->**(**)**
+HSPLcom/soyeb/ieltspractice/data/**;->**(**)**
+HSPLcom/soyeb/ieltspractice/feature/today/**;->**(**)**
+HSPLcom/soyeb/ieltspractice/feature/lr/**;->**(**)**
+Lcom/soyeb/ieltspractice/**;

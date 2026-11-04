@@ -4,11 +4,14 @@ import com.soyeb.ieltspractice.feature.you.bdt
 import com.soyeb.ieltspractice.feature.you.cleanPhone
 import com.soyeb.ieltspractice.feature.you.daysLeft
 import com.soyeb.ieltspractice.feature.you.examDateText
+import com.soyeb.ieltspractice.feature.you.isPaymentUrl
 import com.soyeb.ieltspractice.feature.you.isWebUrl
+import com.soyeb.ieltspractice.feature.you.legalPages
 import com.soyeb.ieltspractice.feature.you.newEnd
 import com.soyeb.ieltspractice.feature.you.paidPlans
 import com.soyeb.ieltspractice.feature.you.phoneOk
 import com.soyeb.ieltspractice.feature.you.planLine
+import com.soyeb.ieltspractice.feature.you.siteUrl
 import com.soyeb.ieltspractice.feature.you.targetBands
 import com.soyeb.ieltspractice.feature.you.tierLabel
 import java.time.Instant
@@ -84,5 +87,20 @@ class YouLogicTest {
         assertFalse(isWebUrl("javascript:alert(1)"))
         assertFalse(isWebUrl("https:///nohost"))
         assertFalse(isWebUrl("not a url"))
+    }
+
+    @Test fun checkoutOpensOnlyPayStation() {
+        assertTrue(isPaymentUrl("https://api.paystation.com.bd/checkout/abc"))
+        assertTrue(isPaymentUrl("https://sandbox.paystation.com.bd/checkout/abc"))
+        assertFalse(isPaymentUrl("https://paystation.com.bd.evil.example/checkout"))
+        assertFalse(isPaymentUrl("https://evilpaystation.com.bd/checkout"))
+        assertFalse(isPaymentUrl("http://api.paystation.com.bd/checkout"))
+    }
+
+    @Test fun theStoreBuildOpensSitePagesMarkedAndWithoutTheRefundPolicy() {
+        assertEquals("https://nextband.app/terms?app=play", siteUrl("/terms", canBuy = false))
+        assertEquals("https://nextband.app/terms", siteUrl("/terms", canBuy = true))
+        assertFalse(legalPages(canBuy = false).any { it.second == "/refunds" })
+        assertTrue(legalPages(canBuy = true).any { it.second == "/refunds" })
     }
 }

@@ -46,6 +46,7 @@ import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.logic.Clocks
+import com.soyeb.ieltspractice.data.logic.GateText
 import com.soyeb.ieltspractice.data.net.ApiError
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.components.Banner
@@ -78,14 +79,16 @@ fun PlanScreen(nav: Nav) {
     val hasAccount by api.hasAccount.collectAsState()
     var plan by remember { mutableStateOf(paidPlans.last()) }
     val demoTab = LocalDemo.current?.tab
-    // The Play build sells nothing (no Play Billing yet): status and what each plan includes only.
+    // The Play build is consumption-only (no Play Billing): status, what each plan includes and a plain, non-clickable
+    // "upgrade at nextband.app" line. Only the web channel's APK sells here.
     val canBuy = BuildConfig.WEB_CHECKOUT
     var checkout by remember { mutableStateOf(canBuy && demoTab == "Checkout") }
     var checking by remember { mutableStateOf(false) }
     var checkFailed by remember { mutableStateOf(false) }
     suspend fun recheck() {
         checking = true
-        checkFailed = runCatching { api.refreshQuota(); api.loadMe() }.isFailure
+        // /api/me carries the quota; /api/quota only when it didn't.
+        checkFailed = runCatching { if (api.loadMe().quota() == null) api.refreshQuota() }.isFailure
         checking = false
     }
 
@@ -132,7 +135,7 @@ fun PlanScreen(nav: Nav) {
         },
     ) { pad ->
         PushedList(pad) {
-            item { StatusCard(tier, until, canBuy) }
+            item { StatusCard(tier, until, canBuy, me?.user?.email.orEmpty()) }
             if (awaiting != null) item {
                 Banner(
                     if (checkFailed) "Couldn't check your payment. Check your connection, then try again."
@@ -177,7 +180,7 @@ fun PlanScreen(nav: Nav) {
 }
 
 @Composable
-private fun StatusCard(tier: String?, until: String?, canBuy: Boolean) {
+private fun StatusCard(tier: String?, until: String?, canBuy: Boolean, email: String) {
     NbCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Your plan", style = NB.type.title2, color = NB.colors.ink, modifier = Modifier.weight(1f))
@@ -185,6 +188,10 @@ private fun StatusCard(tier: String?, until: String?, canBuy: Boolean) {
         }
         Spacer(Modifier.height(6.dp))
         Text(planLine(tier, until, canBuy = canBuy), style = NB.type.bodySmall, color = NB.colors.muted)
+        if (!canBuy && tier != "unlimited" && tier != "guest") {
+            Spacer(Modifier.height(8.dp))
+            Text(GateText.storeUpgrade(email), style = NB.type.bodySmall, color = NB.colors.muted)
+        }
     }
 }
 
@@ -248,6 +255,7 @@ private fun CheckoutSheet(plan: PaidPlan, email: String, current: Instant?, onDi
             error = null
             try {
                 val url = onPay(phone)
+                if (!isPaymentUrl(url)) throw ApiError(0, "Couldn't open the payment page. Try again.")
                 openCustomTab(context, url)
                 onDismiss()
             } catch (e: CancellationException) {

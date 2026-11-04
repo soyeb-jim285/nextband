@@ -33,7 +33,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -140,11 +140,10 @@ fun <T> LoadContent(
 @Composable
 fun Skeleton(modifier: Modifier = Modifier, height: Dp = 16.dp, corner: Dp = 8.dp) {
     val reduced = LocalReducedMotion.current
-    val a = if (reduced) 0.7f else {
-        val t = rememberInfiniteTransition(label = "sk")
-        t.animateFloat(0.45f, 0.9f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "a").value
-    }
-    Box(modifier.height(height).alpha(a).background(NB.colors.surface3, RoundedCornerShape(corner)))
+    // The shimmer is read in the draw layer, so a skeleton never recomposes per frame.
+    val a = if (reduced) null else rememberInfiniteTransition(label = "sk")
+        .animateFloat(0.45f, 0.9f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "a")
+    Box(modifier.height(height).graphicsLayer { alpha = a?.value ?: 0.7f }.background(NB.colors.surface3, RoundedCornerShape(corner)))
 }
 
 /** Generic page skeleton: a hero block and a few rows. */
@@ -172,7 +171,7 @@ fun EmptyState(
         modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(icon, NB.colors.brand, NB.colors.brandSoft, 64.dp)
+        IconTile(icon, NB.colors.brandText, NB.colors.brandSoft, 64.dp)
         Text(title, style = NB.type.title2, color = NB.colors.ink, textAlign = TextAlign.Center)
         Text(body, style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center)
         if (action != null && onAction != null) NbButton(action, onAction, kind = BtnKind.Secondary, modifier = Modifier.padding(top = 4.dp))

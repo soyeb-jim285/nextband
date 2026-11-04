@@ -1,5 +1,7 @@
 package com.soyeb.ieltspractice.feature.lr
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,8 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Spellcheck
-import androidx.compose.material.icons.rounded.VolumeUp
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,6 +40,7 @@ import com.soyeb.ieltspractice.data.logic.timesText
 import com.soyeb.ieltspractice.data.model.LrSpellingItem
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Tone
+import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
@@ -65,12 +67,12 @@ fun SpellingScreen(nav: Nav) {
     val load = rememberLoad { api.lrSpelling().items }
     when (val s = load.state) {
         Load.Loading -> PushedScreen("Spelling drill", nav::back) { pad -> SkeletonList(Modifier.padding(pad)) }
-        is Load.Failed -> PushedScreen("Spelling drill", nav::back) { pad -> ErrorState(s.message, load.reload, Modifier.padding(pad)) }
+        is Load.Failed -> PushedScreen("Spelling drill", nav::back) { pad -> ErrorState(s.message, load.reload, Modifier.padding(pad).verticalScroll(rememberScrollState())) }
         is Load.Ready ->
             if (s.value.isEmpty()) PushedScreen("Spelling drill", nav::back) { pad ->
                 EmptyState(
                     Icons.Rounded.Spellcheck, "No spelling slips yet",
-                    "Words you misspell in Listening gap answers will appear here to practise.", Modifier.padding(pad),
+                    "Words you misspell in Listening gap answers will appear here to practise.", Modifier.padding(pad).verticalScroll(rememberScrollState()),
                 )
             } else SpellingDrill(s.value, nav)
     }
@@ -137,10 +139,7 @@ private fun SpellingDrill(items: List<LrSpellingItem>, nav: Nav) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Word ${i + 1} of ${items.size}", style = NB.type.caption, color = NB.colors.muted)
-                        LinearProgressIndicator(
-                            progress = { (i + if (checked) 1 else 0).toFloat() / items.size }, color = NB.colors.brand, trackColor = NB.colors.surface2,
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(NB.shape.pill),
-                        )
+                        Meter((i + if (checked) 1 else 0).toDouble(), max = items.size.toDouble(), height = 6.dp)
                     }
                 }
                 item {
@@ -156,7 +155,7 @@ private fun SpellingDrill(items: List<LrSpellingItem>, nav: Nav) {
                         )
                         NbButton(
                             "Hear the word", { if (demo == null) graph.tts.speak(cur.word) }, kind = BtnKind.Primary, size = BtnSize.Large,
-                            icon = Icons.Rounded.VolumeUp, modifier = Modifier.padding(top = 16.dp), fill = true,
+                            icon = Icons.AutoMirrored.Rounded.VolumeUp, modifier = Modifier.padding(top = 16.dp), fill = true,
                         )
                     }
                 }

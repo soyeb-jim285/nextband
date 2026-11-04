@@ -67,9 +67,9 @@ private fun outBack(p: Float) = 1 + 2.2f * (p - 1).pow(3) + 1.2f * (p - 1).pow(2
 fun NbSplash(onReveal: () -> Unit, onDone: () -> Unit) {
     if (LocalReducedMotion.current) { LaunchedEffect(Unit) { onReveal(); onDone() }; return }
     val c = NB.colors
-    val sym = if (c.isDark) Color(0xFF2DD4BF) else Color(0xFF0F766E)
-    val word = if (c.isDark) Color(0xFFE6EDF5) else Color(0xFF0F172A)
-    val tagColor = if (c.isDark) Color(0xFF8C9AAE) else Color(0xFF5B6B80)
+    val sym = c.brand
+    val word = c.ink
+    val tagColor = c.muted
     val paths = remember { PathParser().parsePathString(SYMBOL).toPath() to PathParser().parsePathString(WORD).toPath() }
     val t = remember { Animatable(FROM) }
     val fade = remember { Animatable(1f) }

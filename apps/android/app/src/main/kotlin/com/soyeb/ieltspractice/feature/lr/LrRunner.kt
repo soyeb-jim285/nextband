@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TimerOff
@@ -66,6 +66,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -76,6 +77,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -158,14 +160,14 @@ fun LrRunScreen(route: LrRun, nav: Nav) {
     }
     when (val s = load.state) {
         Load.Loading -> PushedScreen("Test", nav::back, close = true) { pad -> SkeletonList(Modifier.padding(pad)) }
-        is Load.Failed -> PushedScreen("Test", nav::back, close = true) { pad -> ErrorState(s.message, load.reload, Modifier.padding(pad)) }
+        is Load.Failed -> PushedScreen("Test", nav::back, close = true) { pad -> ErrorState(s.message, load.reload, Modifier.padding(pad).verticalScroll(rememberScrollState())) }
         is Load.Ready -> {
             val (attempt, local) = s.value
             if (attempt.submitted) {
                 LaunchedEffect(attempt.id) { if (route.mockId != null) nav.toMock(route.mockId) else nav.replace(LrResult(attempt.id)) }
                 PushedScreen("Test", nav::back, close = true) { pad -> SkeletonList(Modifier.padding(pad)) }
             } else if (attempt.test.sections.isEmpty() || attempt.test.flat().isEmpty()) {
-                PushedScreen("Test", nav::back, close = true) { pad -> ErrorState("This test has no questions.", load.reload, Modifier.padding(pad)) }
+                PushedScreen("Test", nav::back, close = true) { pad -> ErrorState("This test has no questions.", load.reload, Modifier.padding(pad).verticalScroll(rememberScrollState())) }
             } else LrRunner(attempt, local, route.mockId, nav)
         }
     }
@@ -291,7 +293,6 @@ private fun RunnerBody(
     var active by remember { mutableStateOf<Int?>(null) }
     var flagged by (held.flagged ?: mutableStateOf<Set<Int>>(if (isDemo) (if (dv == "Navigator") setOf(4, 9) else emptySet()) else local.flags).also { held.flagged = it })
     val section = sections[partIdx.coerceIn(0, sections.lastIndex)]
-    val responses = session.responses
 
     var navOpen by remember { mutableStateOf(dv == "Navigator") }
     var confirm by remember { mutableStateOf(dv == "Submit") }
@@ -315,12 +316,15 @@ private fun RunnerBody(
     LaunchedEffect(playlist) { if (examListening) playlist.attach(context) }
     LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.tick { session.elapsed = it } }
     LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.loadDurations() }
+    // Wall clock, so pausing it in the background loses nothing: the first tick back catches up.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(examListening) {
         if (examListening || isDemo) return@LaunchedEffect
         val t0 = System.nanoTime()
         val base = clock.seconds
         while (true) {
             delay(500)
+            lifecycle.awaitStarted()
             clock.seconds = base + (System.nanoTime() - t0) / 1e9
             session.elapsed = clock.seconds
         }
@@ -338,7 +342,6 @@ private fun RunnerBody(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (!isDemo) session.flushLater(true) }
     DisposableEffect(session) { onDispose { if (!isDemo) session.flushLater(true) } }
     // The clock save: only while the screen is visible (ON_STOP already saved once), so a test left open in the background never wakes the radio.
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(session) { if (!isDemo) while (true) { delay(15_000); lifecycle.awaitStarted(); session.flush(true) } }
     val partNo = section.part
     LaunchedEffect(started, partNo) { if (started && !isDemo) while (true) { delay(1000); if (foreground) session.tickPart(partNo) } }
@@ -351,21 +354,26 @@ private fun RunnerBody(
         }
     }
 
+    /** Submits and leaves for the result; the failure, if any (already shown to the learner). */
+    suspend fun submitNow(): Exception? {
+        if (leaving || session.submitting) return null
+        try {
+            session.submit()
+            leaving = true
+            graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", null) } // notes are not kept past the attempt
+            if (mockId != null) nav.toMock(mockId) else nav.replace(LrResult(attempt.id))
+            return null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            confirm = false
+            submitError = e.message?.takeIf { it.isNotBlank() } ?: "Could not submit. Your answers are saved; try again."
+            return e
+        }
+    }
     fun submit() {
         if (leaving || session.submitting) return
-        scope.launch {
-            try {
-                session.submit()
-                leaving = true
-                graph.scope.launch { graph.prefs.setString("marks:${attempt.id}", null) } // notes are not kept past the attempt
-                if (mockId != null) nav.toMock(mockId) else nav.replace(LrResult(attempt.id))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                confirm = false
-                submitError = e.message?.takeIf { it.isNotBlank() } ?: "Could not submit. Your answers are saved; try again."
-            }
-        }
+        scope.launch { submitNow() }
     }
     fun exit() {
         leaving = true
@@ -377,8 +385,16 @@ private fun RunnerBody(
     LaunchedEffect(session) {
         if (isDemo || !exam) return@LaunchedEffect
         snapshotFlow { if (listening) playlist.phase == ExamPhase.Review && playlist.reviewLeft == 0 else limit - clock.seconds.toInt() <= 0 }.first { it }
-        // Keep trying while offline: time is up, so the attempt must still go in once the connection is back.
-        while (!leaving) { submit(); delay(10_000) }
+        // Keep trying while offline: time is up, so the attempt must still go in once the connection is back. Only while the screen is
+        // visible, backing off to a minute; a refusal (4xx) stops it and leaves the error and the Submit button to the learner.
+        var failures = 0
+        while (!leaving) {
+            lifecycle.awaitStarted()
+            val e = submitNow()
+            if (leaving) break
+            failures = minOf(failures + 1, 8)
+            delay(if (e == null) 2_000L else saveRetryMs(failures, e) ?: break)
+        }
     }
     LaunchedEffect(session) {
         if (isDemo || !exam || listening) return@LaunchedEffect
@@ -403,12 +419,14 @@ private fun RunnerBody(
     val pScroll = pScrolls.getValue(section.part)
 
     fun tick() { hf.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-    val ctx = QCtx(
-        responses, session::change, attempt.assets, graph.api, active = active, flagged = flagged,
-        onFocus = { current = it },
-        onText = { n, on -> if (on) session.noteFocus(n) else session.noteBlur(n) },
-        reg = reg, hl = hl, tick = ::tick,
-    )
+    val ctx = remember(session, hl) {
+        QCtx(
+            { session.responses }, session::change, attempt.assets, graph.api, activeOf = { active }, flaggedOf = { flagged },
+            onFocus = { current = it },
+            onText = { n, on -> if (on) session.noteFocus(n) else session.noteBlur(n) },
+            reg = reg, hl = hl, tick = ::tick,
+        )
+    }
 
     // Listening exam: only the part playing is open; once the recording ends every part opens for the checking time.
     val freeNav = !examListening || playlist.phase == ExamPhase.Review
@@ -449,8 +467,12 @@ private fun RunnerBody(
     }
 
     val navParts = remember(test) { sections.map { s -> NavPart(s.part, "$noun ${s.part}", s.groups.flatMap { g -> g.questions.map { it.n } }) } }
-    val answered = { n: Int -> responses.isAnswered(n) }
-    val answeredTotal = responses.answeredCount(test)
+    // Derived, so a keystroke only recomposes the runner when a count changes (the first letter of an answer, not every letter).
+    val answered = { n: Int -> session.responses.isAnswered(n) }
+    val answeredTotal by remember(session) { derivedStateOf { session.responses.answeredCount(test) } }
+    val partCounts by remember(session) {
+        derivedStateOf(structuralEqualityPolicy()) { navParts.map { p -> p.questions.count { session.responses.isAnswered(it) } to p.questions.size } }
+    }
     val unanswered = total - answeredTotal
     val idx = flat.indexOfFirst { it.n == current }.coerceAtLeast(0)
     val imeUp = WindowInsets.isImeVisible
@@ -475,7 +497,7 @@ private fun RunnerBody(
                         DropdownMenu(menuOpen, { menuOpen = false }, containerColor = c.surface) {
                             DropdownMenuItem(
                                 { Text("Notes${if (hl.list.isNotEmpty()) " (${hl.list.size})" else ""}", style = NB.type.body, color = c.ink) },
-                                { menuOpen = false; notesOpen = true }, leadingIcon = { Icon(Icons.Rounded.Notes, null, tint = c.muted) },
+                                { menuOpen = false; notesOpen = true }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Notes, null, tint = c.muted) },
                             )
                             DropdownMenuItem(
                                 { Text("Text size and colours", style = NB.type.body, color = c.ink) },
@@ -513,7 +535,7 @@ private fun RunnerBody(
                 Column(Modifier.fillMaxSize()) {
                     if (started && sections.size > 1) PartTabs(
                         labels = navParts.map { it.label },
-                        counts = navParts.map { p -> p.questions.count(answered) to p.questions.size },
+                        counts = partCounts,
                         selected = partIdx.coerceIn(0, sections.lastIndex), enabled = freeNav, onSelect = ::goPart,
                     )
                     when {

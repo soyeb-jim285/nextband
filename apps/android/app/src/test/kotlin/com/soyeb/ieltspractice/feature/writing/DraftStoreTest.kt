@@ -43,12 +43,12 @@ class DraftStoreTest {
         } finally { scope.cancel() }
     }
 
-    @Test fun recordingsBelongToTheirOwnerOrTheGuestItCameFrom() {
+    @Test fun recordingsBelongToTheirOwnerOnly() {
         val r = PendingRecording("r1", "p1", 1, "Part 1", 0L, 1000, emptyList(), emptyList(), ownerId = "a")
         assertTrue(r.belongsTo("a"))
         assertFalse(r.belongsTo("b"))
         assertFalse(r.belongsTo(null))
-        assertTrue(r.belongsTo("b", setOf("a")))
         assertFalse(r.copy(ownerId = null).belongsTo(null))
+        assertTrue(r.copy(ownerId = null).belongsTo("b")) // recorded before /api/me answered: the signed-in user claims it at upload
     }
 }

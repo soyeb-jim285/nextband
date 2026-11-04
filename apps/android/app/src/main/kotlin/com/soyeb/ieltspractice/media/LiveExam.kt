@@ -93,7 +93,15 @@ class LiveExam(
 
     val mic = MicRecorder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val audio = LiveAudio().also { a -> a.onLevel = { l -> scope.launch { level = l } } }
+    private val audio = LiveAudio().also { a -> a.onLevel = { l -> if (levelDue()) scope.launch { level = l } } }
+    /** Capture callbacks arrive ~100 times a second; the screen only needs ~10 Hz, so most never reach the main thread. */
+    @Volatile private var levelAt = 0L
+    private fun levelDue(): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (now - levelAt < 100) return false
+        levelAt = now
+        return true
+    }
     private var examiner: LiveKitExaminer? = null
     private var run: kotlinx.coroutines.Job? = null
     private var turnEnded: CompletableDeferred<Unit>? = null
@@ -102,7 +110,7 @@ class LiveExam(
     private var currentPart: Int? = null
     private val recordings = sortedMapOf<Int, PartRecording>()
     private var ending = false
-    private var micLoudSeconds = 0.0
+    @Volatile private var micLoudSeconds = 0.0
     private var talkTimeUp = false
     private var answeredFlag = false // the candidate finished an answer
 
@@ -127,7 +135,7 @@ class LiveExam(
         micChecking = true
         micError = null
         micLoudSeconds = 0.0
-        val ok = mic.start { l, dt -> scope.launch { onMicCheckLevel(l, dt) } }
+        val ok = mic.start { l, dt -> onMicCheckLevel(l, dt) }
         micChecking = false
         if (ok) micReady = true else micError = "The microphone couldn't start. Close other apps that use it and try again."
     }
@@ -141,11 +149,14 @@ class LiveExam(
         else if (!away && micParked) { micParked = false; beginMicCheck() }
     }
 
+    /** On the capture thread: the loud time adds up per chunk, the screen state is set at most ten times a second. */
     private fun onMicCheckLevel(l: Double, dt: Double) {
-        level = l
-        if (stage == LiveStage.Ready && !micHeard) {
-            if (l > 0.25) micLoudSeconds += dt
-            micHeard = micLoudSeconds >= 0.6
+        if (l > 0.25) micLoudSeconds += dt
+        if (!levelDue()) return
+        val heard = micLoudSeconds >= 0.6
+        scope.launch {
+            level = l
+            if (stage == LiveStage.Ready && heard) micHeard = true
         }
     }
 
@@ -156,7 +167,14 @@ class LiveExam(
         caption = ""
         testStartedAt = SystemClock.elapsedRealtime()
         stage = LiveStage.Running
+        scope.launch(Dispatchers.IO) { pruneOldRecordings() }
         run = scope.launch { runLive() }
+    }
+
+    /** Parts of tests abandoned before they were scored: anything over a day old goes (a running test's parts are minutes old). */
+    private fun pruneOldRecordings() {
+        val cutoff = System.currentTimeMillis() - 86_400_000L
+        context.cacheDir.listFiles { f -> f.name.startsWith("live-") && f.name.endsWith(".m4a") && f.lastModified() < cutoff }?.forEach { it.delete() }
     }
 
     /** "I'm done": end the Part 2 long turn now. */
@@ -207,7 +225,8 @@ class LiveExam(
 
     /** The /live body of one part, uploading its recording first if that has not happened yet. */
     private suspend fun partBody(part: Int, r: PartRecording): JsonObject {
-        val key = keys[part] ?: uploadFile(r.file).also { keys[part] = it }
+        // Uploaded: the key is all that is sent from here on, so the voice recording leaves the device now.
+        val key = keys[part] ?: uploadFile(r.file).also { keys[part] = it; withContext(Dispatchers.IO) { r.file.delete() } }
         return buildJsonObject {
             put("part", part); put("audioKey", key); put("durationMs", r.durationMs)
             putJsonArray("energy") { r.energy.take(20000).forEach { add(JsonPrimitive(it)) } }
@@ -368,6 +387,8 @@ class LiveExam(
                 if (e.status != 409) throw e
                 api.attempts("speaking").items.filter { it.sessionId == sessionId }.sortedBy { it.part }.map { it.id }.ifEmpty { throw e }
             }
+            // Scored: the local copies are no longer needed (a failure above keeps them for "score what was recorded").
+            withContext(Dispatchers.IO) { recordings.values.forEach { it.file.delete() } }
             // A mock test: link the finished session to it (a second try covers a dropped connection) before the screen returns to the hub.
             var attached = mockId == null
             repeat(2) { if (!attached) attached = runCatching { api.mockAttach(mockId!!, sessionId) }.isSuccess }

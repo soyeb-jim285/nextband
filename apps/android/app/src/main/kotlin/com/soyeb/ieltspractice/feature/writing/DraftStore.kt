@@ -6,10 +6,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Whose drafts: the signed-in user's id, "" while /api/me has not loaded yet, null when signed out (nothing is shown or kept).
- * ponytail: the "" bucket only fills if /api/me never loaded in a signed-in launch; it is still hidden from signed-out viewers.
+ * Whose drafts: the signed-in user's id; null when signed out or while /api/me has not loaded (nothing is shown or kept, so two
+ * accounts never share an unknown-owner bucket). Callers resolve the id first ([com.soyeb.ieltspractice.data.currentUserId]).
  */
-fun draftOwner(api: Api): String? = if (!api.isSignedIn) null else api.me.value?.user?.id.orEmpty()
+fun draftOwner(api: Api): String? = if (!api.isSignedIn) null else api.me.value?.user?.id
 
 /**
  * Essay + plan per prompt on this device (`draft:{owner}:{promptId}`), so leaving or being killed mid-test loses nothing.

@@ -13,6 +13,12 @@ plugins {
 val releaseKeystore: File? = System.getenv("NEXTBAND_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
 val storeSigned = releaseKeystore != null
 
+// Distribution channel (-Pnextband.channel=play|web, default play). play: the store build is consumption-only (Pro is bought on
+// nextband.app and unlocks after sign-in; no prices, links or checkout in the app). web: the APK downloaded from nextband.app,
+// with the in-app PayStation checkout. It is never uploaded to Play (bundleRelease refuses it).
+val channel = providers.gradleProperty("nextband.channel").getOrElse("play")
+require(channel == "play" || channel == "web") { "nextband.channel must be play or web, got '$channel'" }
+
 android {
     namespace = "com.soyeb.ieltspractice"
     compileSdk = 36
@@ -21,8 +27,11 @@ android {
         applicationId = "com.soyeb.ieltspractice"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // CI passes -Pnextband.versionCode=<run number>: every Play upload needs a higher code than the last.
+        versionCode = providers.gradleProperty("nextband.versionCode").map { it.toInt() }.getOrElse(1)
         versionName = "1.0"
+        // Support can tell the sideloaded web APK (PayStation checkout) from the store build in Settings / About.
+        if (channel == "web") versionNameSuffix = "-web"
     }
 
     signingConfigs {
@@ -38,7 +47,8 @@ android {
         debug {
             isMinifyEnabled = false
             buildConfigField("boolean", "DEMO", "true")
-            buildConfigField("boolean", "WEB_CHECKOUT", "true")
+            // Debug sells (web channel) unless a channel is named: -Pnextband.channel=play renders the store build's Plan and limit panels.
+            buildConfigField("boolean", "WEB_CHECKOUT", providers.gradleProperty("nextband.channel").map { it == "web" }.getOrElse(true).toString())
         }
         release {
             isMinifyEnabled = true
@@ -46,9 +56,9 @@ android {
             signingConfig = signingConfigs.getByName(if (storeSigned) "release" else "debug")
             // Demo mode (intent extras on the exported launcher) never ships in a store-signed build.
             buildConfigField("boolean", "DEMO", (!storeSigned).toString())
-            // Play's Payments policy: digital features bought in the app need Play Billing. Until that ships, the store-signed (Play)
-            // build sells nothing: no prices, no PayStation checkout, only the plan status the server reports.
-            buildConfigField("boolean", "WEB_CHECKOUT", (!storeSigned).toString())
+            // Play's Payments policy: the play channel sells nothing in the app (no Play Billing): plan status and a plain,
+            // non-clickable "upgrade at nextband.app" line only. The web channel keeps the PayStation checkout.
+            buildConfigField("boolean", "WEB_CHECKOUT", (channel == "web").toString())
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -96,7 +106,20 @@ val copyDemoFixtures by tasks.registering(CopyDemoFixtures::class) {
 
 tasks.matching { it.name == "bundleRelease" }.configureEach {
     val signed = storeSigned
-    doFirst { if (!signed) throw GradleException("bundleRelease needs the upload key: set NEXTBAND_KEYSTORE, NEXTBAND_KEYSTORE_PASSWORD, NEXTBAND_KEY_ALIAS, NEXTBAND_KEY_PASSWORD.") }
+    val web = channel == "web"
+    doFirst {
+        if (!signed) throw GradleException("bundleRelease needs the upload key: set NEXTBAND_KEYSTORE, NEXTBAND_KEYSTORE_PASSWORD, NEXTBAND_KEY_ALIAS, NEXTBAND_KEY_PASSWORD.")
+        if (web) throw GradleException("bundleRelease is the Play artifact: build it with nextband.channel=play (the web channel sells in the app).")
+    }
+}
+
+// The web-channel APK is what nextband.app hands out: never debug-signed (public key, demo mode on). Unsigned release APKs are play-channel test builds.
+tasks.matching { it.name == "packageRelease" || it.name == "assembleRelease" }.configureEach {
+    val signed = storeSigned
+    val web = channel == "web"
+    doFirst {
+        if (web && !signed) throw GradleException("The web-channel release APK needs the release key: set NEXTBAND_KEYSTORE, NEXTBAND_KEYSTORE_PASSWORD, NEXTBAND_KEY_ALIAS, NEXTBAND_KEY_PASSWORD.")
+    }
 }
 
 androidComponents {

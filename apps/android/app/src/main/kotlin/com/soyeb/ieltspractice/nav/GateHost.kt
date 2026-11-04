@@ -7,6 +7,7 @@ import androidx.compose.material.icons.rounded.VolunteerActivism
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
+import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.data.logic.FairUse
 import com.soyeb.ieltspractice.data.logic.Gate
 import com.soyeb.ieltspractice.data.logic.GateAction
@@ -28,6 +29,7 @@ fun GateHost(nav: Nav) {
             title = FairUse.TITLE,
             actions = {
                 NbButton("Start the test", g.onStart, fill = true, size = BtnSize.Large)
+                if (g.guest) NbButton("Create a free account", { nav.dismissGate(); nav.go(Auth("signup", "Create a free account for more tests")) }, kind = BtnKind.Text, fill = true)
                 NbButton("Not now", nav::dismissGate, kind = BtnKind.Text, fill = true)
             },
         ) {
@@ -48,6 +50,7 @@ fun GateHost(nav: Nav) {
             ) {
                 IconTile(Icons.Rounded.HourglassTop, NB.colors.warnText, NB.colors.warnSoft, 56.dp)
                 Text(copy.body, style = NB.type.body, color = NB.colors.ink)
+                GateText.storeNote(g.code, g.tier, BuildConfig.WEB_CHECKOUT, nav.email)?.let { Text(it, style = NB.type.bodySmall, color = NB.colors.muted) }
             }
         }
         is Gate.Message -> NbSheet(

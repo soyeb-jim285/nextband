@@ -4,6 +4,7 @@ import com.soyeb.ieltspractice.data.logic.clock
 import com.soyeb.ieltspractice.data.logic.minWords
 import com.soyeb.ieltspractice.data.model.Prompt
 import com.soyeb.ieltspractice.data.net.AppJson
+import com.soyeb.ieltspractice.nav.WritingTask
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlin.math.ceil
@@ -101,7 +102,15 @@ fun decodeDraft(raw: String?): Draft {
     val variant: String? = null,
     val words: Int = 0,
     val updatedAt: Long = 0,
+    /** A full test's other task, so the hub reopens both together. */
+    val pairId: String? = null,
 )
+
+/** The route that resumes [d]: its full test (both tasks, Task 1 first) when it was written in one, else the single task. */
+fun resumeRoute(d: DraftMeta): WritingTask {
+    val pair = d.pairId ?: return WritingTask(if (d.part == 1) "task1" else "task2", d.variant, d.promptId)
+    return if (d.part == 1) WritingTask("full", d.variant, d.promptId, pair) else WritingTask("full", d.variant, pair, d.promptId)
+}
 
 fun encodeIndex(items: List<DraftMeta>): String = AppJson.encodeToString(ListSerializer(DraftMeta.serializer()), items)
 

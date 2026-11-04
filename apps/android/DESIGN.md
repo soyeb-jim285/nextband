@@ -168,7 +168,7 @@ Study tools & you
 - ✓ Coach (report: summary, priorities, plan; "updating" polling; feedback thumbs)
 - ✓ History (bucketed by date, skill filter chips, swipe-to-delete with undo)
 - ✓ Prompt bank (search, skill/part/topic filters)
-- ✓ You / profile, Settings, Plan & limits (tier, tests left, upgrade → opens web checkout in Custom Tab), Help/legal (Custom Tabs to nextband.app pages)
+- ✓ You / profile, Settings, Plan & limits (tier, tests left; `play` channel is consumption-only: plain non-clickable "upgrade at nextband.app" text, no prices/links/checkout; `web` channel APK (`-Pnextband.channel=web`) keeps the PayStation checkout in a Custom Tab; plan re-read on foreground and on Plan open), Help/legal (Custom Tabs to nextband.app pages)
 - ✓ Limit / fair-use / busy sheets (`GateHost`)
 
 ## 5. Architecture

@@ -21,7 +21,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Replay5
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -39,6 +38,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -58,12 +58,14 @@ import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.data.logic.clock
 import com.soyeb.ieltspractice.data.model.LrAudioState
 import com.soyeb.ieltspractice.design.NB
+import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.IconTile
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.media.AudioPlayer
+import com.soyeb.ieltspractice.media.MediaCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -282,6 +284,7 @@ class ExamPlaylist(
         if (demoPhase != null || exo != null || urls.isEmpty()) return
         val p = ExoPlayer.Builder(context.applicationContext)
             .setAudioAttributes(AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).setUsage(C.USAGE_MEDIA).build(), true)
+            .setMediaSourceFactory(MediaCache.sourceFactory(context))
             .build()
         p.addListener(object : Player.Listener {
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -354,6 +357,8 @@ class ExamPlaylist(
     suspend fun tick(onElapsed: (Double) -> Unit = {}) {
         while (true) {
             if (demoPhase == null) {
+                // Nothing to count at the start gate: sleep until the recording starts rather than wake four times a second.
+                if (phase == ExamPhase.Idle) { snapshotFlow { phase }.first { it != ExamPhase.Idle }; continue }
                 if (phase == ExamPhase.Audio) elapsed = starts().getOrElse(idx) { 0.0 } + (exo?.currentPosition ?: 0L) / 1000.0
                 else if (phase == ExamPhase.Review) elapsed = total + (System.currentTimeMillis() - reviewStart) / 1000.0
                 if (phase != ExamPhase.Idle) onElapsed(elapsed)
@@ -382,10 +387,10 @@ fun ExamAudioBar(p: ExamPlaylist, modifier: Modifier = Modifier, parts: List<Int
                 style = NB.type.label, color = c.ink,
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LinearProgressIndicator(
-                    progress = { if (p.total > 0) (p.elapsed / p.total).toFloat().coerceIn(0f, 1f) else 0f },
-                    modifier = Modifier.weight(1f).semantics { contentDescription = "Recording progress" },
-                    color = c.listening, trackColor = c.surface3,
+                Meter(
+                    if (p.total > 0) p.elapsed.toDouble() else 0.0,
+                    Modifier.weight(1f).semantics { contentDescription = "Recording progress" },
+                    max = if (p.total > 0) p.total.toDouble() else 1.0, color = c.listening, height = 6.dp,
                 )
                 if (p.total > 0 && p.phase != ExamPhase.Review) {
                     Text("${clock(minOf(p.elapsed, p.total).toInt())} / ${clock(p.total.toInt())}", style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)

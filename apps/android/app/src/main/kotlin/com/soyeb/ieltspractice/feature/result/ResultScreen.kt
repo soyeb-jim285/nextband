@@ -37,6 +37,7 @@ import com.soyeb.ieltspractice.design.components.PushedScreen
 import com.soyeb.ieltspractice.design.components.SkeletonList
 import com.soyeb.ieltspractice.design.components.awaitStarted
 import com.soyeb.ieltspractice.design.components.nextPollMs
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.feature.speaking.SpeakingResult
 import com.soyeb.ieltspractice.feature.writing.WritingResult
 import com.soyeb.ieltspractice.nav.Nav
@@ -143,6 +144,6 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
 @Composable
 private fun Shell(nav: Nav, content: @Composable () -> Unit) {
     PushedScreen("Result", nav::back) { pad: PaddingValues ->
-        Box(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState())) { content() }
+        Box(Modifier.padding(pad).fillMaxSize().readable().verticalScroll(rememberScrollState())) { content() }
     }
 }

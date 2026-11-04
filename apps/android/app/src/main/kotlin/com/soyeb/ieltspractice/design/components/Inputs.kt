@@ -35,7 +35,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -90,16 +92,17 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
                     .clip(NB.shape.pill).background(if (c.isDark) c.surface3 else c.surface),
             )
         }
-        Row(Modifier.fillMaxWidth().selectableGroup()) {
+        // Labels wrap at large text sizes; IntrinsicSize.Min keeps every segment as tall as the tallest one.
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).selectableGroup()) {
             options.forEachIndexed { i, label ->
                 Box(
-                    Modifier.weight(1f).minimumInteractiveComponentSize().heightIn(min = 36.dp).clip(NB.shape.pill)
+                    Modifier.weight(1f).fillMaxHeight().minimumInteractiveComponentSize().heightIn(min = 36.dp).clip(NB.shape.pill)
                         .selectable(i == selected, role = Role.Tab) { if (i != selected) { hf.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(i) } },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         label, style = NB.type.label, color = if (i == selected) c.ink else c.muted,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp),
+                        textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
             }
@@ -194,11 +197,11 @@ fun NbTextField(
     val focused by src.collectIsFocusedAsState()
     val spec = tween<Color>(NbMotion.BASE, easing = NbMotion.EaseOut)
     val ring by animateColorAsState(
-        when { error != null -> c.bad; focused -> c.brand; else -> if (c.isDark) c.line else Color.Transparent }, spec, label = "fieldRing",
+        when { error != null -> c.bad; focused -> c.brand; else -> c.faint }, spec, label = "fieldRing",
     )
     val well by animateColorAsState(if (focused) c.surface else c.surface2, spec, label = "fieldWell")
     val labelColor by animateColorAsState(if (error != null) c.badText else if (focused) c.brandText else c.muted, spec, label = "fieldLabel")
-    val shape = RoundedCornerShape(14.dp)
+    val shape = NB.shape.tile
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = NB.type.label, color = labelColor, modifier = Modifier.padding(start = 2.dp).clearAndSetSemantics {})
         BasicTextField(

@@ -193,7 +193,7 @@ fun YouScreen(nav: Nav) {
                         RowDivider()
                         StudyRow("Drill", Icons.Rounded.Style) { nav.requireAccount("Create an account to drill your mistakes.") { nav.go(Review()) } }
                         RowDivider()
-                        StudyRow("Your plan", Icons.Rounded.AutoAwesome) { nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) } }
+                        StudyRow("Study plan", Icons.Rounded.AutoAwesome) { nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) } }
                         RowDivider()
                         StudyRow("Prompt bank", Icons.Rounded.Search) { nav.go(Bank()) }
                     }
@@ -237,9 +237,9 @@ fun YouScreen(nav: Nav) {
         }
         YouSheet.Legal -> NbSheet(onDismiss = { sheet = null }, title = "Help & legal") {
             RowGroup {
-                legalPages.forEachIndexed { i, (title, path) ->
+                legalPages(BuildConfig.WEB_CHECKOUT).forEachIndexed { i, (title, path) ->
                     if (i > 0) RowDivider()
-                    NbListRow(title, onClick = { openCustomTab(context, SITE + path) }, trailing = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, Modifier.size(20.dp)) })
+                    NbListRow(title, onClick = { openCustomTab(context, siteUrl(path, BuildConfig.WEB_CHECKOUT)) }, trailing = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, Modifier.size(20.dp)) })
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -262,7 +262,7 @@ fun YouScreen(nav: Nav) {
         "Sign out?", "You can sign back in any time. Results stay on your account.", "Sign out",
         onConfirm = {
             confirmSignOut = false
-            scope.launch { api.signOut(); nav.reset(Welcome) }
+            api.signOut(); nav.reset(Welcome)
         },
         onDismiss = { confirmSignOut = false },
     )

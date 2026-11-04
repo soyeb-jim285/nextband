@@ -1,13 +1,17 @@
 package com.soyeb.ieltspractice.feature.updates
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.TaskAlt
@@ -15,7 +19,9 @@ import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.soyeb.ieltspractice.design.components.EmptyState
 import com.soyeb.ieltspractice.design.components.ErrorState
+import com.soyeb.ieltspractice.design.components.Skeleton
 import com.soyeb.ieltspractice.design.components.Load
 import com.soyeb.ieltspractice.design.components.PollWhileVisible
 import com.soyeb.ieltspractice.nav.MockStart
@@ -30,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.LocalGraph
 import com.soyeb.ieltspractice.data.net.Api
@@ -93,7 +101,7 @@ private fun UpdateRow.open(nav: Nav) {
     when (kind) {
         UpdateKind.Cards -> nav.go(Review())
         UpdateKind.Mock -> nav.go(MockHub(mockId!!))
-        UpdateKind.Exam -> nav.go(MockStart)
+        UpdateKind.Exam -> nav.go(if (n <= 1) Review() else mockId?.let { MockHub(it) } ?: MockStart)
         else -> openItem(nav, item!!)
     }
 }
@@ -146,8 +154,10 @@ fun UpdatesBell(nav: Nav) {
     if (open) NbSheet({ open = false }, title = "Updates") {
         val state = loader.state
         if (state is Load.Failed) ErrorState(state.message, { loader.reload() })
-        else if (rows == null) Text("Loading updates...", style = NB.type.body, color = NB.colors.muted)
-        else if (items.isEmpty()) Text("You're all caught up. Results and reminders show up here.", style = NB.type.body, color = NB.colors.muted)
+        else if (rows == null) Column(Modifier.semantics { contentDescription = "Loading updates" }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) { Skeleton(Modifier.fillMaxWidth(), height = 64.dp, corner = 12.dp) }
+        }
+        else if (items.isEmpty()) EmptyState(Icons.Rounded.NotificationsNone, "You're all caught up", "Results and reminders show up here.")
         else RowGroup {
             items.forEachIndexed { i, u ->
                 if (i > 0) RowDivider()

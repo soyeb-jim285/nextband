@@ -4,6 +4,7 @@ import com.soyeb.ieltspractice.design.components.HeroInk
 import com.soyeb.ieltspractice.design.components.BrandHero
 import com.soyeb.ieltspractice.design.rise
 import com.soyeb.ieltspractice.design.sharedBox
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
@@ -285,7 +286,7 @@ private fun MockHero(nav: Nav, mock: Mock?, last: Mock?, target: Double) {
             NbButton("Start full mock", { nav.go(MockStart) }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
             if (last?.overall != null) Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 6.dp).clip(NB.shape.tile)
-                    .clickable(onClickLabel = "Open your last mock result") { nav.go(MockResult(last.id)) },
+                    .clickable(onClickLabel = "Open your last mock result", role = Role.Button) { nav.go(MockResult(last.id)) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Last mock", style = NB.type.bodySmall, color = ink.muted, modifier = Modifier.weight(1f))
@@ -428,7 +429,7 @@ private fun ToolsGrid(nav: Nav, due: Int) {
         Tool("Patterns", "Mistakes that repeat", Icons.Rounded.ErrorOutline, null) {
             nav.requireAccount("Create an account to see your mistakes.") { nav.go(Mistakes()) }
         },
-        Tool("Your plan", "Coach and focus", Icons.Rounded.AutoAwesome, null) {
+        Tool("Study plan", "Coach and focus", Icons.Rounded.AutoAwesome, null) {
             nav.requireAccount("Create an account to get your coach report.") { nav.go(CoachRoute) }
         },
         Tool("History", "All your results", Icons.Rounded.HistoryIcon, null) {

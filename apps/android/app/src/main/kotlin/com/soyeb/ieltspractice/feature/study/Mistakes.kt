@@ -66,6 +66,7 @@ import com.soyeb.ieltspractice.design.components.SectionHeader
 import com.soyeb.ieltspractice.design.components.Skeleton
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.rememberLoad
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.nav.AttemptResult
 import com.soyeb.ieltspractice.nav.Mistakes
 import com.soyeb.ieltspractice.nav.Nav
@@ -144,7 +145,7 @@ fun MistakesScreen(nav: Nav, route: Mistakes) {
                 )
             }
             LazyColumn(
-                Modifier.fillMaxSize(),
+                Modifier.fillMaxSize().readable(),
                 contentPadding = PaddingValues(start = NB.space.gutter, end = NB.space.gutter, top = 4.dp, bottom = pad.calculateBottomPadding() + 32.dp),
                 verticalArrangement = Arrangement.spacedBy(NB.space.lg),
             ) {

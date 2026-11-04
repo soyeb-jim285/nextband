@@ -214,7 +214,8 @@ private fun Scrubber(player: ResultPlayer, timeline: Timeline) {
     val colors = MarkerType.entries.associateWith { it.color() }
     val d = max(player.duration, 0.1)
     Canvas(
-        Modifier.fillMaxWidth().height(34.dp)
+        // 48dp hit area (DESIGN.md min target); the 34dp drawing is centred in it.
+        Modifier.fillMaxWidth().height(48.dp)
             .semantics {
                 contentDescription = "Audio position"
                 stateDescription = "${clock(player.currentTime.roundToInt())} of ${clock(player.duration.roundToInt())}"
@@ -227,7 +228,9 @@ private fun Scrubber(player: ResultPlayer, timeline: Timeline) {
             },
     ) {
         val trackH = 6.dp.toPx()
-        val cy = size.height * 0.62f
+        val band = 34.dp.toPx()
+        val top = (size.height - band) / 2
+        val cy = top + band * 0.62f
         drawRoundRect(c.surface3, Offset(0f, cy - trackH / 2), Size(size.width, trackH), CornerRadius(trackH / 2))
         for (p in timeline.pauses) {
             val x = size.width * (p.start / d).toFloat()
@@ -238,7 +241,7 @@ private fun Scrubber(player: ResultPlayer, timeline: Timeline) {
         drawRoundRect(c.brand, Offset(0f, cy - trackH / 2), Size(played, trackH), CornerRadius(trackH / 2))
         for (m in timeline.markers) {
             val x = size.width * (m.t / d).toFloat().coerceIn(0f, 1f)
-            drawMarker(m.type, Offset(x, size.height * 0.2f), 4.dp.toPx(), colors.getValue(m.type), c.surface)
+            drawMarker(m.type, Offset(x, top + band * 0.2f), 4.dp.toPx(), colors.getValue(m.type), c.surface)
         }
         drawCircle(c.brand, 8.dp.toPx(), Offset(played, cy))
         drawCircle(c.surface, 3.dp.toPx(), Offset(played, cy))

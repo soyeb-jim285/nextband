@@ -20,6 +20,7 @@ class AudioPlayer(context: Context) {
     private val player = ExoPlayer.Builder(context.applicationContext)
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
         .setHandleAudioBecomingNoisy(true)
+        .setMediaSourceFactory(MediaCache.sourceFactory(context))
         .build()
 
     private val _playing = MutableStateFlow(false)

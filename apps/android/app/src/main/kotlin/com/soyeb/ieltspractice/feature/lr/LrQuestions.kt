@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableFloatStateOf
@@ -111,7 +112,7 @@ import com.soyeb.ieltspractice.design.components.Segmented
 // compact inline gap fields that grow, large radio / checkbox cards, three-way segmented T/F/NG, a picker sheet for matching,
 // word-box chips that fill the blanks, zoomable figures.
 
-/** Where each question is on screen, so a jump can scroll to it and focus it. Remember one per screen; [QCtx] is rebuilt on every change. */
+/** Where each question is on screen, so a jump can scroll to it and focus it. Remember one per screen. */
 class QRegistry {
     private val bring = HashMap<Int, BringIntoViewRequester>()
     private val focus = HashMap<Int, FocusRequester>()
@@ -119,15 +120,19 @@ class QRegistry {
     fun focuser(n: Int) = focus.getOrPut(n) { FocusRequester() }
 }
 
-/** What every question composable of one screen shares. */
+/**
+ * What every question composable of one screen shares. Remember one per screen: the answers, the ringed question and the flags are read
+ * through lambdas over snapshot state, so a keystroke recomposes the questions that read it, not the runner around them.
+ */
+@Stable
 class QCtx(
-    val responses: Map<String, String>,
+    private val responsesOf: () -> Map<String, String>,
     val onChange: (Map<String, String>) -> Unit,
     val assets: Map<String, String>,
     val api: Api,
     /** The question to ring (jumped to from the navigator). */
-    val active: Int? = null,
-    val flagged: Set<Int> = emptySet(),
+    private val activeOf: () -> Int? = { null },
+    private val flaggedOf: () -> Set<Int> = { emptySet() },
     val onFocus: (Int) -> Unit = {},
     /** A text gap gained (true) or lost (false) the cursor: pacing counts a typed change once per visit. */
     val onText: (Int, Boolean) -> Unit = { _, _ -> },
@@ -137,6 +142,9 @@ class QCtx(
     /** A small haptic tick on choosing. */
     val tick: () -> Unit = {},
 ) {
+    val responses: Map<String, String> get() = responsesOf()
+    val active: Int? get() = activeOf()
+    val flagged: Set<Int> get() = flaggedOf()
     fun value(n: Int) = responses[n.toString()].orEmpty()
     fun set(n: Int, v: String) = onChange(responses.withAnswer(n, v))
     fun requester(n: Int) = reg.requester(n)

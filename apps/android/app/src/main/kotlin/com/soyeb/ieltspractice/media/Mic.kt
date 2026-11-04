@@ -237,12 +237,24 @@ class MicRecorder {
     private var onLevel: ((Double, Double) -> Unit)? = null
     /** While true the microphone stays open but nothing is written or measured, so the recording clock ([elapsed]) stands still (the examiner is talking). */
     @Volatile var paused = false
-    /** The app is in the background: Android hands it silence, so nothing is written and the clock stands still until it returns. */
+    /**
+     * The app is in the background: Android hands it silence, so the microphone is released (the encoder stays open) and the clock stands
+     * still until it returns. A microphone that will not reopen on return reads as [failed].
+     */
     @Volatile var away = false
+        set(v) {
+            synchronized(this) {
+                if (field == v) return
+                field = v
+                if (!isRecording) return
+                if (v) capture.stop() else if (!capture.start()) reopenFailed = true
+            }
+        }
+    @Volatile private var reopenFailed = false
 
     var isRecording by mutableStateOf(false); private set
     /** The capture or the encoder failed mid-recording: [stop] it (what was written is kept when the file closes cleanly). */
-    val failed: Boolean get() = capture.failed
+    val failed: Boolean get() = capture.failed || reopenFailed
     @Volatile var elapsed = 0.0; private set
     @Volatile var level = 0.0; private set
     @Volatile var silence = 0.0; private set
@@ -263,6 +275,7 @@ class MicRecorder {
         this.onLevel = onLevel
         elapsed = 0.0; silence = 0.0; liveWpm = 0; loud = 0; soft = 0; level = 0.0
         ring.fill(0.0); head = 0
+        reopenFailed = false
         capture.onPcm = { pcm, n ->
             if (!paused && !away) {
                 writer?.write(pcm, n)
@@ -278,7 +291,8 @@ class MicRecorder {
                 this.onLevel?.invoke(l, dt)
             }
         }
-        if (!capture.start()) { writer?.finish(); writer = null; return false }
+        // Started while away (a preparation minute ran out in the background): the microphone opens when the app returns.
+        if (!away && !capture.start()) { writer?.finish(); writer = null; return false }
         isRecording = true
         return true
     }

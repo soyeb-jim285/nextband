@@ -195,15 +195,25 @@ fun BandScale(color: Color, modifier: Modifier = Modifier) {
 /** Ink for content sitting on [BrandHero]. */
 class HeroInk(val fg: Color, val muted: Color)
 
+/** Fill of the loud brand surface ([BrandHero], Welcome and sign-in headers). */
+@Composable
+fun heroFill(): Color = if (NB.colors.isDark) NB.colors.brandSoft else NB.colors.brandText
+
+/** Ink for content on [heroFill]. */
+@Composable
+fun heroInk(): HeroInk {
+    val c = NB.colors
+    return HeroInk(if (c.isDark) c.ink else Color.White, if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f))
+}
+
 /**
  * The one loud surface: deep teal (light) / teal-tinted night (dark) with the [BandScale] ornament in its corner.
  * White type on brandText is 7:1. One per screen. Pair its action with BtnKind.Inverse.
  */
 @Composable
 fun BrandHero(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.(HeroInk) -> Unit) {
-    val c = NB.colors
-    val ink = HeroInk(if (c.isDark) c.ink else Color.White, if (c.isDark) c.muted else Color.White.copy(alpha = 0.86f))
-    Box(modifier.fillMaxWidth().clip(NB.shape.card).background(if (c.isDark) c.brandSoft else c.brandText)) {
+    val ink = heroInk()
+    Box(modifier.fillMaxWidth().clip(NB.shape.card).background(heroFill())) {
         // Centre on the top-right corner so the ticks stay in the corner, clear of the copy.
         BandScale(ink.fg, Modifier.align(Alignment.TopEnd).offset(x = 110.dp, y = (-110).dp).size(220.dp))
         Column(Modifier.fillMaxWidth().padding(20.dp)) { content(ink) }

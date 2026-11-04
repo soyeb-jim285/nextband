@@ -34,6 +34,12 @@ class Nav(
 ) {
     fun go(route: Any) = controller.navigate(route) { launchSingleTop = true }
 
+    /** Push [route] even when the top screen is the same kind (result → another result): single-top would swap it in place. */
+    fun push(route: Any) = controller.navigate(route)
+
+    /** The signed-in account's email ("" for a guest or before /me loads). */
+    val email: String get() = api.me.value?.user?.email.orEmpty()
+
     /** False on a lone root (nothing beneath to go back to). */
     val canGoBack: Boolean get() = controller.previousBackStackEntry != null
 
@@ -73,8 +79,21 @@ class Nav(
         launchSingleTop = true
     }
 
-    /** Switch tab like the bottom bar does: each tab keeps its own stack. */
-    fun openTab(tab: Tab) = controller.navigate(tab.route) {
+    /**
+     * Switch tab like the bottom bar does: each tab keeps its own stack. When [tab] is the one we're already in (a link
+     * deep inside its stack), pop back to its root: saving and restoring its own stack would leave us where we are.
+     */
+    fun openTab(tab: Tab) {
+        // Other tabs' stacks are saved off the back stack, so a non-Today tab root on it is the current tab; Today (the anchor,
+        // always underneath) is current only when no other tab root is above it.
+        val current = if (tab == Tab.Today) Tab.entries.none { it != Tab.Today && onStack(it.route) } else onStack(tab.route)
+        if (current && controller.popBackStack(tab.route, inclusive = false)) return
+        navigateTab(tab)
+    }
+
+    private fun onStack(route: Any): Boolean = runCatching { controller.getBackStackEntry(route) }.isSuccess
+
+    private fun navigateTab(tab: Tab) = controller.navigate(tab.route) {
         popUpTo(todayId() ?: controller.graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
         restoreState = true

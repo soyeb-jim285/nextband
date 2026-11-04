@@ -50,9 +50,13 @@ import java.io.IOException
     val ownerId: String? = null,
 )
 
-/** Listed and uploaded only for the account that made it, or the account its guest session became (the server links a guest's data). */
-fun PendingRecording.belongsTo(userId: String?, formerGuests: Set<String> = emptySet()): Boolean =
-    ownerId != null && (ownerId == userId || ownerId in formerGuests)
+/**
+ * Listed and uploaded only for the account that made it (a guest's recordings are re-owned by the account it signs into: [PendingStore.reassign]).
+ * No owner (recorded before /api/me answered, e.g. offline): any signed-in user, and the upload stamps that user as the owner.
+ * ponytail: an unowned recording could follow a later account switch on this device; rare (needs /api/me to have failed all session).
+ */
+fun PendingRecording.belongsTo(userId: String?): Boolean =
+    if (ownerId == null) userId != null else ownerId == userId
 
 /** The signed-in user's id, loading /api/me when it isn't known yet; null when signed out or offline. */
 suspend fun currentUserId(api: Api): String? = api.me.value?.user?.id ?: runCatching { api.loadMe().user.id }.getOrNull()
@@ -120,6 +124,12 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
     private fun keep(p: PendingRecording) =
         _items.update { list -> if (list.any { it.id == p.id }) list.map { if (it.id == p.id) p else it } else listOf(p) + list }
 
+    /** A guest signed into [to]: the server linked its data there, so its recordings on this device now belong to that account. */
+    fun reassign(from: String, to: String) {
+        reload() // the hub may not have read the disk yet this launch
+        _items.value.filter { it.ownerId == from }.forEach { add(it.copy(ownerId = to)) }
+    }
+
     fun remove(id: String) {
         audioFile(id).delete()
         metaFile(id).delete()
@@ -145,10 +155,12 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
         _states.update { s -> if (s[rec.id] is UploadState.Uploading) { busy = true; s } else { busy = false; s + (rec.id to UploadState.Uploading) } }
         if (busy) return null
         var p = _items.value.firstOrNull { it.id == rec.id } ?: rec
-        if (!p.belongsTo(currentUserId(api), api.formerGuests)) {
+        val uid = currentUserId(api)
+        if (!p.belongsTo(uid)) {
             _states.update { it + (p.id to UploadState.Failed("This recording belongs to another account. Sign in to it to upload, or delete it.")) }
             return null
         }
+        if (p.ownerId == null) p = p.copy(ownerId = uid).also(::add)
         // Creating an attempt reserves nothing (the quota is taken at submit), so a fresh one can replace an expired upload URL.
         suspend fun create(from: PendingRecording): PendingRecording {
             val created: Created = api.send("POST", "/api/attempts", buildJsonObject {

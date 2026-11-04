@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
+import com.soyeb.ieltspractice.data.currentUserId
 import com.soyeb.ieltspractice.data.logic.QuotaCopy
 import com.soyeb.ieltspractice.data.logic.formatDate
 import com.soyeb.ieltspractice.data.logic.sentenceCase
@@ -112,6 +113,7 @@ fun WritingHub(nav: Nav) {
             store.save("w2", Draft("Many people argue that working from home brings real benefits to both employees and employers. Workers save the time and money they would spend commuting."), DraftMeta("w2", 2, "Remote work"))
             store.save("w1a", Draft("The graph shows how much electricity three countries generate from renewable sources between 2000 and 2020."), DraftMeta("w1a", 1, "Renewable energy share", "academic"))
         }
+        if (demo == null && api.isSignedIn) currentUserId(api) // the drafts are keyed by the account id
         HubData(
             drafts = store.index(),
             recent = if (!account) emptyList() else runCatching {
@@ -193,10 +195,10 @@ fun WritingHub(nav: Nav) {
                         if (i > 0) RowDivider()
                         NbListRow(
                             sentenceCase(d.title),
-                            subtitle = "Task ${d.part} · ${plural(d.words)} · ${ago(d.updatedAt, now)}",
+                            subtitle = "${if (d.pairId != null) "Full test · " else ""}Task ${d.part} · ${plural(d.words)} · ${ago(d.updatedAt, now)}",
                             leading = { IconTile(Icons.Rounded.EditNote, NB.colors.writing, NB.colors.writingSoft, 40.dp) },
                             trailing = { NbIconButton(Icons.Rounded.Close, "Discard draft: ${d.title}", { discard = d }) },
-                            onClick = { nav.go(WritingTask(if (d.part == 1) "task1" else "task2", d.variant, d.promptId)) },
+                            onClick = { nav.go(resumeRoute(d)) },
                         )
                     }
                 }

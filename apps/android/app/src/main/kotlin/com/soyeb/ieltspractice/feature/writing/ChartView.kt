@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -191,11 +192,13 @@ private fun Cartesian(spec: ChartSpec) {
     val hi = ticks.last()
     val yTitle = yAxisTitle(spec)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Canvas(Modifier.fillMaxWidth().height(260.dp).semantics { contentDescription = describe(spec) }) {
+        Canvas(Modifier.fillMaxWidth().height(260.dp * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).semantics { contentDescription = describe(spec) }) {
             val grid = c.muted.copy(alpha = 0.22f)
             val axis = c.muted.copy(alpha = 0.55f)
+            // Axis titles get the caption's real line height, so large text doesn't run them into the tick labels.
+            val lineH = measurer.measure(AnnotatedString("Ag"), label, maxLines = 1).size.height
             val tickLayouts = ticks.map { measurer.measure(AnnotatedString(tickFormat.format(it)), label) }
-            val left = (tickLayouts.maxOf { it.size.width } + 6.dp.toPx()) + (if (yTitle.isNotEmpty()) 28.dp.toPx() else 6.dp.toPx())
+            val left = (tickLayouts.maxOf { it.size.width } + 6.dp.toPx()) + (if (yTitle.isNotEmpty()) lineH + 8.dp.toPx() else 6.dp.toPx())
             val right = 12.dp.toPx()
             val top = 8.dp.toPx()
             val pw = max(0f, size.width - left - right)
@@ -209,7 +212,7 @@ private fun Cartesian(spec: ChartSpec) {
             val single = if (fits) wrapped else spec.categories.map { measurer.measure(AnnotatedString(it), label, maxLines = 1) }
             val every = if (fits || single.isEmpty()) 1 else max(1, ceil((single.maxOf { it.size.width } + 8.dp.toPx()) / max(band, 1f)).toInt())
             val labelsH = single.maxOfOrNull { it.size.height } ?: 0
-            val bottom = 8.dp.toPx() + labelsH + (if (spec.xLabel.isNotEmpty()) 22.dp.toPx() else 4.dp.toPx())
+            val bottom = 8.dp.toPx() + labelsH + (if (spec.xLabel.isNotEmpty()) lineH + 6.dp.toPx() else 4.dp.toPx())
             val ph = size.height - top - bottom
             fun x(i: Int) = left + band * (i + 0.5f)
             fun y(v: Double) = top + ph * (1 - ((v - lo) / (hi - lo)).toFloat())

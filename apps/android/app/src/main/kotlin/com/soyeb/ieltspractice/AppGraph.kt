@@ -52,6 +52,7 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
     val tts: Tts by lazy { Tts(app) }
 
     init {
+        api.onGuestLinked = { guest, account -> scope.launch { pending.reassign(guest, account) } }
         // A goal picked in onboarding before there was a session (prefs "goal:*") goes to the account once one exists,
         // then the device copy is dropped. A failed save stays queued for the next sign-in or launch.
         if (demo == null) scope.launch {

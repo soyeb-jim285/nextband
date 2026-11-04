@@ -21,13 +21,12 @@ import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -41,6 +40,7 @@ import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.Skill
 import com.soyeb.ieltspractice.design.bandTone
+import com.soyeb.ieltspractice.design.components.Meter
 import com.soyeb.ieltspractice.design.components.BandRing
 import com.soyeb.ieltspractice.design.components.Banner
 import com.soyeb.ieltspractice.design.components.BtnKind
@@ -146,18 +146,15 @@ fun AnalysingState(stage: String?, skill: Skill, modifier: Modifier = Modifier) 
         .let { if (skill == Skill.Writing) it.drop(1) else it }
     val at = steps.indexOfFirst { it.first == stage }.coerceAtLeast(0)
     val reduced = LocalReducedMotion.current
-    val pulse = if (reduced) 1f else rememberInfiniteTransition(label = "an").animateFloat(0.55f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "p").value
+    val pulse = if (reduced) null else rememberInfiniteTransition(label = "an").animateFloat(0.55f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "p")
     Column(
         modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp).semantics { liveRegion = LiveRegionMode.Polite },
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        IconTile(Icons.Rounded.AutoAwesome, NB.colors.brandText, NB.colors.brandSoft, 72.dp, Modifier.alpha(pulse))
+        IconTile(Icons.Rounded.AutoAwesome, NB.colors.brandText, NB.colors.brandSoft, 72.dp, Modifier.graphicsLayer { alpha = pulse?.value ?: 1f })
         Text("Marking your ${skill.label.lowercase()}", style = NB.type.title1, color = NB.colors.ink, textAlign = TextAlign.Center)
         Text("Usually under a minute. You can leave this screen; the result will be in History.", style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center)
-        LinearProgressIndicator(
-            progress = { (at + 1f) / steps.size }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            color = NB.colors.brand, trackColor = NB.colors.surface2,
-        )
+        Meter((at + 1).toDouble(), Modifier.padding(top = 4.dp), max = steps.size.toDouble(), height = 6.dp)
         Text(steps[at].second + "…", style = NB.type.label, color = NB.colors.brandText)
     }
 }

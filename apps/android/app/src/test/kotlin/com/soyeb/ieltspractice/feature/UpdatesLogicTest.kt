@@ -50,6 +50,18 @@ class UpdatesLogicTest {
         assertEquals(emptyList(), build(exam = "2026-12-01").map { it.kind })
     }
 
+    @Test fun stuckMarkingCountsAsFailedSoPollingStops() {
+        val rows = build(item("w3", HStatus.Analysing, at = "2026-10-03T16:30:00Z", band = null), item("w4", HStatus.Analysing, at = "2026-10-03T17:50:00Z", band = null))
+        assertEquals(listOf(UpdateKind.Marking, UpdateKind.Failed), rows.map { it.kind })
+        assertEquals(listOf("a:w4", "f:w3"), rows.map { it.key })
+    }
+
+    @Test fun examRowCarriesTheOpenMock() {
+        val rows = buildUpdates(0, "m1", emptyList(), "2026-10-10", now, utc)
+        assertEquals(listOf(UpdateKind.Mock, UpdateKind.Exam), rows.map { it.kind })
+        assertEquals("m1", rows.last().mockId)
+    }
+
     @Test fun seenRoundTripsAndStaysSmall() {
         val many = (1..60).map { "d:$it" }
         val rows = build(item("new", HStatus.Done))

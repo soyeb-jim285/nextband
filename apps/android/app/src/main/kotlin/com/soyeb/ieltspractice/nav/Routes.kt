@@ -33,11 +33,12 @@ import kotlinx.serialization.Serializable
 @Serializable data object Spelling
 
 // Writing (feature/writing)
-/** [task]: task1 | task2 | full. [variant]: academic | general (task 1). [promptId] null = random. */
+/** [task]: task1 | task2 | full. [variant]: academic | general (task 1). [promptId] null = random; a resumed full test also sets [promptId2] (Task 2). */
 @Serializable data class WritingTask(
     val task: String,
     val variant: String? = null,
     val promptId: String? = null,
+    val promptId2: String? = null,
     val mockId: String? = null,
     /** A retake: the attempt this one improves on (the result then shows what changed). */
     val parentId: String? = null,

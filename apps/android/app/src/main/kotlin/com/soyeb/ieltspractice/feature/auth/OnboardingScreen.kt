@@ -67,6 +67,7 @@ import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbChip
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.StickyActionBar
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.design.fmtBand
 import com.soyeb.ieltspractice.feature.today.daysToExam
 import com.soyeb.ieltspractice.feature.today.examChipText
@@ -149,7 +150,7 @@ fun OnboardingScreen(nav: Nav) {
         }
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.Top) { p ->
             Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 16.dp),
+                Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 when (p) {

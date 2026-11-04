@@ -10,6 +10,10 @@ import androidx.browser.customtabs.CustomTabsIntent
 fun isWebUrl(url: String): Boolean =
     runCatching { java.net.URI(url) }.getOrNull()?.let { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrEmpty() } ?: false
 
+/** The checkout URL must be PayStation's own page (sandbox or live): a bad server answer can't send the user to a look-alike payment page. */
+fun isPaymentUrl(url: String): Boolean = isWebUrl(url) &&
+    java.net.URI(url).host.lowercase().let { it == "paystation.com.bd" || it.endsWith(".paystation.com.bd") }
+
 /** Open a web page in a Custom Tab (falls back to any browser). Used for legal pages and checkout. Throws on a non-https URL. */
 fun openCustomTab(context: Context, url: String) {
     require(isWebUrl(url)) { "Refused to open a non-https page." }

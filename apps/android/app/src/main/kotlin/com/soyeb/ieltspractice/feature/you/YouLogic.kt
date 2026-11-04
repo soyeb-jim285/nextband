@@ -75,5 +75,12 @@ fun phoneOk(raw: String) = PHONE.matches(cleanPhone(raw))
 val freeFeatures = listOf("5 Writing tests a week", "10 recorded Speaking tests a month", "5 live examiner sessions a month", "Most Listening and Reading tests")
 val paidFeatures = listOf("Unlimited Writing tests", "Unlimited recorded Speaking tests", "Live examiner: 5 a day, 40 a month", "Every original Listening and Reading practice test (Cambridge tests are not part of the plan)")
 
-/** The Help & legal pages (title to path on the site). */
-val legalPages = listOf("Terms and conditions" to "/terms", "Privacy policy" to "/privacy", "Refund policy" to "/refunds", "Contact us" to "/contact", "About NextBand" to "/about")
+/** The Help & legal pages (title to path on the site). The store build ([canBuy] false) sells nothing, so no refund policy. */
+fun legalPages(canBuy: Boolean) = listOf("Terms and conditions" to "/terms", "Privacy policy" to "/privacy", "Refund policy" to "/refunds", "Contact us" to "/contact", "About NextBand" to "/about")
+    .filter { canBuy || it.second != "/refunds" }
+
+/**
+ * A site page opened from the app. The store build marks it ?app=play so the site can hide its Pricing links (Play Payments
+ * policy: no path from the app to checkout). ponytail: the site must honour the marker (apps/web LegalLayout).
+ */
+fun siteUrl(path: String, canBuy: Boolean) = SITE + path + if (canBuy) "" else "?app=play"

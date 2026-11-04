@@ -48,6 +48,7 @@ import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.design.components.Skeleton
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.components.rememberLoad
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.nav.Bank
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.SpeakingSession
@@ -101,7 +102,7 @@ fun BankScreen(nav: Nav, route: Bank) {
     PushedScreen("Prompt bank", nav::back) { pad ->
         val gutter = Modifier.padding(horizontal = NB.space.gutter)
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().readable(),
             contentPadding = PaddingValues(top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

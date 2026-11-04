@@ -47,7 +47,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -218,7 +220,10 @@ private fun Strip(durationS: Double, marks: List<Mark>, player: ResultPlayer, su
     val c = NB.colors
     val d = max(durationS, 1.0)
     Canvas(
-        Modifier.fillMaxWidth().height(44.dp).semantics { contentDescription = summary }
+        Modifier.fillMaxWidth().height(44.dp).semantics {
+            contentDescription = summary
+            customActions = marks.distinctBy { it.start }.map { m -> CustomAccessibilityAction("Play at ${clock(m.start.roundToInt())}") { onPick(m.start); true } }
+        }
             .pointerInput(marks, d) {
                 detectTapGestures { off ->
                     val w = size.width.toFloat()
@@ -343,7 +348,15 @@ private fun PaceCard(metrics: SpeechMetrics, timeline: Timeline, player: ResultP
     NbCard {
         Canvas(
             Modifier.fillMaxWidth().height(180.dp)
-                .semantics { contentDescription = "Pace over time, from about $lowest to $highest words a minute. The typical band 7 range is 120 to 170." }
+                .semantics {
+                    contentDescription = "Pace over time, from about $lowest to $highest words a minute. The typical band 7 range is 120 to 170."
+                    // The markers are tap-only on the canvas; TalkBack and switch users reach each one here.
+                    customActions = timeline.markers.map { m ->
+                        CustomAccessibilityAction("${m.type.label}: ${m.label} at ${clock(m.t.roundToInt())}") {
+                            onFocus(m.id); if (player.isLoaded) player.seek(max(0.0, m.t - 0.3)); true
+                        }
+                    }
+                }
                 .pointerInput(timeline, duration, player.isLoaded) {
                     detectTapGestures { off ->
                         val w = size.width.toFloat()

@@ -150,7 +150,7 @@ fun PushedScreen(
 }
 
 /** Tablets and unfolded foldables: keep lists to a readable column, centred, instead of running edge to edge. */
-private fun Modifier.readable() = wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth()
+fun Modifier.readable() = wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth()
 
 /** Standard scrolling body for a [PushedScreen]. */
 @Composable
@@ -176,7 +176,7 @@ fun StickyActionBar(modifier: Modifier = Modifier, ime: Boolean = true, content:
         Column {
             HorizontalDivider(color = NB.colors.line)
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().let { if (ime) it.imePadding() else it }
+                Modifier.fillMaxWidth().readable().navigationBarsPadding().let { if (ime) it.imePadding() else it }
                     .padding(horizontal = NB.space.gutter, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp), content = content,
             )

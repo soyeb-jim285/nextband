@@ -254,4 +254,15 @@ class CommunityTest {
         assertTrue(DemoCommunity.guest("gate-quota-guest"))
         assertFalse(DemoCommunity.anonymousSession("gate-quota-guest"))
     }
+
+    @Test fun storeNoteOnlyForAFreeAccountOutOfTestsInThePlayBuild() {
+        assertEquals(GateText.storeUpgrade(""), GateText.storeNote(Codes.QUOTA, "community", canBuy = false))
+        assertTrue(GateText.storeNote(Codes.QUOTA, "community", canBuy = false, email = "a@b.co")!!.contains("with a@b.co"))
+        assertTrue(GateText.storeUpgrade("").contains("the same account"))
+        assertNull(GateText.storeNote(Codes.QUOTA, "community", canBuy = true))
+        assertNull(GateText.storeNote(Codes.QUOTA, "guest", canBuy = false))
+        assertNull(GateText.storeNote(Codes.QUOTA, "subscriber", canBuy = false))
+        assertNull(GateText.storeNote(Codes.BUSY, "community", canBuy = false))
+        assertFalse(GateText.storeUpgrade("a@b.co").contains("http"))
+    }
 }
