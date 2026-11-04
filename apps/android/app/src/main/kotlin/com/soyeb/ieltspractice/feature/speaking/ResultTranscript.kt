@@ -206,6 +206,10 @@ fun TranscriptPanel(
                             toks.flatMap { it.marks }.forEach { m ->
                                 add(CustomAccessibilityAction("Hear ${m.detail}") { markDetail = m.detail; player.seek(max(0.0, m.time - 0.3)); true })
                             }
+                            // The same pauses the chips show: long ones always, every one under the Pauses filter.
+                            toks.mapNotNull { it.pauseAfter }.filter { isLongPause(it) || filter == TrFilter.Pauses }.forEach { p ->
+                                add(CustomAccessibilityAction("Hear ${if (isLongPause(p)) "long pause" else "pause"}, ${pauseSec(p)} seconds") { player.seek(max(0.0, p.start - 0.3)); true })
+                            }
                         }
                     },
                     horizontalArrangement = Arrangement.spacedBy(4.dp, androidx.compose.ui.Alignment.Start), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically,

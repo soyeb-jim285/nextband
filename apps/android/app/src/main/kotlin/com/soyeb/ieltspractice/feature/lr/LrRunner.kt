@@ -79,6 +79,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -315,7 +316,7 @@ private fun RunnerBody(
     // attach is a no-op once the player exists; LrRunHolder.onCleared releases it when the run's screen goes.
     LaunchedEffect(playlist) { if (examListening) playlist.attach(context) }
     LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.tick { session.elapsed = it } }
-    LaunchedEffect(playlist) { if (examListening && !isDemo) playlist.loadDurations() }
+    LaunchedEffect(playlist, playlist.loadTries) { if (examListening && !isDemo) playlist.loadDurations() }
     // Wall clock, so pausing it in the background loses nothing: the first tick back catches up.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(examListening) {
@@ -791,7 +792,8 @@ private fun PhoneReading(
                         )
                         Icon(if (expanded) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.KeyboardArrowUp, null, tint = c.muted)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Expanded, the list below already starts with this question; the preview only serves the peek.
+                    if (!expanded) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         QNum(cur.n, ctx.value(cur.n).isNotBlank(), cur.n in flagged)
                         Text(
                             questionPrompt(cur.group, cur.q), style = NB.type.bodySmall, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -883,10 +885,10 @@ private fun SettingsSheet(s: LrSettings, onChange: (LrSettings) -> Unit, onDismi
     val schemes = listOf("std" to "Standard", "bw" to "Black on white", "cream" to "Black on cream", "yb" to "Yellow on black")
     NbSheet(onDismiss, title = "Text size and colours", subtitle = "Applies to the questions and passage, not the timer.") {
         Text("Text size", style = NB.type.title3, color = NB.colors.ink, modifier = Modifier.semantics { heading() })
-        Segmented(listOf("Standard", "Large", "Extra large"), sizes.indexOf(s.size).coerceAtLeast(0), { onChange(s.copy(size = sizes[it])) })
+        Segmented(listOf("Standard", "Large", "Extra large"), sizes.indexOf(s.size).coerceAtLeast(0), { onChange(s.copy(size = sizes[it])) }, role = androidx.compose.ui.semantics.Role.RadioButton)
         Text("Colours", style = NB.type.title3, color = NB.colors.ink, modifier = Modifier.semantics { heading() })
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            schemes.forEach { (k, label) -> NbChip(label, s.scheme == k, { onChange(s.copy(scheme = k)) }) }
+        FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            schemes.forEach { (k, label) -> NbChip(label, s.scheme == k, { onChange(s.copy(scheme = k)) }, role = androidx.compose.ui.semantics.Role.RadioButton) }
         }
         NbButton("Reset to default", { onChange(LrSettings()) }, kind = BtnKind.Text, enabled = s != LrSettings())
     }

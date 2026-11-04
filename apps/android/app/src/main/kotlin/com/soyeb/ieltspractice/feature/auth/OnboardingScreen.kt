@@ -132,6 +132,7 @@ fun OnboardingScreen(nav: Nav) {
                 }
             }
             prefs.setOnboardingDone()
+            me?.user?.id?.let { prefs.setString(onboardedKey(it), "1") }
             nav.reset(TodayTab)
         }
     }
@@ -230,8 +231,8 @@ private fun BandPage(band: Double, onChange: (Double) -> Unit) {
             NbIconButton(Icons.Rounded.Remove, "Lower target band", { onChange((band - 0.5).coerceAtLeast(targetBands.first())) }, tonal = true, enabled = band > targetBands.first())
             NbIconButton(Icons.Rounded.Add, "Raise target band", { onChange((band + 0.5).coerceAtMost(targetBands.last())) }, tonal = true, enabled = band < targetBands.last())
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(6.0, 6.5, 7.0, 7.5, 8.0).forEach { b -> NbChip(fmtBand(b), selected = b == band, onClick = { onChange(b) }) }
+        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(6.0, 6.5, 7.0, 7.5, 8.0).forEach { b -> NbChip(fmtBand(b), selected = b == band, onClick = { onChange(b) }, role = androidx.compose.ui.semantics.Role.RadioButton) }
         }
     }
 }

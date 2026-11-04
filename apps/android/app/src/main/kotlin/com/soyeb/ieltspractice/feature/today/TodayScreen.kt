@@ -484,10 +484,10 @@ private fun GuestToday(nav: Nav) {
                 Spacer(Modifier.height(18.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Rounded.WorkspacePremium, null, Modifier.size(18.dp), tint = ink.fg)
-                    Text("Full mock · 2 h 45 m", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = ink.fg)
+                    Text("Full mock · 2 h 45 m · free account", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = ink.fg)
                 }
                 Spacer(Modifier.height(18.dp))
-                NbButton("Start full mock", { nav.go(MockStart) }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
+                NbButton("Start full mock", { nav.requireAccount("Create a free account to take a full mock") { nav.go(MockStart) } }, kind = BtnKind.Inverse, fill = true, size = com.soyeb.ieltspractice.design.components.BtnSize.Large, haptic = true)
             }
         }
         item {

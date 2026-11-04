@@ -96,6 +96,12 @@ class CommunityTest {
         assertEquals("It resets in 6 h. Your essay is still here.", community.body)
         assertNull(community.primary)
         assertEquals("Wait for the reset" to GateAction.Close, community.secondary)
+        // The web channel sells: a free account out of tests may go to the plans. Guests and paid tiers don't; nor does Play.
+        val webCommunity = GateText.copy(Codes.QUOTA, "writing", "community", day, canBuy = true, now = now, zone = dhaka)
+        assertEquals("See Pro plans" to GateAction.Plan, webCommunity.primary)
+        assertEquals("Create a free account for more" to GateAction.Account, GateText.copy(Codes.QUOTA, "speaking", "guest", week, canBuy = true, now = now, zone = dhaka).primary)
+        assertNull(GateText.copy(Codes.QUOTA, "writing", "subscriber", day, canBuy = true, now = now, zone = dhaka).primary)
+        assertNull(GateText.copy(Codes.BUSY, "writing", "community", null, canBuy = true).primary)
         val paused = GateText.copy(Codes.BALANCE, "speaking", "community", null)
         assertEquals("Scoring is paused for now", paused.title)
         assertEquals("Scoring is paused for a short while. Please try again later.", paused.body)

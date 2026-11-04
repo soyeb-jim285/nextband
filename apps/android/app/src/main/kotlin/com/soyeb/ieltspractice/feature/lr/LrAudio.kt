@@ -329,7 +329,7 @@ class ExamPlaylist(
             }
         }
         if (durations != null) return
-        if (ds.all { it != null && it > 0 }) durations = ds.map { it!! / 1000.0 } else error = true
+        if (ds.all { it != null && it > 0 }) { durations = ds.map { it!! / 1000.0 }; error = false } else error = true
     }
 
     fun start() {
@@ -353,6 +353,13 @@ class ExamPlaylist(
     /** The stream failed mid-exam (a network drop): prepare again where it stopped. The clock reads the player, so it resumes there too. */
     fun retry() { error = false; stalled = false; exo?.apply { prepare(); playWhenReady = true } }
 
+    /** Bumped by [retryLoad]; LrRunner reruns [loadDurations] when it changes. */
+    var loadTries by mutableIntStateOf(0)
+        private set
+
+    /** Start gate: read the lengths again and re-prepare the player, without starting playback. */
+    fun retryLoad() { error = false; exo?.prepare(); loadTries++ }
+
     /** Keeps [elapsed] current (4 times a second) until the screen leaves; [onElapsed] gets each new value. */
     suspend fun tick(onElapsed: (Double) -> Unit = {}) {
         while (true) {
@@ -363,7 +370,7 @@ class ExamPlaylist(
                 else if (phase == ExamPhase.Review) elapsed = total + (System.currentTimeMillis() - reviewStart) / 1000.0
                 if (phase != ExamPhase.Idle) onElapsed(elapsed)
             }
-            delay(250)
+            delay(if (phase == ExamPhase.Review) 1000 else 250) // Review counts whole seconds on the wall clock; no need to wake 4x/s
         }
     }
 
@@ -415,9 +422,13 @@ fun ExamGate(p: ExamPlaylist, resumed: Boolean, onBack: () -> Unit, parts: List<
             style = NB.type.body, color = c.ink,
         )
         Text("Check your volume first. Headphones help.", style = NB.type.bodySmall, color = c.muted)
-        if (p.error) Text("The recording could not be loaded. Check your connection and reopen the test.", style = NB.type.bodySmall, color = c.badText)
+        // A stalled read never fails on its own (MediaMetadataRetriever has no timeout): offer Retry after 20 s too.
+        var slow by remember(p.loadTries) { mutableStateOf(false) }
+        LaunchedEffect(p.loadTries) { delay(20_000); slow = true }
+        if (p.error) Text("The recording could not be loaded. Check your connection and try again.", style = NB.type.bodySmall, color = c.badText)
         NbButton(if (resumed) "Resume test" else "Start test", p::start, size = BtnSize.Large, fill = true, enabled = p.durations != null && !p.error, haptic = true)
-        if (p.durations == null && !p.error) Text("Loading the recording…", style = NB.type.caption, color = c.muted)
+        if (p.durations == null && !p.error) Text(if (slow) "Still loading the recording. Check your connection." else "Loading the recording…", style = NB.type.caption, color = c.muted)
+        if (p.error || (slow && p.durations == null)) NbButton("Retry", p::retryLoad, kind = BtnKind.Secondary, fill = true)
         NbButton("Back", onBack, kind = BtnKind.Text, fill = true)
     }
 }

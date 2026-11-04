@@ -23,10 +23,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -180,6 +182,8 @@ fun MarkerGlyph(type: MarkerType, glyphSize: Dp = 10.dp, modifier: Modifier = Mo
 @Composable
 fun ResultAudioBar(player: ResultPlayer, timeline: Timeline, modifier: Modifier = Modifier) {
     val c = NB.colors
+    // currentTime changes 25x/s; the bar only needs whole seconds (the Scrubber reads currentTime in its own scope).
+    val sec by remember(player) { derivedStateOf { player.currentTime.roundToInt() } }
     Surface(color = c.surface, contentColor = c.ink, modifier = modifier.fillMaxWidth()) {
         Column {
             HorizontalDivider(color = c.line)
@@ -195,7 +199,7 @@ fun ResultAudioBar(player: ResultPlayer, timeline: Timeline, modifier: Modifier 
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Scrubber(player, timeline)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(clock(player.currentTime.roundToInt()), style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
+                        Text(clock(sec), style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
                         Text(clock(player.duration.roundToInt()), style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.muted)
                     }
                 }

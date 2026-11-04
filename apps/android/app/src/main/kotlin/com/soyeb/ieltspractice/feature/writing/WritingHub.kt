@@ -148,7 +148,7 @@ fun WritingHub(nav: Nav) {
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                Segmented(listOf("Academic", "General"), if (variant == "general") 1 else 0, { picked = if (it == 1) "general" else "academic" })
+                Segmented(listOf("Academic", "General"), if (variant == "general") 1 else 0, { picked = if (it == 1) "general" else "academic" }, role = androidx.compose.ui.semantics.Role.RadioButton)
                 Spacer(Modifier.height(16.dp))
                 NbButton(
                     "Start full test", { nav.startTest("writing") { nav.go(WritingTask("full", variant)) } },

@@ -109,7 +109,9 @@ fun CoachScreen(nav: Nav) {
         "Study plan", nav::back,
         bottomBar = {
             if (account && coach != null && !coach.ready) StickyActionBar {
-                NbButton("Take a full mock", { nav.go(MockStart) }, fill = true, size = BtnSize.Large)
+                // A short test first: any mix of tests unlocks the coach, a full mock is the heaviest way there.
+                NbButton("Take a Listening test", { nav.openTab(Tab.Listening) }, fill = true, size = BtnSize.Large)
+                NbButton("Take a full mock", { nav.go(MockStart) }, kind = BtnKind.Text, fill = true)
             }
         },
     ) { pad ->

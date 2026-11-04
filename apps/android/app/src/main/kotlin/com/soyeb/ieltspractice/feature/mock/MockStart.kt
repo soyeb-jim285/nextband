@@ -184,7 +184,7 @@ fun MockStartScreen(nav: Nav) {
                 item {
                     Segmented(listOf("Academic", "General Training"), if (variant == "general") 1 else 0, { i ->
                         scope.launch { g.prefs.setMockVariant(if (i == 1) "general" else "academic") }
-                    })
+                    }, role = androidx.compose.ui.semantics.Role.RadioButton)
                 }
 
                 item { SectionHeader("Questions from") }
@@ -295,7 +295,7 @@ private fun SourceBlock(
             return@Column
         }
         if (canOwn && cams.isNotEmpty()) {
-            Segmented(listOf("NextBand originals", "Cambridge test"), if (source == "cambridge") 1 else 0, { onSource(if (it == 1) "cambridge" else "generated") })
+            Segmented(listOf("NextBand originals", "Cambridge test"), if (source == "cambridge") 1 else 0, { onSource(if (it == 1) "cambridge" else "generated") }, role = androidx.compose.ui.semantics.Role.RadioButton)
         }
         if (source == "cambridge" && ref != null) {
             NbCard(padding = PaddingValues(0.dp)) {

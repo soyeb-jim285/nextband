@@ -60,6 +60,7 @@ import com.soyeb.ieltspractice.design.components.RowDivider
 import com.soyeb.ieltspractice.design.components.RowGroup
 import com.soyeb.ieltspractice.design.components.SectionHeader
 import com.soyeb.ieltspractice.design.components.Segmented
+import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Welcome
 import com.soyeb.ieltspractice.data.currentUserId
@@ -125,7 +126,7 @@ fun SettingsScreen(nav: Nav) {
         PushedList(pad) {
             item {
                 Block("Appearance") {
-                    Segmented(listOf("System", "Light", "Dark"), appearances.indexOf(appearance).coerceAtLeast(0), { i -> scope.launch { prefs.setAppearance(appearances[i]) } })
+                    Segmented(listOf("System", "Light", "Dark"), appearances.indexOf(appearance).coerceAtLeast(0), { i -> scope.launch { prefs.setAppearance(appearances[i]) } }, role = androidx.compose.ui.semantics.Role.RadioButton)
                 }
             }
             if (hasAccount && s != null) {
@@ -143,7 +144,7 @@ fun SettingsScreen(nav: Nav) {
             }
             if (me?.cambridgeAccess == true) item {
                 Block("Speaking questions") {
-                    Segmented(listOf("Mixed", "Cambridge", "Ours"), sources.indexOf(source).coerceAtLeast(0), { i -> scope.launch { prefs.setSpeakingSource(sources[i]) } })
+                    Segmented(listOf("Mixed", "Cambridge", "Ours"), sources.indexOf(source).coerceAtLeast(0), { i -> scope.launch { prefs.setSpeakingSource(sources[i]) } }, role = androidx.compose.ui.semantics.Role.RadioButton)
                     Text("Where random Speaking tests draw their questions from.", style = NB.type.caption, color = NB.colors.muted, modifier = Modifier.padding(horizontal = 4.dp))
                 }
             }
@@ -184,6 +185,8 @@ fun SettingsScreen(nav: Nav) {
 
     if (deleting) DeleteSheet(
         onDismiss = { deleting = false },
+        // Forgot it: reset by email code, then come back here (Close on the sign-in step returns to Settings).
+        onForgot = { deleting = false; nav.go(Auth("forgot", email = me?.user?.email?.ifEmpty { null })) },
         onDelete = { password ->
             deleteEverything(password).also { if (it == null) { deleting = false; nav.reset(Welcome) } }
         },
@@ -257,7 +260,7 @@ private fun ReadingSize(saved: Float, onSave: (Float) -> Unit) {
 
 /** Confirms with the account password (Better Auth delete-user). [onDelete] returns an error message, or null when it worked. */
 @Composable
-private fun DeleteSheet(onDismiss: () -> Unit, onDelete: suspend (String) -> String?) {
+private fun DeleteSheet(onDismiss: () -> Unit, onForgot: () -> Unit, onDelete: suspend (String) -> String?) {
     var password by remember { mutableStateOf("") }
     var show by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -291,5 +294,6 @@ private fun DeleteSheet(onDismiss: () -> Unit, onDelete: suspend (String) -> Str
                 NbIconButton(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Hide password" else "Show password", { show = !show })
             },
         )
+        NbButton("Forgot password?", onForgot, kind = BtnKind.Text, size = BtnSize.Small, enabled = !busy)
     }
 }

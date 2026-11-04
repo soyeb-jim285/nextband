@@ -58,8 +58,12 @@ class UpdatesLogicTest {
 
     @Test fun examRowCarriesTheOpenMock() {
         val rows = buildUpdates(0, "m1", emptyList(), "2026-10-10", now, utc)
-        assertEquals(listOf(UpdateKind.Mock, UpdateKind.Exam), rows.map { it.kind })
+        // 7 days out the Exam row opens the mock, so there is no separate Mock row.
+        assertEquals(listOf(UpdateKind.Exam), rows.map { it.kind })
         assertEquals("m1", rows.last().mockId)
+        // Exam tomorrow opens drill cards, so the mock keeps its own row; no exam date keeps it too.
+        assertEquals(listOf(UpdateKind.Mock, UpdateKind.Exam), buildUpdates(0, "m1", emptyList(), "2026-10-04", now, utc).map { it.kind })
+        assertEquals(listOf(UpdateKind.Mock), buildUpdates(0, "m1", emptyList(), null, now, utc).map { it.kind })
     }
 
     @Test fun seenRoundTripsAndStaysSmall() {

@@ -603,7 +603,7 @@ fun QuestionGroup(g: LrGroup, ctx: QCtx, modifier: Modifier = Modifier) {
                             Segmented(
                                 keys.map(::trioLabel), keys.indexOfFirst { it.equals(ctx.value(q.n), true) },
                                 { idx -> ctx.set(q.n, keys[idx]); ctx.onFocus(q.n) },
-                                Modifier.semantics { contentDescription = "Question ${q.n}" },
+                                strong = true, describe = { "$it, question ${q.n}" },
                             )
                         }
                     }

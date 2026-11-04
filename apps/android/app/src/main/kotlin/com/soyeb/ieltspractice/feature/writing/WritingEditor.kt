@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -202,7 +203,8 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     val snack = remember { androidx.compose.material3.SnackbarHostState() } // own host: the root one sits under the keyboard
     val me by api.me.collectAsState()
     val blockPaste = me?.settings?.blockPaste ?: true
-    val autoSubmit = me?.settings?.writingAutoSubmit ?: false
+    // Server and web default to on; rememberUpdatedState so the time-up handler sees a /api/me that loads or changes later.
+    val autoSubmit by rememberUpdatedState(me?.settings?.writingAutoSubmit ?: true)
     val prompts = session.prompts
     val multi = prompts.size > 1
     val total = examSeconds(prompts)
@@ -472,7 +474,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
     }
 }
 
-/** The bar that rides above the keyboard: words against the goal with a thin meter, the clock, Plan (Task 2) and Submit. */
+/** The bar that rides above the keyboard: words against the goal with a thin meter, overtime if any, Plan (Task 2) and Submit. */
 @Composable
 private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean, onPlan: () -> Unit, onSubmit: () -> Unit, submitting: Boolean, compact: Boolean = false) {
     val c = NB.colors
@@ -499,13 +501,13 @@ private fun AccessoryBar(words: Int, need: Int, left: State<Int>, plan: Boolean,
                             "$words / $need words", Modifier.weight(1f, fill = false),
                             style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = if (reached) c.goodText else c.ink, maxLines = 2,
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Rounded.Timer, null, Modifier.width(14.dp).height(14.dp), tint = c.muted)
-                        Spacer(Modifier.width(2.dp))
-                        Text(
-                            if (l < 0) "+${clock(-l)}" else clock(l),
-                            style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = if (l <= 60) c.badText else if (l <= 300) c.warnText else c.muted, maxLines = 1,
-                        )
+                        // The top bar's TimerPill owns the countdown; this only shows overtime, which the pill (stopped at 0:00) cannot.
+                        if (l < 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Icon(Icons.Rounded.Timer, null, Modifier.width(14.dp).height(14.dp), tint = c.muted)
+                            Spacer(Modifier.width(2.dp))
+                            Text("+${clock(-l)}", style = NB.type.caption.copy(fontFeatureSettings = "tnum"), color = c.badText, maxLines = 1)
+                        }
                     }
                     Meter(words.toDouble(), max = need.toDouble(), color = if (reached) c.good else c.brand, height = 4.dp)
                 }

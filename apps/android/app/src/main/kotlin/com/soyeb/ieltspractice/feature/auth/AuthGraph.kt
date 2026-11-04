@@ -12,7 +12,7 @@ fun NavGraphBuilder.authGraph(nav: Nav) {
     composable<Welcome> { WelcomeScreen(nav) }
     composable<Auth> { entry ->
         val r = entry.toRoute<Auth>()
-        AuthScreen(nav, r.mode, r.reason)
+        AuthScreen(nav, r.mode, r.reason, r.email)
     }
     composable<Onboarding> { OnboardingScreen(nav) }
 }

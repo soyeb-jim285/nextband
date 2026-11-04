@@ -14,18 +14,21 @@ import java.util.Locale
  */
 class Tts(context: Context) {
     private val app = context.applicationContext
-    private val ready = CompletableDeferred<Boolean>()
+    @Volatile private var ready = CompletableDeferred<Boolean>()
     @Volatile private var engine: TextToSpeech? = null
     @Volatile private var ok = false
     @Volatile private var pending: Pair<String, String>? = null
 
     private fun start(): TextToSpeech = engine ?: synchronized(this) {
-        engine ?: TextToSpeech(app) { status ->
-            ok = status == TextToSpeech.SUCCESS
-            ready.complete(ok)
-            pending?.let { (text, accent) -> engine?.let { say(it, text, accent) } }
-            pending = null
-        }.also { engine = it }
+        engine ?: run {
+            val r = CompletableDeferred<Boolean>().also { ready = it } // a fresh one per engine: start() after shutdown() waits again
+            TextToSpeech(app) { status ->
+                ok = status == TextToSpeech.SUCCESS
+                r.complete(ok)
+                pending?.let { (text, accent) -> engine?.let { say(it, text, accent) } }
+                pending = null
+            }.also { engine = it }
+        }
     }
 
     /** The engine started and failed: no voice on this device, [speak] says nothing. */

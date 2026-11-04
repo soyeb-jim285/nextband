@@ -77,13 +77,14 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
         // A screenshot test must go idle, so demo mode fetches once instead of polling. A hidden app polls nothing (the next poll runs on
         // return), and the interval backs off so a stuck analysis doesn't keep the radio busy.
         var wait = 2500L
-        while (demo == null && error == null && ids.any { attempts[it]?.finished != true }) {
+        // "recording" (a speaking upload that never finished) never moves on by itself, so it stops the polling too.
+        while (demo == null && error == null && ids.any { attempts[it]?.let { a -> !a.finished && a.status != "recording" } != false }) {
             delay(wait)
             lifecycle.awaitStarted()
             wait = nextPollMs(wait)
             for (id in ids) {
                 val cur = attempts[id] ?: continue
-                if (cur.finished) continue
+                if (cur.finished || cur.status == "recording") continue
                 try {
                     val st = api.attemptStatus(id)
                     if (st.status == "done" || st.status == "failed") attempts[id] = api.attempt(id)
@@ -99,16 +100,23 @@ fun AttemptResultScreen(ids: List<String>, nav: Nav) {
 
     fun retry(failed: List<Attempt>) {
         scope.launch {
-            try {
-                failed.forEach { api.submitAttempt(it.id) }
-                failed.forEach { attempts[it.id] = it.copy(status = "analyzing", stage = null, error = null) }
-                round++
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Retrying costs nothing again, unless the allowance was used elsewhere meanwhile: say so, the answer stays.
-                if (!(e is ApiError && nav.reportBlocked(e, failed.first().skill))) snack.showSnackbar(e.message ?: "Couldn't try again.")
+            // Each part on its own: one that went through is analysing even if another failed, so it polls and isn't resent.
+            var err: Exception? = null
+            var sent = false
+            for (a in failed) {
+                try {
+                    api.submitAttempt(a.id)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (!(e is ApiError && e.status == 409)) { err = e; continue } // 409: already analysing from an earlier try
+                }
+                attempts[a.id] = a.copy(status = "analyzing", stage = null, error = null)
+                sent = true
             }
+            if (sent) round++
+            // Retrying costs nothing again, unless the allowance was used elsewhere meanwhile: say so, the answer stays.
+            err?.let { e -> if (!(e is ApiError && nav.reportBlocked(e, failed.first().skill))) snack.showSnackbar(e.message ?: "Couldn't try again.") }
         }
     }
 

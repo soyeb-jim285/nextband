@@ -21,6 +21,10 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
@@ -35,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NbMotion
 import com.soyeb.ieltspractice.design.pressScale
+import com.soyeb.ieltspractice.design.components.readable
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -95,13 +100,18 @@ fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, todayBadge: Int = 0) {
     val accent by animateColorAsState(current.skill?.color ?: c.brand, tween(NbMotion.SLOW, easing = NbMotion.EaseOut), label = "barAccent")
     Column(Modifier.fillMaxWidth().background(c.surface).windowInsetsPadding(WindowInsets.navigationBars)) {
         HorizontalDivider(color = c.line)
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Tablets: the five tabs keep to a centred 560dp strip instead of spreading ~256dp apart.
+        BoxWithConstraints(Modifier.readable(560.dp)) {
             val w = maxWidth / Tab.entries.size
             val x by animateDpAsState(w * index, if (reduced) tween(0) else tween(NbMotion.SLOW, easing = NbMotion.EaseOut), label = "barRule")
             // Grows with large text instead of clipping (DESIGN.md: no fixed heights on text containers).
+            // At 150%+ text only the selected tab keeps its label, so it can stay readable instead of five labels shrinking
+            // to fit. Hidden labels move into each tab's contentDescription.
+            val bigText = LocalDensity.current.fontScale >= 1.5f
             Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).height(IntrinsicSize.Min).selectableGroup()) {
                 Tab.entries.forEach { tab ->
                     val selected = tab == current
+                    val showLabel = selected || !bigText
                     val src = remember { MutableInteractionSource() }
                     val tint by animateColorAsState(if (selected) tab.skill?.color ?: c.brand else c.muted, tween(NbMotion.BASE, easing = NbMotion.EaseOut), label = "barIcon")
                     Column(
@@ -110,23 +120,36 @@ fun BottomBar(current: Tab, onSelect: (Tab) -> Unit, todayBadge: Int = 0) {
                                 if (!selected) hf.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSelect(tab)
                             }
-                            .semantics { if (tab == Tab.Today && todayBadge > 0) contentDescription = "Today, $todayBadge review cards due" },
+                            .semantics {
+                                if (tab == Tab.Today && todayBadge > 0) contentDescription = "Today, $todayBadge review cards due"
+                                else if (!showLabel) contentDescription = tab.label
+                            },
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Box(Modifier.pressScale(src, 0.88f)) {
+                        // Top padding keeps the Today badge clear of the 3dp accent rule at large font scales.
+                        Box(Modifier.padding(top = 6.dp).pressScale(src, 0.88f)) {
                             val ic: @Composable () -> Unit = { Icon(if (selected) tab.selectedIcon else tab.icon, null, Modifier.size(24.dp), tint = tint) }
                             if (tab == Tab.Today && todayBadge > 0) BadgedBox(badge = {
-                                Badge(containerColor = c.bad, contentColor = c.onBad) { Text(if (todayBadge > 99) "99+" else "$todayBadge") }
+                                // Badge text ignores font scale so the dot stays about 16dp; the count is also in the tab's contentDescription.
+                                val d = LocalDensity.current
+                                CompositionLocalProvider(LocalDensity provides Density(d.density, 1f)) {
+                                    Badge(containerColor = c.bad, contentColor = c.onBad) { Text(if (todayBadge > 99) "99+" else "$todayBadge") }
+                                }
                             }) { ic() } else ic()
                         }
+                        if (showLabel) {
                         Spacer(Modifier.height(4.dp))
-                        // One line that shrinks to fit a narrow tab at large font scales, never cut mid-word.
+                        // One line that shrinks to fit a narrow tab at large font scales, never cut mid-word. minFontSize is
+                        // scaled by fontScale too, so 8sp is already 16 at 200%; a higher floor would clip "Listening" in a 1/5 cell.
                         BasicText(
                             tab.label, maxLines = 1,
                             style = NB.type.caption.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) c.ink else c.muted),
                             autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = NB.type.caption.fontSize),
+                            // Side padding keeps a gap between neighbouring labels when they shrink to fill the cell.
+                            modifier = Modifier.padding(horizontal = 4.dp),
                         )
+                        }
                     }
                 }
             }

@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 
 // Auth & onboarding (feature/auth)
 @Serializable data object Welcome
-/** [mode]: signin | signup | verify | forgot | reset. [reason]: why the user was sent here ("Sign in to keep your results"). */
-@Serializable data class Auth(val mode: String = "signin", val reason: String? = null)
+/** [mode]: signin | signup | verify | forgot | reset. [reason]: why the user was sent here ("Sign in to keep your results"). [email] prefills the address. */
+@Serializable data class Auth(val mode: String = "signin", val reason: String? = null, val email: String? = null)
 @Serializable data object Onboarding
 
 // You (feature/you)

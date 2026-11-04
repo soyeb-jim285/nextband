@@ -1,6 +1,7 @@
 package com.soyeb.ieltspractice
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.soyeb.ieltspractice.data.KeystoreTokenStore
@@ -12,11 +13,12 @@ import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.demo.DemoFixtures
 import com.soyeb.ieltspractice.data.demo.DemoInterceptor
 import com.soyeb.ieltspractice.data.net.Api
+import com.soyeb.ieltspractice.media.MediaCache
 import com.soyeb.ieltspractice.media.Tts
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.io.File
@@ -29,7 +31,8 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
     val app: Context = context.applicationContext
 
     /** Outlives every screen: uploads, sign-out cleanup, gate checks. */
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // A failed fire-and-forget write (disk full, DataStore IOException) is logged, never a process crash.
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> Log.w("NextBand", "background task failed", e) })
 
     val api: Api = if (demo == null) Api(store = KeystoreTokenStore(app), scope = scope) else {
         DemoCommunity.pinClock()
@@ -54,7 +57,12 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
 
     init {
         api.onGuestLinked = { guest, account -> scope.launch { pending.reassign(guest, account) } }
-        if (demo == null) scope.launch { api.signedIn.drop(1).filter { !it }.collect { pending.dropUnowned() } }
+        // ponytail: after a 401 the next account to sign in here claims unowned recordings; persist the last account id if that matters.
+        if (demo == null) api.onSignedOut = { expired ->
+            // Cached audio includes this account's own recordings: gone on every sign-out (and account delete, which signs out).
+            scope.launch(Dispatchers.IO) { MediaCache.clear(app) }
+            if (!expired) scope.launch { pending.dropUnowned() }
+        }
         // A goal picked in onboarding before there was a session (prefs "goal:*") goes to the account once one exists,
         // then the device copy is dropped. A failed save stays queued for the next sign-in or launch.
         if (demo == null) scope.launch {

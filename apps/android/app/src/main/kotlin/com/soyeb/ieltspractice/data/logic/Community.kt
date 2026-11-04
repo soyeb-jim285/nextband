@@ -98,7 +98,7 @@ object FairUse {
 
 // MARK: The limit panels
 
-enum class GateAction { Account, Close }
+enum class GateAction { Account, Plan, Close }
 
 /** The text and buttons of a "you can't start this test" panel. [primary] is the one teal button. */
 data class GateCopy(val title: String, val body: String, val primary: Pair<String, GateAction>?, val secondary: Pair<String, GateAction>)
@@ -108,9 +108,10 @@ object GateText {
      * The same titles and bodies as the web and iOS (docs/community.md, panel copy). [code] is the server's code, [tier] guest/community/subscriber/unlimited.
      * [keep] is a note for a test that was already under way ("Your essay is still here.").
      * [skill] is kept for the callers; the copy no longer names it.
+     * [canBuy] (web channel only): a free account out of tests gets "See Pro plans". The Play build never links to a plan.
      */
     @Suppress("UNUSED_PARAMETER")
-    fun copy(code: String, skill: String, tier: String, resetAt: String?, keep: String? = null,
+    fun copy(code: String, skill: String, tier: String, resetAt: String?, keep: String? = null, canBuy: Boolean = false,
              now: Instant = Clocks.now(), zone: ZoneId = Clocks.zone()): GateCopy {
         val guest = tier == "guest"
         fun withKeep(s: String) = if (keep == null) s else "$s $keep"
@@ -119,7 +120,11 @@ object GateText {
             Codes.QUOTA -> GateCopy(
                 if (guest) "You've used your free tests for now" else "You've used all your tests for now",
                 withKeep("It resets ${whenText ?: "soon"}."),
-                if (guest) "Create a free account for more" to GateAction.Account else null,
+                when {
+                    guest -> "Create a free account for more" to GateAction.Account
+                    canBuy && tier == "community" -> "See Pro plans" to GateAction.Plan
+                    else -> null
+                },
                 (if (guest) "Not now" else "Wait for the reset") to GateAction.Close,
             )
             Codes.BALANCE -> GateCopy(
@@ -169,10 +174,12 @@ sealed interface Gate {
     /** A test can't start (or finish) now. [keep] says what was kept ("Your essay is still here."). */
     data class Blocked(
         val code: String, val skill: String, val tier: String, val resetAt: String?, val keep: String? = null,
+        /** Starts the blocked test again; run after a guest signs up from the sheet. */
+        val retry: (() -> Unit)? = null,
     ) : Gate
 
     /** The fair-use dialog for the free tiers. [onStart] continues into the test. */
-    data class FairUse(val skill: String, val quota: Quota, val guest: Boolean, val onStart: () -> Unit) : Gate
+    data class FairUse(val skill: String, val quota: Quota, val guest: Boolean, val retry: (() -> Unit)? = null, val onStart: () -> Unit) : Gate
 
     /** Anything else worth a sentence (offline while checking, a guest session that couldn't start). */
     data class Message(val title: String, val body: String) : Gate

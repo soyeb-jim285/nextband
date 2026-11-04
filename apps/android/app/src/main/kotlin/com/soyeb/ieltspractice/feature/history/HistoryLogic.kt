@@ -43,7 +43,9 @@ fun AttemptListItem.toItem() = HistoryItem(
 )
 
 fun LrAttemptItem.toItem() = HistoryItem(
-    id = id, skill = Skill.of(skill) ?: Skill.Listening, title = title, detail = partsLabel(skill, parts),
+    id = id, skill = Skill.of(skill) ?: Skill.Listening, title = title,
+    // ponytail: a submitted whole-test attempt with no band is a question-type drill started on the web (server noBand); the list carries no types yet.
+    detail = if (status == "submitted" && parts == null && band == null) "Practice" else partsLabel(skill, parts),
     at = submittedAt ?: startedAt, durationMs = null,
     status = if (status == "submitted") HStatus.Done else HStatus.Open, band = band, lr = true,
 )

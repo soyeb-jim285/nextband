@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.soyeb.ieltspractice.R
@@ -21,10 +22,13 @@ val Newsreader = variable(R.font.newsreader, 400, 500, 600)
 private fun sans(size: Int, line: Int, weight: Int = 400, tracking: Double = 0.0, tnum: Boolean = false) = TextStyle(
     fontFamily = Hanken, fontWeight = FontWeight(weight), fontSize = size.sp, lineHeight = line.sp, letterSpacing = tracking.em,
     fontFeatureSettings = if (tnum) "tnum, lnum" else null,
+    // All copy is English: in an RTL locale each paragraph still runs LTR, so "fur." never becomes ".fur". The layout still mirrors.
+    textDirection = TextDirection.Content,
 )
 
 private fun serif(size: Int, line: Int, weight: Int = 400, tracking: Double = -0.003) = TextStyle(
     fontFamily = Newsreader, fontWeight = FontWeight(weight), fontSize = size.sp, lineHeight = line.sp, letterSpacing = tracking.em,
+    textDirection = TextDirection.Content,
 )
 
 /** The NextBand type scale (DESIGN.md). Read with `NB.type`. Colour comes from the caller or LocalContentColor. */

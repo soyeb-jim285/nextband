@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
@@ -78,6 +79,7 @@ import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.design.components.Skeleton
 import com.soyeb.ieltspractice.design.components.Tag
 import com.soyeb.ieltspractice.design.fmtBand
+import com.soyeb.ieltspractice.feature.writing.DraftStore
 import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.Bank
 import com.soyeb.ieltspractice.nav.CoachRoute
@@ -229,7 +231,7 @@ fun YouScreen(nav: Nav) {
         YouSheet.Type -> NbSheet(onDismiss = { sheet = null }, title = "Test type", subtitle = "Sets the Writing Task 1 and Reading you see first.", actions = {
             NbButton("Done", { sheet = null }, fill = true, size = BtnSize.Large)
         }) {
-            Segmented(listOf("Academic", "General"), if (testType == "general") 1 else 0, { i -> scope.launch { prefs.setTestType(if (i == 1) "general" else "academic") } })
+            Segmented(listOf("Academic", "General"), if (testType == "general") 1 else 0, { i -> scope.launch { prefs.setTestType(if (i == 1) "general" else "academic") } }, role = androidx.compose.ui.semantics.Role.RadioButton)
             Spacer(Modifier.height(8.dp))
         }
         YouSheet.Feedback -> FeedbackSheet(onDismiss = { sheet = null }) { msg ->
@@ -259,10 +261,16 @@ fun YouScreen(nav: Nav) {
     )
 
     if (confirmSignOut) ConfirmDialog(
-        "Sign out?", "You can sign back in any time. Results stay on your account.", "Sign out",
+        "Sign out?", "You can sign back in any time. Results stay on your account; unsent essay drafts on this phone are removed.", "Sign out",
         onConfirm = {
             confirmSignOut = false
-            api.signOut(); nav.reset(Welcome)
+            // Drafts are essay text on disk: a shared phone must not keep the last user's (a 401 sign-out keeps them for the same learner).
+            // ponytail: only the loaded /api/me id, so a tap never waits on the network; drafts are only written once it has loaded.
+            val uid = api.me.value?.user?.id
+            scope.launch {
+                if (uid != null) runCatching { DraftStore(prefs) { uid }.clearAll() }
+                api.signOut(); nav.reset(Welcome)
+            }
         },
         onDismiss = { confirmSignOut = false },
     )
@@ -338,8 +346,8 @@ private fun BandSheet(current: Double, onDismiss: () -> Unit, onSave: suspend (D
         onDismiss, title = "Target band", subtitle = "Scores at or above it show green; up to one band below, amber; further below, red.",
         actions = { NbButton("Save", { scope.launch { busy = true; onSave(pick); busy = false } }, fill = true, size = BtnSize.Large, loading = busy) },
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            targetBands.forEach { b -> NbChip(fmtBand(b), selected = b == pick, onClick = { pick = b }, modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp)) }
+        FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            targetBands.forEach { b -> NbChip(fmtBand(b), selected = b == pick, onClick = { pick = b }, modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp), role = androidx.compose.ui.semantics.Role.RadioButton) }
         }
         Text("Most universities ask for 6.5 to 7.0 overall.", style = NB.type.caption, color = NB.colors.muted)
     }

@@ -5,12 +5,17 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -38,7 +43,7 @@ class MemoryTokenStore(private var token: String? = null) : TokenStore {
     override suspend fun loadGuest() = guest
 }
 
-private val Context.sessionStore by preferencesDataStore("session")
+private val Context.sessionStore by preferencesDataStore("session", corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() })
 
 /** DataStore holds `base64(iv + AES-GCM ciphertext)`; the AES key never leaves the Android Keystore. */
 class KeystoreTokenStore(context: Context) : TokenStore {
@@ -57,15 +62,21 @@ class KeystoreTokenStore(context: Context) : TokenStore {
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply { init(spec) }.generateKey()
     }
 
-    override suspend fun load(): String? = runCatching {
-        val raw = Base64.decode(store.data.first()[key] ?: return null, Base64.NO_WRAP)
-        val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.DECRYPT_MODE, secret(), GCMParameterSpec(128, raw, 0, IV_BYTES)) }
-        String(cipher.doFinal(raw, IV_BYTES, raw.size - IV_BYTES), Charsets.UTF_8)
-    }.getOrNull() // a lost key (restore, reinstall) reads as signed out
+    // Keystore calls are IPC to keystore2 (slow on low-end phones): never on the main thread, which runs this at cold start.
+    override suspend fun load(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val sealed = store.data.first()[key] ?: return@runCatching null
+            val raw = Base64.decode(sealed, Base64.NO_WRAP)
+            val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.DECRYPT_MODE, secret(), GCMParameterSpec(128, raw, 0, IV_BYTES)) }
+            String(cipher.doFinal(raw, IV_BYTES, raw.size - IV_BYTES), Charsets.UTF_8)
+        }.getOrNull() // a lost key (restore, reinstall) reads as signed out
+    }
 
     // Keystore throws ProviderException/KeyStoreException on some OEM devices. The session in memory still works, so a failed
     // save must not fail the sign-in (an emailed code is already used by then); the user signs in again after the next cold start.
-    override suspend fun save(token: String, guest: Boolean) {
+    override suspend fun save(token: String, guest: Boolean) { withContext(Dispatchers.IO) { saveSealed(token, guest) } }
+
+    private suspend fun saveSealed(token: String, guest: Boolean) {
         try {
             val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.ENCRYPT_MODE, secret()) }
             val sealed = cipher.iv + cipher.doFinal(token.toByteArray(Charsets.UTF_8))
@@ -79,7 +90,9 @@ class KeystoreTokenStore(context: Context) : TokenStore {
 
     override suspend fun loadGuest(): Boolean = runCatching { store.data.first()[guestKey] == true }.getOrDefault(false)
 
-    override suspend fun clear() { store.edit { it.remove(key); it.remove(guestKey) } }
+    override suspend fun clear() {
+        try { store.edit { it.remove(key); it.remove(guestKey) } } catch (e: IOException) { Log.w("TokenStore", "Couldn't clear the session token", e) }
+    }
 
     private companion object {
         const val ALIAS = "ielts-session-token"

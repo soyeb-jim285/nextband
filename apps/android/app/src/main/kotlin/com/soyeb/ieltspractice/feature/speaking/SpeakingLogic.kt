@@ -67,14 +67,23 @@ fun finishProgress(total: Int, done: Int, failed: Int): String = when {
     else -> "Uploading ${minOf(done + 1, total)} of $total"
 }
 
-/** The server's cue-card body repeats the title and ends with a "You should say:" lead; the bullets get their own heading, so drop both. */
-fun cueIntro(p: Prompt): String {
+/**
+ * The server's cue-card body repeats the title and ends with a "You should say:" lead; the bullets get their own heading, so drop both.
+ * With bullets, the closing "and explain…" line goes after them (see [cueClosing]), as on a real cue card.
+ */
+fun cueIntro(p: Prompt): String = cueLines(p).filterNot { !p.bullets.isNullOrEmpty() && isClosing(it) }.joinToString("\n")
+
+/** The "and explain…" line that ends a cue card, shown after the bullets; empty without bullets (it stays in [cueIntro]). */
+fun cueClosing(p: Prompt): String = if (p.bullets.isNullOrEmpty()) "" else cueLines(p).filter(::isClosing).joinToString("\n")
+
+private fun isClosing(line: String) = line.startsWith("and ", ignoreCase = true)
+
+private fun cueLines(p: Prompt): List<String> {
     val bullets = p.bullets.orEmpty()
     var text = p.body
     if (text.startsWith(p.title)) text = text.removePrefix(p.title)
     return text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
         .filter { line -> bullets.isEmpty() || line.lowercase().trim(':', ' ') != "you should say" }
-        .joinToString("\n")
 }
 
 /** Part 3 rows carry two sub-topic headings in bullets; the first half of the questions sits under the first. */

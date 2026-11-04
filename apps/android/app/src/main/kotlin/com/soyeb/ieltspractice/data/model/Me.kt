@@ -13,8 +13,8 @@ import kotlinx.serialization.Serializable
 /** GET/PUT /api/settings. PUT goes through [com.soyeb.ieltspractice.data.net.Api.saveSettings], which sends only the fields that change. */
 @Serializable data class AppSettings(
     val targetBand: Double = 7.0,
-    val writingAutoSubmit: Boolean = false,
-    val blockPaste: Boolean = false,
+    val writingAutoSubmit: Boolean = true, // server DEFAULT_SETTINGS
+    val blockPaste: Boolean = true,
     val productEmails: Boolean = false,
     /** `yyyy-MM-dd` or null. */
     val examDate: String? = null,

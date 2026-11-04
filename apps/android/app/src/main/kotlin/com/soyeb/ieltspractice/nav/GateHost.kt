@@ -29,7 +29,7 @@ fun GateHost(nav: Nav) {
             title = FairUse.TITLE,
             actions = {
                 NbButton("Start the test", g.onStart, fill = true, size = BtnSize.Large)
-                if (g.guest) NbButton("Create a free account", { nav.dismissGate(); nav.go(Auth("signup", "Create a free account for more tests")) }, kind = BtnKind.Text, fill = true)
+                if (g.guest) NbButton("Create a free account", { nav.signUpForMore(g.retry) }, kind = BtnKind.Text, fill = true)
                 NbButton("Not now", nav::dismissGate, kind = BtnKind.Text, fill = true)
             },
         ) {
@@ -37,13 +37,19 @@ fun GateHost(nav: Nav) {
             FairUse.paragraphs(g.quota, g.skill, g.guest).forEach { Text(it, style = NB.type.body, color = NB.colors.ink) }
         }
         is Gate.Blocked -> {
-            val copy = GateText.copy(g.code, g.skill, g.tier, g.resetAt, g.keep)
+            val copy = GateText.copy(g.code, g.skill, g.tier, g.resetAt, g.keep, canBuy = BuildConfig.WEB_CHECKOUT)
             NbSheet(
                 onDismiss = nav::dismissGate,
                 title = copy.title,
                 actions = {
                     copy.primary?.let { (label, action) ->
-                        NbButton(label, { nav.dismissGate(); if (action == GateAction.Account) nav.go(Auth("signup", "Create a free account for more tests")) }, fill = true, size = BtnSize.Large)
+                        NbButton(label, {
+                            when (action) {
+                                GateAction.Account -> nav.signUpForMore(g.retry)
+                                GateAction.Plan -> { nav.dismissGate(); nav.go(Plan) }
+                                GateAction.Close -> nav.dismissGate()
+                            }
+                        }, fill = true, size = BtnSize.Large)
                     }
                     NbButton(copy.secondary.first, nav::dismissGate, kind = if (copy.primary == null) BtnKind.Secondary else BtnKind.Text, fill = true, size = if (copy.primary == null) BtnSize.Large else BtnSize.Medium)
                 },

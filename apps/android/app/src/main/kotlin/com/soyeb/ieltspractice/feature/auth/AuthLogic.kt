@@ -1,6 +1,8 @@
 package com.soyeb.ieltspractice.feature.auth
 
+import com.soyeb.ieltspractice.data.model.AppSettings
 import com.soyeb.ieltspractice.data.model.EmailStatus
+import com.soyeb.ieltspractice.data.net.ApiError
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -76,6 +78,24 @@ fun otpError(status: Int, code: String?, message: String): String = when {
     code == "otp_locked" -> message.ifEmpty { "Too many wrong codes. Try again later." }
     status == 429 -> "Too many requests. Wait a minute, then try again."
     else -> message.ifEmpty { "Something went wrong. Try again." }
+}
+
+/**
+ * After a sign-in: open goal setup unless this account finished it on this device ([doneHere]) or already has goals
+ * from elsewhere (a non-default target or an exam date). Not the device-wide flag: a second person on the phone needs their own setup.
+ */
+fun needsOnboarding(s: AppSettings, doneHere: Boolean): Boolean =
+    !doneHere && s.examDate == null && s.targetBand == AppSettings().targetBand
+
+/** Per-account "finished goal setup on this device" key in Prefs' string store. */
+fun onboardedKey(userId: String) = "onboarded:$userId"
+
+/** Why a request to send a code failed, as an [EmailStatus.error] kind for [emailStatusLine] ("" when no reason fits). */
+fun sendFailureKind(x: Throwable): String = when {
+    x !is ApiError || x.status == 0 -> "network"
+    x.status == 429 -> "rate_limited"
+    x.status >= 500 -> "unavailable"
+    else -> ""
 }
 
 /** The status line under the code boxes: text and whether it is a failure. Same wording as the web's StatusLine. */

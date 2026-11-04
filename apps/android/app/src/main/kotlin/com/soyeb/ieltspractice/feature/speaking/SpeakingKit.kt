@@ -225,6 +225,11 @@ fun CueCard(p: Prompt, modifier: Modifier = Modifier) {
                     Text(b, style = NB.type.reading, color = c.ink, modifier = Modifier.weight(1f))
                 }
             }
+            val closing = cueClosing(p)
+            if (closing.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(closing, style = NB.type.reading, color = c.ink)
+            }
         }
     }
 }

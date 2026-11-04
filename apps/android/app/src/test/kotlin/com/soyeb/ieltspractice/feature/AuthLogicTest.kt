@@ -1,6 +1,8 @@
 package com.soyeb.ieltspractice.feature
 
+import com.soyeb.ieltspractice.data.model.AppSettings
 import com.soyeb.ieltspractice.data.model.EmailStatus
+import com.soyeb.ieltspractice.data.net.ApiError
 import com.soyeb.ieltspractice.feature.auth.AuthStep
 import com.soyeb.ieltspractice.feature.auth.MISMATCH
 import com.soyeb.ieltspractice.feature.auth.codeError
@@ -8,9 +10,11 @@ import com.soyeb.ieltspractice.feature.auth.emailError
 import com.soyeb.ieltspractice.feature.auth.emailStatusLine
 import com.soyeb.ieltspractice.feature.auth.isCodeError
 import com.soyeb.ieltspractice.feature.auth.liveMismatch
+import com.soyeb.ieltspractice.feature.auth.needsOnboarding
 import com.soyeb.ieltspractice.feature.auth.otpDigits
 import com.soyeb.ieltspractice.feature.auth.otpError
 import com.soyeb.ieltspractice.feature.auth.resetErrors
+import com.soyeb.ieltspractice.feature.auth.sendFailureKind
 import com.soyeb.ieltspractice.feature.auth.signInErrors
 import com.soyeb.ieltspractice.feature.auth.signUpErrors
 import com.soyeb.ieltspractice.feature.auth.stepOf
@@ -62,6 +66,22 @@ class AuthLogicTest {
         assertFalse(isCodeError("too_many_requests"))
         assertEquals("That code has expired. Request a new one.", otpError(400, "OTP_EXPIRED", ""))
         assertEquals("Too many requests. Wait a minute, then try again.", otpError(429, null, ""))
+    }
+
+    @Test fun onboardingFollowsTheAccountNotTheDevice() {
+        assertTrue(needsOnboarding(AppSettings(), doneHere = false))
+        assertFalse(needsOnboarding(AppSettings(), doneHere = true))
+        assertFalse(needsOnboarding(AppSettings(targetBand = 6.5), doneHere = false))
+        assertFalse(needsOnboarding(AppSettings(examDate = "2027-01-10"), doneHere = false))
+    }
+
+    @Test fun sendFailureKeepsTheReason() {
+        assertEquals("rate_limited", sendFailureKind(ApiError(429, "Too many requests")))
+        assertEquals("unavailable", sendFailureKind(ApiError(503, "Down")))
+        assertEquals("network", sendFailureKind(ApiError(0, "Offline")))
+        assertEquals("network", sendFailureKind(java.io.IOException()))
+        assertEquals("", sendFailureKind(ApiError(400, "Bad email")))
+        assertTrue(emailStatusLine(EmailStatus("failed", error = "rate_limited"), 0).first.contains("busy"))
     }
 
     @Test fun routeModeMapsToAStep() {

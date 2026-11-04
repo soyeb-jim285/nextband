@@ -148,11 +148,11 @@ fun AnalysingState(stage: String?, skill: Skill, modifier: Modifier = Modifier) 
     val reduced = LocalReducedMotion.current
     val pulse = if (reduced) null else rememberInfiniteTransition(label = "an").animateFloat(0.55f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "p")
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp).semantics { liveRegion = LiveRegionMode.Polite },
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(Icons.Rounded.AutoAwesome, NB.colors.brandText, NB.colors.brandSoft, 72.dp, Modifier.graphicsLayer { alpha = pulse?.value ?: 1f })
-        Text("Marking your ${skill.label.lowercase()}", style = NB.type.title1, color = NB.colors.ink, textAlign = TextAlign.Center)
+        IconTile(Icons.Rounded.AutoAwesome, NB.colors.brandText, NB.colors.brandSoft, 64.dp, Modifier.graphicsLayer { alpha = pulse?.value ?: 1f })
+        Text("Marking your ${skill.label.lowercase()}", style = NB.type.title2, color = NB.colors.ink, textAlign = TextAlign.Center)
         Text("Usually under a minute. You can leave this screen; the result will be in History.", style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center)
         Meter((at + 1).toDouble(), Modifier.padding(top = 4.dp), max = steps.size.toDouble(), height = 6.dp)
         Text(steps[at].second + "…", style = NB.type.label, color = NB.colors.brandText)
@@ -163,16 +163,16 @@ fun AnalysingState(stage: String?, skill: Skill, modifier: Modifier = Modifier) 
 @Composable
 fun FailedState(message: String?, retryable: Boolean, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(Icons.Rounded.ErrorOutline, NB.colors.badText, NB.colors.badSoft, 72.dp)
-        Text("We couldn't mark this one", style = NB.type.title1, color = NB.colors.ink, textAlign = TextAlign.Center)
+        IconTile(Icons.Rounded.ErrorOutline, NB.colors.badText, NB.colors.badSoft, 64.dp)
+        Text("We couldn't mark this one", style = NB.type.title2, color = NB.colors.ink, textAlign = TextAlign.Center)
         Text(
             message?.takeIf { it.isNotBlank() } ?: if (retryable) "Something went wrong while marking. Your answer is saved." else "Marking is paused for now. Your answer is saved; try again later.",
             style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center,
         )
-        if (retryable) NbButton("Try marking again", onRetry, icon = Icons.Rounded.Refresh)
+        if (retryable) NbButton("Try marking again", onRetry, kind = BtnKind.Secondary, icon = Icons.Rounded.Refresh, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -180,13 +180,13 @@ fun FailedState(message: String?, retryable: Boolean, onRetry: () -> Unit, modif
 @Composable
 fun NoSpeechState(onRetake: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(Icons.Rounded.MicOff, NB.colors.warnText, NB.colors.warnSoft, 72.dp)
-        Text("We couldn't hear an answer", style = NB.type.title1, color = NB.colors.ink, textAlign = TextAlign.Center)
+        IconTile(Icons.Rounded.MicOff, NB.colors.warnText, NB.colors.warnSoft, 64.dp)
+        Text("We couldn't hear an answer", style = NB.type.title2, color = NB.colors.ink, textAlign = TextAlign.Center)
         Text("Check your microphone, hold the phone a little closer and try again.", style = NB.type.bodySmall, color = NB.colors.muted, textAlign = TextAlign.Center)
-        NbButton("Try again", onRetake, kind = BtnKind.Secondary)
+        NbButton("Try again", onRetake, kind = BtnKind.Secondary, modifier = Modifier.padding(top = 4.dp))
     }
 }
 

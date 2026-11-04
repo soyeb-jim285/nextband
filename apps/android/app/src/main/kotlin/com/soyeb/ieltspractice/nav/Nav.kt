@@ -111,6 +111,13 @@ class Nav(
         }
     }
 
+    /** "Create a free account" on a limit or fair-use sheet: after sign-up, [retry] starts the test the guest tapped. */
+    fun signUpForMore(retry: (() -> Unit)?) {
+        dismissGate()
+        pendingAfterAuth = retry
+        go(Auth("signup", "Create a free account for more tests"))
+    }
+
     companion object {
         const val SESSION_ENDED = "You were signed out. Sign in again to keep your results in your account."
     }
@@ -167,15 +174,15 @@ class Nav(
         val q = api.refreshQuota()
         val guest = !api.hasAccount.value
         if (live && !q.live) {
-            gate = Gate.Blocked(Codes.LIVE, skill, q.tier, null)
+            gate = Gate.Blocked(Codes.LIVE, skill, q.tier, null, retry = { begin(skill, live, go) })
             return
         }
         val s = q.of(skill)
-        s.blocked?.let { gate = Gate.Blocked(it, skill, q.tier, s.resetAt); return }
+        s.blocked?.let { gate = Gate.Blocked(it, skill, q.tier, s.resetAt, retry = { begin(skill, live, go) }); return }
         val user = if (guest) "guest" else api.me.value?.user?.id ?: "account"
         val key = FairUse.ackKey(user)
         if (q.free && prefs.lastSeenFairUseDay.first() != key) {
-            gate = Gate.FairUse(skill, q, guest) {
+            gate = Gate.FairUse(skill, q, guest, retry = { begin(skill, live, go) }) {
                 gate = null
                 scope.launch(Dispatchers.Main.immediate) {
                     prefs.setLastSeenFairUseDay(key)

@@ -94,7 +94,11 @@ private fun UpdateRow.body(): String = when (kind) {
     UpdateKind.Result -> item!!.title
     UpdateKind.Cards -> "A few minutes keeps your mistakes from coming back."
     UpdateKind.Mock -> "Pick up where you left off."
-    UpdateKind.Exam -> "A full mock this week shows where you stand."
+    UpdateKind.Exam -> when {
+        n <= 1 -> "A few drill cards keep your mistakes fresh."
+        mockId != null -> "Finish your full mock to see where you stand."
+        else -> "A full mock this week shows where you stand."
+    }
 }
 
 private fun UpdateRow.open(nav: Nav) {

@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.LocalDemo
 import com.soyeb.ieltspractice.LocalGraph
@@ -50,6 +51,7 @@ import com.soyeb.ieltspractice.data.logic.GateText
 import com.soyeb.ieltspractice.data.net.ApiError
 import com.soyeb.ieltspractice.design.NB
 import com.soyeb.ieltspractice.design.components.Banner
+import com.soyeb.ieltspractice.design.components.awaitStarted
 import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.CardTone
@@ -87,9 +89,17 @@ fun PlanScreen(nav: Nav) {
     var checkFailed by remember { mutableStateOf(false) }
     suspend fun recheck() {
         checking = true
-        // /api/me carries the quota; /api/quota only when it didn't.
-        checkFailed = runCatching { if (api.loadMe().quota() == null) api.refreshQuota() }.isFailure
-        checking = false
+        // /api/me carries the quota; /api/quota only when it didn't. Leaving the screen mid-check is not a failed check.
+        try {
+            if (api.loadMe().quota() == null) api.refreshQuota()
+            checkFailed = false
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            checkFailed = true
+        } finally {
+            checking = false
+        }
     }
 
     // Back from the payment page: the plan may have changed.
@@ -118,9 +128,11 @@ fun PlanScreen(nav: Nav) {
         }
     }
     // The gateway can confirm a minute or two late: keep checking while we wait. ponytail: bounded at 2 minutes, then "Check again".
+    // Paused while the app sits behind the payment page; the resume refresh above covers the return.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(awaiting != null) {
         if (awaiting == null) return@LaunchedEffect
-        repeat(24) { delay(5_000); if (awaiting == null) return@LaunchedEffect; recheck() }
+        repeat(24) { delay(5_000); lifecycle.awaitStarted(); if (awaiting == null) return@LaunchedEffect; recheck() }
     }
 
     PushedScreen(

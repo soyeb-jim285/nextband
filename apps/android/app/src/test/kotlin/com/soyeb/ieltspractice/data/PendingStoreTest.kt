@@ -49,4 +49,14 @@ class PendingStoreTest {
         assertFalse(g.belongsTo("acctB")) // a later account on this device never sees it
         assertEquals("other", b.items.value.first { it.id == "x1" }.ownerId)
     }
+
+    @Test fun anUnknownUserIsOfflineNotAnotherAccount() {
+        val mine = PendingRecording("r1", "p1", 1, "Part 1", 1L, 1000, emptyList(), emptyList(), ownerId = "acctA")
+        val unowned = mine.copy(ownerId = null)
+        assertTrue(blockedReason(mine, null)!!.startsWith("Can't reach"))
+        assertTrue(blockedReason(unowned, null)!!.startsWith("Can't reach"))
+        assertTrue(blockedReason(mine, "acctB")!!.contains("another account"))
+        assertEquals(null, blockedReason(mine, "acctA"))
+        assertEquals(null, blockedReason(unowned, "acctA"))
+    }
 }

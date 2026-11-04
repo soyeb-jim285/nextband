@@ -58,6 +58,16 @@ fun clockText(seconds: Long): String {
 }
 
 /**
+ * Spoken time left for TalkBack. Whole minutes, then "under a minute" in the last one (not "0 minutes"). It stays coarse
+ * on purpose: the pill is a live region in the warn/bad zones, so a per-second description would announce every tick.
+ */
+internal fun timeLeftWords(seconds: Long): String = when {
+    seconds < 60 -> "under a minute"
+    seconds < 120 -> "1 minute"
+    else -> "${seconds / 60} minutes"
+}
+
+/**
  * Countdown pill. Neutral, then warn under [warnAt] seconds, bad under [badAt]; a haptic tick when crossing each threshold.
  * Announces only at the thresholds (not every second) for TalkBack.
  */
@@ -75,7 +85,7 @@ fun TimerPill(secondsLeft: Long, modifier: Modifier = Modifier, warnAt: Long = 3
     Row(
         modifier.heightIn(min = 36.dp).background(bg, NB.shape.pill).padding(horizontal = 12.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription = "$label ${secondsLeft / 60} minutes"
+                contentDescription = "$label ${timeLeftWords(secondsLeft)}"
                 if (zone > 0) liveRegion = LiveRegionMode.Polite
             },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),

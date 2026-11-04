@@ -167,7 +167,7 @@ class Api(
             fun field(k: String) = (err?.get(k) as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull
             if (status == 401 && sent != null && _token.value == sent && !path.startsWith("/api/auth/")) {
                 val wasAccount = _account.value
-                signOutLocal()
+                signOutLocal(accountExpired = wasAccount)
                 _sessionEnded.trySend(wasAccount)
             }
             // A guest on an account-only endpoint is not an expired session: flip the UI to its "Create an account" gates.
@@ -424,12 +424,19 @@ class Api(
         signOutLocal()
     }
 
-    fun signOutLocal() {
+    fun signOutLocal(accountExpired: Boolean = false) {
         setSession(null, false)
         _me.value = null
         _quota.value = null
         scope.launch { store.clear() }
+        onSignedOut?.invoke(accountExpired)
     }
+
+    /**
+     * After every sign-out: true when the server ended an account's session (401), false for one the user chose or a guest's.
+     * AppGraph keeps unowned recordings on an expired account session (the same learner usually signs back in) and drops them otherwise.
+     */
+    @Volatile var onSignedOut: ((accountExpired: Boolean) -> Unit)? = null
 
     // MARK: Endpoints (one suspend function per route in apps/web/src/openapi.json; admin and replay are left out)
 

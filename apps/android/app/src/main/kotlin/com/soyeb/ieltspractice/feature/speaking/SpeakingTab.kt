@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -61,7 +62,6 @@ import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbCard
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.NbListRow
-import com.soyeb.ieltspractice.design.components.Overline
 import com.soyeb.ieltspractice.design.components.RowDivider
 import com.soyeb.ieltspractice.design.components.RowGroup
 import com.soyeb.ieltspractice.design.components.SectionHeader
@@ -140,6 +140,19 @@ fun SpeakingTabScreen(nav: Nav) {
                 resumeText = m?.let { x -> x.next?.let { n -> Skill.of(n)?.label?.let { "$it next" } } ?: "In progress" },
             )
         }
+        if (pending.isNotEmpty()) {
+            // Right under the strip: the saving screen sends people here to upload later, so it must be the first thing they see.
+            item { SectionHeader("Not uploaded yet") }
+            item {
+                RowGroup {
+                    pending.forEachIndexed { i, p ->
+                        if (i > 0) RowDivider()
+                        PendingRow(p, states[p.id], onRetry = { started.add(p.id); store.start(p, api) }, onDiscard = { deleting = p })
+                    }
+                }
+            }
+        }
+
         if (liveOn) item {
             LiveHero(quota?.let { QuotaCopy.leftShort(it, "examiner") }, nav.checking) { nav.startLive { nav.go(LiveExam()) } }
         }
@@ -160,7 +173,7 @@ fun SpeakingTabScreen(nav: Nav) {
         if (me?.cambridgeAccess == true) item {
             val opts = listOf("any" to "Mixed", "cambridge" to "Cambridge books", "generated" to "Our own")
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Overline("Question source")
+                SectionHeader("Question source")
                 ChipRow(
                     opts.map { it.second }, setOf(opts.indexOfFirst { it.first == source }.coerceAtLeast(0)),
                     { i -> scope.launch { graph.prefs.setSpeakingSource(opts[i].first) } }, contentPadding = PaddingValues(0.dp),
@@ -169,18 +182,6 @@ fun SpeakingTabScreen(nav: Nav) {
                     "Cambridge questions have no recorded examiner voice, so the practice test shows them on screen. The live examiner still asks them aloud.",
                     style = NB.type.caption, color = NB.colors.muted,
                 )
-            }
-        }
-
-        if (pending.isNotEmpty()) {
-            item { Column { Spacer(Modifier.height(12.dp)); SectionHeader("Not uploaded yet") } }
-            item {
-                RowGroup {
-                    pending.forEachIndexed { i, p ->
-                        if (i > 0) RowDivider()
-                        PendingRow(p, states[p.id], onRetry = { started.add(p.id); store.start(p, api) }, onDiscard = { deleting = p })
-                    }
-                }
             }
         }
 
@@ -279,7 +280,7 @@ private fun PartCard(p: PartInfo, modifier: Modifier, onStart: () -> Unit, onTop
             Text("Part ${p.n}", style = NB.type.title3, color = c.ink)
             Text(p.name, style = NB.type.bodySmall, color = c.muted)
             Text(p.time, style = NB.type.caption, color = c.muted)
-            NbButton("Topics", onTopic, kind = BtnKind.Text, size = BtnSize.Small, modifier = Modifier.semantics { contentDescription = "Choose a topic for Part ${p.n}" })
+            NbButton("Topics", onTopic, kind = BtnKind.Text, size = BtnSize.Small, modifier = Modifier.offset(x = -BtnSize.Small.pad).semantics { contentDescription = "Choose a topic for Part ${p.n}" })
         }
     }
 }

@@ -53,10 +53,18 @@ import java.io.IOException
 /**
  * Listed and uploaded only for the account that made it (a guest's recordings are re-owned by the account it signs into: [PendingStore.reassign]).
  * No owner (recorded before /api/me answered, e.g. offline): the signed-in user, and the upload stamps that user as the owner.
- * Unowned recordings are deleted on sign-out ([PendingStore.dropUnowned]), so they never reach a different account.
+ * Unowned recordings are deleted on sign-out ([PendingStore.dropUnowned]), so they never reach a different account; an account
+ * session the server ended (401) keeps them for when the learner signs back in.
  */
 fun PendingRecording.belongsTo(userId: String?): Boolean =
     if (ownerId == null) userId != null else ownerId == userId
+
+/** Why [p] can't upload for [uid] now, or null when it can. An unknown user (offline, or /api/me failed) is not another account. */
+fun blockedReason(p: PendingRecording, uid: String?): String? = when {
+    uid == null -> "Can't reach NextBand. Your recording is saved on this device; retry when you're online."
+    !p.belongsTo(uid) -> "This recording belongs to another account. Sign in to it to upload, or delete it."
+    else -> null
+}
 
 /** The signed-in user's id, loading /api/me when it isn't known yet; null when signed out or offline. */
 suspend fun currentUserId(api: Api): String? = api.me.value?.user?.id ?: runCatching { api.loadMe().user.id }.getOrNull()
@@ -162,8 +170,8 @@ class PendingStore(private val dir: File, private val scope: CoroutineScope) {
         if (busy) return null
         var p = _items.value.firstOrNull { it.id == rec.id } ?: rec
         val uid = currentUserId(api)
-        if (!p.belongsTo(uid)) {
-            _states.update { it + (p.id to UploadState.Failed("This recording belongs to another account. Sign in to it to upload, or delete it.")) }
+        blockedReason(p, uid)?.let { msg ->
+            _states.update { it + (p.id to UploadState.Failed(msg)) }
             return null
         }
         if (p.ownerId == null) p = p.copy(ownerId = uid).also(::add)

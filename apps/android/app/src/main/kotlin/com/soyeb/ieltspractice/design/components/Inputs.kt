@@ -66,15 +66,30 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.design.LocalReducedMotion
 import com.soyeb.ieltspractice.design.NB
 
-/** iOS-style segmented control: surface2 track, sliding surface thumb. 2–4 options. */
+/**
+ * iOS-style segmented control: surface2 track, sliding surface thumb. 2–4 options.
+ * [strong] is for answer pickers (True / False / Not given): the thumb is brandSoft with a brand border and brandText label,
+ * so the chosen answer meets 3:1 non-text contrast and matches the MCQ OptionCard. Settings and filters keep the neutral thumb.
+ */
 @Composable
-fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun Segmented(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    strong: Boolean = false,
+    /** RadioButton for a choice (answers, settings); Tab only where the control switches views. */
+    role: Role = if (strong) Role.RadioButton else Role.Tab,
+    /** TalkBack text for one option, e.g. "True, question 3", so context is read on the option rather than a separate stop. */
+    describe: ((String) -> String)? = null,
+) {
     val c = NB.colors
     val hf = LocalHapticFeedback.current
     val reduced = LocalReducedMotion.current
@@ -88,8 +103,12 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
         Box(Modifier.matchParentSize()) {
             Box(
                 Modifier.offset(x = x).width(w).fillMaxHeight()
-                    .then(if (c.isDark) Modifier else Modifier.shadow(3.dp, NB.shape.pill, ambientColor = c.ink.copy(alpha = 0.25f), spotColor = c.ink.copy(alpha = 0.25f)))
-                    .clip(NB.shape.pill).background(if (c.isDark) c.surface3 else c.surface),
+                    .then(if (c.isDark || strong) Modifier else Modifier.shadow(3.dp, NB.shape.pill, ambientColor = c.ink.copy(alpha = 0.25f), spotColor = c.ink.copy(alpha = 0.25f)))
+                    .clip(NB.shape.pill)
+                    .then(
+                        if (strong) Modifier.background(c.brandSoft).border(1.5.dp, c.brand, NB.shape.pill)
+                        else Modifier.background(if (c.isDark) c.surface3 else c.surface),
+                    ),
             )
         }
         // Labels wrap at large text sizes; IntrinsicSize.Min keeps every segment as tall as the tallest one.
@@ -97,11 +116,14 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
             options.forEachIndexed { i, label ->
                 Box(
                     Modifier.weight(1f).fillMaxHeight().minimumInteractiveComponentSize().heightIn(min = 36.dp).clip(NB.shape.pill)
-                        .selectable(i == selected, role = Role.Tab) { if (i != selected) { hf.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(i) } },
+                        .selectable(i == selected, role = role) { if (i != selected) { hf.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(i) } }
+                        .then(if (describe != null) Modifier.semantics { contentDescription = describe(label) } else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        label, style = NB.type.label, color = if (i == selected) c.ink else c.muted,
+                        label, style = NB.type.label, color = if (i != selected) c.muted else if (strong) c.brandText else c.ink,
+                        // Weight is a second, non-colour cue for the chosen segment.
+                        fontWeight = if (i == selected) FontWeight.SemiBold else null,
                         textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
@@ -119,31 +141,32 @@ fun ChipRow(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = NB.space.gutter),
 ) {
+    // Every ChipRow is single-select (filters, parts), so its chips are radio buttons in one group.
     Row(
-        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(contentPadding),
+        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(contentPadding).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        options.forEachIndexed { i, label -> NbChip(label, i in selected, { onToggle(i) }) }
+        options.forEachIndexed { i, label -> NbChip(label, i in selected, { onToggle(i) }, role = Role.RadioButton) }
     }
 }
 
 @Composable
-fun NbChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+fun NbChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, role: Role = Role.Checkbox) {
     val c = NB.colors
     val spec = tween<Color>(NbMotion.BASE, easing = NbMotion.EaseOut)
     val bg by animateColorAsState(if (selected) c.brandSoft else c.surface, spec, label = "chipBg")
     val fg by animateColorAsState(if (selected) c.brandText else c.ink, spec, label = "chipFg")
-    val edge by animateColorAsState(if (selected) c.brand.copy(alpha = 0.45f) else c.line, spec, label = "chipEdge")
+    val edge by animateColorAsState(if (selected) c.brand else c.line, spec, label = "chipEdge")
     val src = remember { MutableInteractionSource() }
     Row(
         modifier.minimumInteractiveComponentSize().heightIn(min = 36.dp).pressScale(src).clip(NB.shape.pill).background(bg).border(1.dp, edge, NB.shape.pill)
-            .selectable(selected, interactionSource = src, indication = PressWash, role = Role.Checkbox, onClick = onClick)
+            .selectable(selected, interactionSource = src, indication = PressWash, role = role, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (icon != null) Icon(icon, null, Modifier.size(18.dp), tint = if (selected) fg else c.muted)
-        Text(label, style = NB.type.label, color = fg, maxLines = 1)
+        Text(label, style = NB.type.label, color = fg, maxLines = 1, fontWeight = if (selected) FontWeight.SemiBold else null)
     }
 }
 

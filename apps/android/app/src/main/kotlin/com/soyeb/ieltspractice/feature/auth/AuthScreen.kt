@@ -111,6 +111,7 @@ import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbIconButton
 import com.soyeb.ieltspractice.design.components.NbTextField
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.BuildConfig
 import com.soyeb.ieltspractice.feature.you.siteUrl
 import com.soyeb.ieltspractice.nav.Nav
@@ -144,15 +145,17 @@ private class AuthForm(email: String) {
     var address by mutableStateOf(email.trim())
     /** Proof of the request that sent the code, for the delivery status. */
     var token by mutableStateOf<String?>(null)
+    /** Why that first send failed ([sendFailureKind]), shown until a resend works. */
+    var sendError by mutableStateOf<String?>(null)
 
     companion object {
         /** Rotation / process death mid-flow keeps the step's context (who the code went to). Passwords are left out on purpose. */
         val Saver = listSaver<AuthForm, Any?>(
-            save = { listOf(it.name, it.email, it.code, it.fromSignUp, it.address, it.token) },
+            save = { listOf(it.name, it.email, it.code, it.fromSignUp, it.address, it.token, it.sendError) },
             restore = {
                 AuthForm(it[1] as String).apply {
                     name = it[0] as String; code = it[2] as String; fromSignUp = it[3] as Boolean
-                    address = it[4] as String; token = it[5] as String?
+                    address = it[4] as String; token = it[5] as String?; sendError = it[6] as String?
                 }
             },
         )
@@ -166,7 +169,7 @@ private class AuthForm(email: String) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AuthScreen(nav: Nav, mode: String, reason: String?) {
+fun AuthScreen(nav: Nav, mode: String, reason: String?, email: String? = null) {
     val graph = LocalGraph.current
     val api = graph.api
     val prefs = graph.prefs
@@ -181,7 +184,7 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
             when (demoTab) { "SignIn" -> AuthStep.SignIn; "Signup" -> AuthStep.SignUp; "Verify" -> AuthStep.Verify; "Forgot" -> AuthStep.Forgot; "Reset" -> AuthStep.Reset; else -> stepOf(mode) },
         )
     }
-    val f = rememberSaveable(saver = AuthForm.Saver) { AuthForm(if (demoMail) "maya@example.com" else "") }
+    val f = rememberSaveable(saver = AuthForm.Saver) { AuthForm(if (demoMail) "maya@example.com" else email.orEmpty()) }
 
     fun go(s: AuthStep) {
         step = s
@@ -194,7 +197,12 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     /** Signed in: continue what the guest was doing, or land on Today (Onboarding the first time). */
     fun finished() {
         if (reason != null) nav.authFinished(true)
-        else scope.launch { if (prefs.onboardingDone.first()) nav.reset(TodayTab) else nav.reset(Onboarding) }
+        else scope.launch {
+            val me = api.me.value ?: runCatching { api.loadMe() }.getOrNull()
+            val needs = if (me == null) !prefs.onboardingDone.first() // profile didn't load: the device flag is the best guess
+            else needsOnboarding(me.settings, prefs.getString(onboardedKey(me.user.id)) != null)
+            nav.reset(if (needs) Onboarding else TodayTab)
+        }
     }
 
     /** Run a code step. [codeOnly] puts every failure under the boxes (verify); otherwise only code problems go there. */
@@ -240,7 +248,8 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
                 throw x
             } catch (x: ApiError) {
                 if (!signUp && x.code == "EMAIL_NOT_VERIFIED") { // other 403s show the server's message
-                    f.token = runCatching { api.sendOtp(a, "email-verification") }.getOrNull()
+                    f.sendError = null
+                    f.token = try { api.sendOtp(a, "email-verification") } catch (e: CancellationException) { throw e } catch (e: Exception) { f.sendError = sendFailureKind(e); null }
                     f.address = a; f.fromSignUp = false; go(AuthStep.Verify)
                 } else if (signUp) {
                     if (x.status == 422 || x.code == "USER_ALREADY_EXISTS" || x.message.contains("already exists", true)) f.exists = true
@@ -292,7 +301,10 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
     val onHeroMuted = heroInk().muted
     val keyboard = WindowInsets.isImeVisible
     // Landscape phone or very large text: the full hero would leave the form no room, so use the compact header.
-    val compact = keyboard || LocalConfiguration.current.screenHeightDp < 480 || LocalDensity.current.fontScale > 1.5f
+    val short = LocalConfiguration.current.screenHeightDp < 480
+    val compact = keyboard || short || LocalDensity.current.fontScale > 1.5f
+
+    val actions: @Composable (Modifier) -> Unit = { m -> AuthActions(step, f, primary, keyboard, { go(it) }, m) }
 
     Box(Modifier.fillMaxSize().background(hero)) {
         BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 96.dp, y = (-40).dp).size(300.dp))
@@ -325,7 +337,11 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
             }
             // The form rises over the header as a sheet; the primary action and the switch sit at its foot, in thumb reach.
             Column(Modifier.weight(1f).fillMaxWidth().clip(NB.shape.sheet).background(c.surface)) {
-                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter).padding(top = 28.dp, bottom = 16.dp)) {
+                // Short screens (landscape): the action scrolls with the form instead of pinning over the fields.
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().then(if (short) Modifier.navigationBarsPadding().imePadding() else Modifier)
+                        .verticalScroll(rememberScrollState()).readable(480.dp).padding(horizontal = NB.space.gutter).padding(top = 28.dp, bottom = 16.dp),
+                ) {
                     AnimatedContent(
                         targetState = step,
                         transitionSpec = {
@@ -345,32 +361,41 @@ fun AuthScreen(nav: Nav, mode: String, reason: String?) {
                             }
                         }
                     }
+                    if (short) Spacer(Modifier.height(16.dp))
+                    if (short) actions(Modifier)
                 }
-                Column(
-                    Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    NbButton(
-                        when (step) { AuthStep.SignIn -> "Sign in"; AuthStep.SignUp -> "Create account"; AuthStep.Verify -> "Verify email"; AuthStep.Forgot -> "Send code"; AuthStep.Reset -> "Update password" },
-                        primary, fill = true, size = BtnSize.Large, loading = f.busy, haptic = true,
-                    )
-                    if ((step == AuthStep.SignIn || step == AuthStep.SignUp) && !keyboard) {
-                        val signUp = step == AuthStep.SignUp
-                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (signUp) "Already have an account?" else "New to NextBand?", style = NB.type.bodySmall, color = c.muted)
-                            NbButton(
-                                if (signUp) "Sign in" else "Create an account",
-                                { go(if (signUp) AuthStep.SignIn else AuthStep.SignUp); f.info = null; f.confirm = "" },
-                                kind = BtnKind.Text, size = BtnSize.Small,
-                            )
-                        }
-                    }
-                }
+                if (!short) actions(Modifier.navigationBarsPadding().imePadding().readable(480.dp).padding(horizontal = NB.space.gutter))
             }
         }
     }
 }
 
+@Composable
+private fun AuthActions(
+    step: AuthStep, f: AuthForm, primary: () -> Unit, keyboard: Boolean, go: (AuthStep) -> Unit, modifier: Modifier,
+) {
+    val c = NB.colors
+    Column(
+        modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        NbButton(
+            when (step) { AuthStep.SignIn -> "Sign in"; AuthStep.SignUp -> "Create account"; AuthStep.Verify -> "Verify email"; AuthStep.Forgot -> "Send code"; AuthStep.Reset -> "Update password" },
+            primary, fill = true, size = BtnSize.Large, loading = f.busy, haptic = true,
+        )
+        if ((step == AuthStep.SignIn || step == AuthStep.SignUp) && !keyboard) {
+            val signUp = step == AuthStep.SignUp
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (signUp) "Already have an account?" else "New to NextBand?", style = NB.type.bodySmall, color = c.muted)
+                NbButton(
+                    if (signUp) "Sign in" else "Create an account",
+                    { go(if (signUp) AuthStep.SignIn else AuthStep.SignUp); f.info = null; f.confirm = "" },
+                    kind = BtnKind.Text, size = BtnSize.Small,
+                )
+            }
+        }
+    }
+}
 
 private fun stepCopy(s: AuthStep, f: AuthForm): Pair<String, String> = when (s) {
     AuthStep.SignIn -> "Welcome back" to "Sign in to continue your practice."
@@ -443,7 +468,7 @@ private fun VerifyStep(f: AuthForm, demo: EmailStatus?, onComplete: () -> Unit, 
         )
         CodeField(f.code, errs ?: f.codeIssue) { f.code = it; f.codeIssue = null; if (it.length == 6) onComplete() }
         Column {
-            CodeDelivery(f.token, demo) { api.sendOtp(f.address, "email-verification") }
+            CodeDelivery(f.token, demo, f.sendError) { api.sendOtp(f.address, "email-verification") }
             // A typo in the address: back to the sign-up form with name and email still filled in.
             if (f.fromSignUp) NbButton("Use a different email", { go(AuthStep.SignUp) }, kind = BtnKind.Text, size = BtnSize.Small)
         }
@@ -568,13 +593,14 @@ private fun CodeField(code: String, error: String?, onChange: (String) -> Unit) 
  * the status is polled every 2 s for 20 s after each send. [demo] (screenshots) is shown as is, with no network.
  */
 @Composable
-private fun CodeDelivery(first: String?, demo: EmailStatus?, send: suspend () -> String?) {
+private fun CodeDelivery(first: String?, demo: EmailStatus?, firstError: String? = null, send: suspend () -> String?) {
     val api = LocalGraph.current.api
     val c = NB.colors
     var token by remember { mutableStateOf(first) }
     var status by remember { mutableStateOf(demo) }
     var wait by remember { mutableIntStateOf(demo?.resendAvailableIn ?: 0) }
-    var sendFailed by remember { mutableStateOf(first == null && demo == null) }
+    // Why the latest send failed (an EmailStatus.error kind), null while none has.
+    var sendFailed by remember { mutableStateOf(if (first == null && demo == null) firstError ?: "network" else null) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(token) {
         val t = token ?: return@LaunchedEffect
@@ -585,7 +611,7 @@ private fun CodeDelivery(first: String?, demo: EmailStatus?, send: suspend () ->
         }
     }
     LaunchedEffect(wait) { if (wait > 0) { delay(1000); wait-- } }
-    val shown = if (sendFailed) EmailStatus("failed", error = "network") else status?.copy(resendAvailableIn = wait)
+    val shown = sendFailed?.let { EmailStatus("failed", error = it) } ?: status?.copy(resendAvailableIn = wait)
     val (line, bad) = emailStatusLine(shown, System.currentTimeMillis())
     Column {
         Text(line, style = NB.type.bodySmall, color = if (bad) c.badText else c.muted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -593,9 +619,11 @@ private fun CodeDelivery(first: String?, demo: EmailStatus?, send: suspend () ->
             if (wait > 0) "Resend code in ${wait}s" else "Resend code",
             {
                 scope.launch {
-                    sendFailed = false
-                    val t = try { send() } catch (x: CancellationException) { throw x } catch (x: Exception) { null }
-                    if (t == null) sendFailed = true else { status = null; token = t }
+                    sendFailed = null
+                    try {
+                        val t = send()
+                        if (t == null) sendFailed = "network" else { status = null; token = t }
+                    } catch (x: CancellationException) { throw x } catch (x: Exception) { sendFailed = sendFailureKind(x) }
                 }
             },
             kind = BtnKind.Text, size = BtnSize.Small, enabled = wait == 0,

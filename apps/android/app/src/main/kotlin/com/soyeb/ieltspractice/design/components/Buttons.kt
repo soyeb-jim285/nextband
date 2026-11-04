@@ -106,11 +106,12 @@ fun NbButton(
     val fgA by animateColorAsState(fg, tween(NbMotion.BASE, easing = NbMotion.EaseOut), label = "btnFg")
     val shape = size.shape
     val src = remember { MutableInteractionSource() }
-    // Primary sits on a soft brand-tinted shadow in light mode; everything else is flat.
+    // Primary sits on a soft brand-tinted shadow in light mode; everything else is flat. Kept at 4 dp so the halo stays
+    // inside StickyActionBar's 12 dp padding instead of reaching (and being cut by) the bar's edge.
     val lift = kind == BtnKind.Primary && on && !c.isDark
     Box(
         m.pressScale(src)
-            .then(if (lift) Modifier.shadow(10.dp, shape, ambientColor = c.brand, spotColor = c.brand) else Modifier)
+            .then(if (lift) Modifier.shadow(4.dp, shape, ambientColor = c.brand, spotColor = c.brand) else Modifier)
             .clip(shape)
             .background(bgA)
             .then(if (kind == BtnKind.Outline) Modifier.border(1.dp, if (on) c.faint.copy(alpha = 0.6f) else c.line, shape) else Modifier)

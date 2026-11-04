@@ -172,7 +172,7 @@ private fun AppShell(graph: AppGraph, start: Any) {
             else if (snack.showSnackbar(
                     "You were signed out. Sign in again to see your results.", actionLabel = "Sign in", duration = SnackbarDuration.Long,
                 ) == SnackbarResult.ActionPerformed
-            ) nav.go(Auth("signin"))
+            ) nav.go(Auth("signin", Nav.SESSION_ENDED))
         }
     }
 

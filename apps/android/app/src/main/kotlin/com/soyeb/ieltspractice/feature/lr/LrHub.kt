@@ -169,7 +169,7 @@ fun LrHubScreen(skill: Skill, nav: Nav) {
         if (!listening) item {
             Segmented(
                 listOf("Academic", "General Training"), if (testType == "general") 1 else 0,
-                { i -> scope.launch { graph.prefs.setTestType(if (i == 1) "general" else "academic") } },
+                { i -> scope.launch { graph.prefs.setTestType(if (i == 1) "general" else "academic") } }, role = androidx.compose.ui.semantics.Role.RadioButton,
             )
         }
         when (val st = load.state) {
@@ -269,9 +269,9 @@ private fun StatsStrip(attempts: List<LrAttemptItem>) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             Stat("${done.size}", "Taken")
             VDivider()
-            Stat(if (bands.isEmpty()) "–" else Band.format(Band.round(bands.average())), "Average band")
+            Stat(if (bands.isEmpty()) "–" else fmtBand(Band.round(bands.average())), "Average band")
             VDivider()
-            Stat(bands.maxOrNull()?.let { Band.format(it) } ?: "–", "Best band")
+            Stat(fmtBand(bands.maxOrNull()), "Best band")
         }
     }
 }
@@ -439,7 +439,7 @@ private fun TestPlanBody(plan: StartPlan) {
             }
         }
         Text("Mode", style = NB.type.title3, color = c.ink, modifier = Modifier.semantics { heading() })
-        Segmented(listOf("Exam", "Practice"), if (plan.exam) 0 else 1, { plan.exam = it == 0 })
+        Segmented(listOf("Exam", "Practice"), if (plan.exam) 0 else 1, { plan.exam = it == 0 }, role = androidx.compose.ui.semantics.Role.RadioButton)
         Text(modeNote(listening, plan.exam, plan.parts), style = NB.type.bodySmall, color = c.muted)
     }
 }

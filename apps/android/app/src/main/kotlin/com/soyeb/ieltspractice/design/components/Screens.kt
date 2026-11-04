@@ -45,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -92,7 +94,10 @@ fun TabScreen(
         containerColor = NB.colors.bg,
         contentWindowInsets = WindowInsets(0),
         topBar = {
+            // Tablets: the header keeps to the same centred column as the list; the band behind it still spans the width.
+            Box(Modifier.fillMaxWidth().background(if (scroll.state.collapsedFraction > 0.01f) NB.colors.surface else NB.colors.bg)) {
             LargeTopAppBar(
+                modifier = Modifier.readable(),
                 title = {
                     Column {
                         Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -103,6 +108,7 @@ fun TabScreen(
                 navigationIcon = { Logo(Modifier.padding(start = NB.space.gutter, end = 8.dp), height = 20.dp) },
                 actions = actions, colors = topBarColors, scrollBehavior = scroll,
             )
+            }
         },
     ) { pad ->
         val body: @Composable () -> Unit = {
@@ -137,7 +143,13 @@ fun PushedScreen(
         containerColor = NB.colors.bg,
         topBar = {
             TopAppBar(
-                title = { Text(title, style = NB.type.title2, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    Text(
+                        title, Modifier.semantics { heading() }, style = NB.type.title2,
+                        // Large text: wrap to a second line rather than cut the title off.
+                        maxLines = if (LocalDensity.current.fontScale > 1.3f) 2 else 1, overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = {
                     NbIconButton(if (close) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack, if (close) "Close" else "Back", onBack)
                 },
@@ -150,7 +162,8 @@ fun PushedScreen(
 }
 
 /** Tablets and unfolded foldables: keep lists to a readable column, centred, instead of running edge to edge. */
-fun Modifier.readable() = wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth()
+/** Pass a smaller [max] for forms and button stacks (480 dp) so fields don't stretch across a landscape phone. */
+fun Modifier.readable(max: Dp = 720.dp) = wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = max).fillMaxWidth()
 
 /** Standard scrolling body for a [PushedScreen]. */
 @Composable

@@ -1,5 +1,6 @@
 package com.soyeb.ieltspractice.feature
 
+import com.soyeb.ieltspractice.data.model.LrAttemptItem
 import com.soyeb.ieltspractice.data.model.Mock
 import com.soyeb.ieltspractice.data.model.MockSection
 import com.soyeb.ieltspractice.design.Skill
@@ -53,5 +54,11 @@ class HistoryLogicTest {
         assertEquals(6.5, done.band)
         assertEquals(HStatus.Open, Mock("m2", startedAt = "2026-10-02T09:00:00Z").toItem().status)
         assertEquals(HStatus.Analysing, Mock("m3", status = "completed", sections = listOf(MockSection("speaking", state = "marking"))).toItem().status)
+    }
+
+    @Test fun bandlessWholeTestIsPractice() {
+        val drill = LrAttemptItem(id = "a", skill = "reading", title = "T", status = "submitted", startedAt = "2026-10-01T00:00:00Z")
+        assertEquals("Practice", drill.toItem().detail)
+        assertEquals("Full test", drill.copy(band = 6.5).toItem().detail)
     }
 }

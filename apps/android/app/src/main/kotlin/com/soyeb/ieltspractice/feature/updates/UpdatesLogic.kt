@@ -28,13 +28,15 @@ fun buildUpdates(due: Int, mockId: String?, attempts: List<HistoryItem>, examDat
     val recent = attempts.filter { (it.instant ?: Instant.EPOCH) > since }.map {
         if (it.status == HStatus.Analysing && (it.instant ?: Instant.EPOCH) < stuck) it.copy(status = HStatus.Failed) else it
     }
+    val days = daysToExam(examDate, now, zone)?.takeIf { it in 0..30 }
     return buildList {
         recent.filter { it.status == HStatus.Analysing }.forEach { add(UpdateRow(UpdateKind.Marking, "a:${it.id}", it)) }
         recent.filter { it.status == HStatus.Failed }.forEach { add(UpdateRow(UpdateKind.Failed, "f:${it.id}", it)) }
         recent.filter { it.status == HStatus.Done && it.band != null }.take(4).forEach { add(UpdateRow(UpdateKind.Result, "d:${it.id}", it)) }
         if (due > 0) add(UpdateRow(UpdateKind.Cards, "cards", n = due))
-        if (mockId != null) add(UpdateRow(UpdateKind.Mock, "mock", mockId = mockId))
-        daysToExam(examDate, now, zone)?.takeIf { it in 0..30 }?.let { add(UpdateRow(UpdateKind.Exam, "exam", n = it, mockId = mockId)) }
+        // An Exam row 2+ days out already opens the open mock, so the Mock row would be a second nudge for one action.
+        if (mockId != null && (days == null || days <= 1)) add(UpdateRow(UpdateKind.Mock, "mock", mockId = mockId))
+        days?.let { add(UpdateRow(UpdateKind.Exam, "exam", n = it, mockId = mockId)) }
     }
 }
 

@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import com.soyeb.ieltspractice.design.rise
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -26,8 +27,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -51,11 +50,10 @@ import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.SkillTile
+import com.soyeb.ieltspractice.design.components.readable
 import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.Nav
 import com.soyeb.ieltspractice.nav.Onboarding
-import com.soyeb.ieltspractice.nav.TodayTab
-import com.soyeb.ieltspractice.LocalGraph
 
 
 /**
@@ -65,8 +63,6 @@ import com.soyeb.ieltspractice.LocalGraph
 @Composable
 fun WelcomeScreen(nav: Nav) {
     val c = NB.colors
-    // Back here after signing out: goals are already set, so skip the three setup pages.
-    val onboarded by LocalGraph.current.prefs.onboardingDone.collectAsState(initial = false)
     val hero = heroFill()
     val onHero = heroInk().fg
     val onHeroMuted = heroInk().muted
@@ -76,7 +72,8 @@ fun WelcomeScreen(nav: Nav) {
         // Header and value lines scroll together; the two ways in stay pinned below, whatever the font scale.
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Box(Modifier.fillMaxWidth().background(hero)) {
-                BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 110.dp, y = (-30).dp).size(340.dp))
+                // Pushed right and faded so its ticks sit beside the copy as texture, never as a stroke through a word.
+                BandScale(onHero, Modifier.align(Alignment.TopEnd).offset(x = 150.dp, y = (-30).dp).size(340.dp).alpha(0.4f))
                 Column(
                     // 56 = 32 of air + the 24 the sheet below rises over.
                     Modifier.statusBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 20.dp, bottom = 56.dp),
@@ -104,7 +101,7 @@ fun WelcomeScreen(nav: Nav) {
                 }
             }
             Column(
-                Modifier.fillMaxWidth().offset(y = (-24).dp).clip(NB.shape.sheet).background(c.surface)
+                Modifier.fillMaxWidth().offset(y = (-24).dp).clip(NB.shape.sheet).background(c.surface).readable(480.dp)
                     .padding(horizontal = NB.space.gutter).padding(top = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
@@ -113,8 +110,8 @@ fun WelcomeScreen(nav: Nav) {
                 ValueLine(Skill.Reading, "Full Listening and Reading tests", "Timed like the exam, free, with every answer explained.", Modifier.rise(5))
             }
         }
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp)) {
-            NbButton("Start practising free", { if (onboarded) nav.reset(TodayTab) else nav.go(Onboarding) }, fill = true, size = BtnSize.Large, haptic = true)
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().readable(480.dp).padding(horizontal = NB.space.gutter).padding(top = 4.dp, bottom = 12.dp)) {
+            NbButton("Start practising free", { nav.go(Onboarding) }, fill = true, size = BtnSize.Large, haptic = true)
             NbButton("I have an account", { nav.go(Auth("signin")) }, kind = BtnKind.Text, fill = true)
         }
     }
