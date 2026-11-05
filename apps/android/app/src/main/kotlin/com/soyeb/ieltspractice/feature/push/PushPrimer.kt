@@ -92,7 +92,7 @@ private fun PushPrimer(onTurnOn: () -> Unit, onNotNow: () -> Unit) {
         }
         Text("Want a ping when your band is ready and before your streak runs out?", style = NB.type.title1, color = c.ink, modifier = Modifier.semantics { heading() })
         Text(
-            "Marking takes a minute or two. We'll tell you the moment it's done. Reminders come at most once a day, never between 22:30 and 08:00, and you can switch each kind off in Settings.",
+            "Marking takes a minute or two. We'll tell you the moment it's done. Reminders come at most once a day, never in your quiet hours, and you can switch each kind off in Settings.",
             style = NB.type.body, color = c.muted,
         )
     }

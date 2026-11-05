@@ -14,7 +14,7 @@ Analytics collection switched off in the manifest.
 | Audio recordings (Audio) | Speaking answers, live examiner voice | Transcription and scoring | Soniox (speech to text), LiveKit (live session transport), stored in Cloudflare R2 | Yes: only Speaking uses the mic | Account deletion removes R2 audio |
 | Other user-generated content | Writing essays, transcripts | AI feedback and band scores | OpenRouter (routes to Anthropic / OpenAI models) | Yes | Account deletion |
 | App interactions / Other app activity | Test attempts, answers, scores, streaks | Progress, quotas | Not shared | No (needed for the service) | Account deletion |
-| Device or other IDs | The Firebase Installation ID this phone gets push through (FCM), with app version and phone language; the Better Auth session token stays on the device | Push notifications (app functionality) | Google Firebase Cloud Messaging delivers the pushes (processor) | Yes: no notification permission means nothing is shown | Sign out removes it from the account (DELETE /api/push/token); account deletion deletes it |
+| Device or other IDs | The Firebase Installation ID this phone gets push through (FCM), with app version and phone language; the Better Auth session token stays on the device | Push notifications (app functionality) | Google Firebase Cloud Messaging delivers the pushes (processor) | No: sent on every launch and sign-in; turning notifications off only stops them showing | Sign out removes it from the account (DELETE /api/push/token); account deletion deletes it |
 
 Processors act on our behalf (Play: "service providers"), so the form may list them as not shared; declare them as collected.
 
