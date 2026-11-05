@@ -22,7 +22,7 @@ const Streak = z
       .object({ target: z.number(), until: z.string(), daysDone: z.number() })
       .nullable()
       .openapi({ description: 'Broken streak with no freeze: practise on 2 separate days before `until` to get `target` back' }),
-    remindAt: z.string().nullable().openapi({ description: 'Today\'s reminder time, HH:MM local: the student\'s chosen time, else their usual practice time (20:30 at the latest while a streak is at risk), clear of quiet hours and Jumu\'ah. The app schedules its local streak reminder for it; null = no time fits today' }),
+    remindAt: z.string().nullable().openapi({ description: 'Today\'s streak-reminder time, HH:MM local: the student\'s chosen time, else their usual practice time (20:30 at the latest), clear of quiet hours and Jumu\'ah. The app schedules its local streak reminder for it. null = no reminder today: no streak at risk (under 2 days, or already practised), streak reminders off, the holdout group, a back-off level of 2 or more (incl. after the goodbye), or today\'s nudge cap already used (a nudge went today, or every other day at level 1)' }),
     justReached: z.number().optional().openapi({ description: 'A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today' }),
   })
   .openapi('Streak');
@@ -41,7 +41,8 @@ export function register(app: App) {
     }),
     async (c) => {
       const id = currentUser(c).id;
-      const [streak, remindAt] = await Promise.all([getStreak(id), remindAtFor(id).catch(() => null)]);
+      const streak = await getStreak(id); // first: it refreshes the cached streak row remindAtFor reads
+      const remindAt = await remindAtFor(id).catch(() => null);
       return c.json({ ...streak, remindAt }, 200);
     },
   );

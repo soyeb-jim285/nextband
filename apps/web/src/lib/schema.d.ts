@@ -7823,7 +7823,7 @@ export interface components {
                 until: string;
                 daysDone: number;
             } | null;
-            /** @description Today's reminder time, HH:MM local: the student's chosen time, else their usual practice time (20:30 at the latest while a streak is at risk), clear of quiet hours and Jumu'ah. The app schedules its local streak reminder for it; null = no time fits today */
+            /** @description Today's streak-reminder time, HH:MM local: the student's chosen time, else their usual practice time (20:30 at the latest), clear of quiet hours and Jumu'ah. The app schedules its local streak reminder for it. null = no reminder today: no streak at risk (under 2 days, or already practised), streak reminders off, the holdout group, a back-off level of 2 or more (incl. after the goodbye), or today's nudge cap already used (a nudge went today, or every other day at level 1) */
             remindAt: string | null;
             /** @description A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today */
             justReached?: number;
@@ -7842,6 +7842,8 @@ export interface components {
             appVersion?: string;
             /** @description Device locale (BCP 47, e.g. bn-BD): push language until notifyLanguage is set */
             locale?: string;
+            /** @description The student opened the app (it came to the foreground). Resets the nudge back-off; a start in the background (an FCM wake-up) must not send it */
+            foreground?: boolean;
         };
         PushUnregister: {
             /** @description FCM registration token, or the Firebase Installation ID when kind is fid */

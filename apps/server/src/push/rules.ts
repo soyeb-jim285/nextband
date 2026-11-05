@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import type { PushChannel } from '@ielts/core';
 import { isTimeZone, type Settings } from '../settings';
 
-/** The P1/P2 types (§4) the server sends. #4 last call is local only (the app), #11 weekly recap is round D, #9 milestone near has its own copy. */
+/** The P1/P2 types (§4) the server sends. #4 last call is local only (the app), #11 weekly recap is round D (templates.ts NOT_WIRED), #9 milestone near has its own copy. */
 export const NUDGE_TYPES = ['streak', 'milestone', 'drills', 'pattern', 'exam', 'cold', 'winback', 'goodbye', 'mock'] as const;
 export type NudgeType = (typeof NUDGE_TYPES)[number];
 export const isNudge = (t: string): t is NudgeType => (NUDGE_TYPES as readonly string[]).includes(t);
@@ -16,8 +16,8 @@ export const NUDGE_CHANNEL: Record<NudgeType, PushChannel> = {
 export const NUDGE_SWITCH: Record<NudgeType, keyof Settings> = {
   streak: 'notifyStreak', milestone: 'notifyStreak', drills: 'notifyPractice', pattern: 'notifyPractice', exam: 'notifyExam', cold: 'notifyPractice', winback: 'notifyPractice', goodbye: 'notifyPractice', mock: 'notifyPractice',
 };
-/** §4 priority: P1 = timely and valuable (2), P2 = nudge (1). */
-export const PRIORITY: Record<NudgeType, number> = { streak: 2, milestone: 1, drills: 1, pattern: 2, exam: 2, cold: 1, winback: 1, goodbye: 1, mock: 1 };
+/** §4 priority: P1 = timely and valuable (2), P2 = nudge (1). #9 milestone near only runs merged into #3 (planner), so it keeps #3's P1. */
+export const PRIORITY: Record<NudgeType, number> = { streak: 2, milestone: 2, drills: 1, pattern: 2, exam: 2, cold: 1, winback: 1, goodbye: 1, mock: 1 };
 /** Days before a type is fully "fresh" again after it was sent (§5.3 freshness). */
 const COOLDOWN: Record<NudgeType, number> = { streak: 1, milestone: 1, drills: 2, pattern: 7, exam: 1, cold: 7, winback: 3, goodbye: 1, mock: 3 };
 
@@ -41,13 +41,14 @@ export const STREAK_LATEST = hhmm('20:30');
 const JUMUAH: [number, number] = [hhmm('12:30'), hhmm('14:00')];
 const WINDOW = 15; // the send window is ±15 min around the send time
 
-/** Median local minute of the student's activity starts (last 21 days) minus 30 min; 19:30 with fewer than 4 of them. */
+const NIGHT_END = hhmm('04:00'); // a start before 04:00 belongs to the evening before
+/** Median local minute of the student's activity starts (last 21 days) minus 30 min; 19:30 with fewer than 4 of them. Starts before
+ *  04:00 count as 24:00+, so a night owl's 23:50 and 00:10 give midnight, not noon. */
 export function usualMinute(starts: number[]): number {
   if (starts.length < 4) return DEFAULT_USUAL;
-  const s = [...starts].sort((a, b) => a - b);
+  const s = starts.map((m) => (m < NIGHT_END ? m + DAY_MIN : m)).sort((a, b) => a - b);
   const mid = s.length >> 1;
   const median = s.length % 2 ? s[mid]! : Math.round((s[mid - 1]! + s[mid]!) / 2);
-  // ponytail: a plain median, so starts either side of midnight (23:50, 00:10) average to noon-ish; quiet hours cover that hour anyway
   return (median - 30 + DAY_MIN) % DAY_MIN;
 }
 
@@ -55,14 +56,15 @@ const inRange = (m: number, [a, b]: [number, number]) => (a <= b ? m >= a && m <
 /** No nudge now: quiet hours (default 22:30–08:00, across midnight) or, on Friday, Jumu'ah 12:30–14:00. */
 export const blocked = (minute: number, weekday: number, quiet: [number, number]) => inRange(minute, quiet) || (weekday === 5 && inRange(minute, JUMUAH));
 
-/** The send time nearest `want` whose whole ±15 min window is outside quiet hours and Jumu'ah; null when no such time exists. */
-export function placeSend(want: number, weekday: number, quiet: [number, number]): number | null {
+/** The send time nearest `want` whose whole ±15 min window is outside quiet hours and Jumu'ah; null when no such time exists.
+ *  `notLater`: only `want` or earlier (the streak saver's 20:30 at the latest). */
+export function placeSend(want: number, weekday: number, quiet: [number, number], notLater = false): number | null {
   const clear = (t: number) => {
     for (let m = t - WINDOW; m < t + WINDOW; m++) if (blocked((m + DAY_MIN) % DAY_MIN, weekday, quiet)) return false;
     return true;
   };
   for (let d = 0; d <= DAY_MIN / 2; d += 5)
-    for (const t of d ? [want - d, want + d] : [want]) {
+    for (const t of d ? (notLater ? [want - d] : [want - d, want + d]) : [want]) {
       const m = (t + DAY_MIN) % DAY_MIN;
       if (clear(m)) return m;
     }
@@ -72,9 +74,11 @@ export function placeSend(want: number, weekday: number, quiet: [number, number]
 /** Today's send time (§5.2): the student's chosen "Best time to remind me", else the usual time from `starts` (local minutes); with an
  *  at-risk streak and no chosen time, 20:30 at the latest (§4 #3); then moved clear of quiet hours and Jumu'ah. */
 export function sendMinute(o: { remindAt: string | null; starts: number[]; atRisk: boolean; weekday: number; quiet: [number, number] }): number | null {
-  let want = o.remindAt ? hhmm(o.remindAt) : usualMinute(o.starts);
-  if (!o.remindAt && o.atRisk) want = Math.min(want, STREAK_LATEST);
-  return placeSend(want, o.weekday, o.quiet);
+  if (o.remindAt) return placeSend(hhmm(o.remindAt), o.weekday, o.quiet);
+  const usual = usualMinute(o.starts);
+  // at risk: 20:30 at the latest, and a usual time after midnight (a night owl) is later than that too; moved only earlier
+  if (o.atRisk) return placeSend(usual < NIGHT_END ? STREAK_LATEST : Math.min(usual, STREAK_LATEST), o.weekday, o.quiet, true);
+  return placeSend(usual, o.weekday, o.quiet);
 }
 
 /** `now` is inside the ±15 min window around `send` (minutes of the day, across midnight). */
@@ -125,10 +129,12 @@ export function underCaps(level: number, today: string, sentDays: string[]): boo
 export const isHoldout = (userId: string) => createHash('sha256').update(`holdout-v1:${userId}`).digest().readUInt32BE(0) % 100 < 10;
 
 // ---------- §5.3 choosing the type ----------
-export type Candidate = { type: NudgeType; vars: Record<string, string>; route: string };
+/** noDrill: fewer than 5 cards, so no copy that only offers drills; noFomo: a saved freeze covers tonight, so no FOMO copy (templates.ts fits). */
+export type Candidate = { type: NudgeType; vars: Record<string, string>; route: string; noDrill?: boolean; noFomo?: boolean };
 export type TypeHistory = { sent: number; ignored: number; lastSentDaysAgo: number | null };
 
-/** priority × freshness × (1 − fatigue); fatigue = ignored share of this type in the last 14 days (one ignored of one = 0.5, not 1). */
+/** priority × freshness × (1 − fatigue); fatigue = ignored share of this type in the last 14 days, smoothed as ignored / (sent + 1) so
+ *  one ignored of one is 0.5, not 1, and a type is never scored out for good (§5.3). */
 export function score(c: Candidate, h: TypeHistory | undefined): number {
   const fresh = h?.lastSentDaysAgo == null ? 1 : Math.min(1, h.lastSentDaysAgo / COOLDOWN[c.type]);
   const fatigue = h ? h.ignored / (h.sent + 1) : 0;

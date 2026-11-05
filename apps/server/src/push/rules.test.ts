@@ -82,6 +82,7 @@ describe('usual time', () => {
     expect(usualMinute([t('20:00'), t('21:00'), t('20:10'), t('20:20')])).toBe(t('19:45'));
     expect(usualMinute([t('06:00'), t('07:00'), t('07:10'), t('22:00'), t('07:20')])).toBe(t('06:40'));
     expect(usualMinute([t('00:10'), t('00:10'), t('00:20'), t('00:20')])).toBe(t('23:45'));
+    expect(usualMinute([t('23:30'), t('23:50'), t('00:10'), t('00:30'), t('23:40')])).toBe(t('23:20')); // across midnight: not noon
   });
   it('the send time: chosen time first, an at-risk streak by 20:30, clear of quiet hours', () => {
     const late = [t('21:30'), t('21:40'), t('21:50'), t('22:00')]; // usual 21:15
@@ -92,6 +93,10 @@ describe('usual time', () => {
     expect(sendMinute({ ...base, remindAt: '21:00', atRisk: true })).toBe(t('21:00')); // the student's own choice wins
     expect(sendMinute({ ...base, remindAt: '13:00', weekday: FRI })).toBe(t('12:15'));
     expect(sendMinute({ ...base, remindAt: '23:30' })).toBe(t('22:15'));
+    const owl = [t('00:30'), t('00:40'), t('01:00'), t('01:10')]; // usual 00:20
+    expect(sendMinute({ ...base, starts: owl })).toBe(t('22:15'));
+    expect(sendMinute({ ...base, starts: owl, atRisk: true })).toBe(t('20:30')); // never moved past 20:30
+    expect(sendMinute({ ...base, atRisk: true, quiet: [t('20:00'), t('08:00')] })).toBe(t('19:45')); // 20:30 is quiet: earlier, not later
   });
 });
 

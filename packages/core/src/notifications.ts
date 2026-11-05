@@ -58,9 +58,16 @@ export function renderPush(type: PushType, lang: PushLanguage, vars: Record<stri
   return { templateId: t.id, title: fillTemplate(t.title, vars), body: fillTemplate(t.body, vars) };
 }
 
-// §5.6 guardrail list plus "plan" and a few more selling words. Matched as whole words, case-insensitive.
-const SELLING = ['pro', 'premium', 'upgrade', 'upgrades', 'price', 'prices', 'pricing', 'buy', 'subscribe', 'subscription', 'website', 'link', 'plan', 'plans', 'unlock', 'discount', 'offer', 'sale', 'purchase', 'pay', 'payment'];
-const SHAME = ['disappointed', 'disappointing', 'lazy', 'failing', 'ashamed', 'shame', 'pathetic'];
+// §5.6 guardrail list plus "plan" and a few more selling words, in English and Banglish (romanised Bangla). Whole words or phrases,
+// case-insensitive. SHAME also covers §2 rule 5's comparison guilt ("your friends are ahead").
+const SELLING = [
+  'pro', 'premium', 'upgrade', 'upgrades', 'price', 'prices', 'pricing', 'buy', 'subscribe', 'subscription', 'website', 'link', 'plan', 'plans', 'unlock', 'discount', 'offer', 'offers', 'sale', 'purchase', 'pay', 'payment',
+  'kino', 'kinun', 'kinte', 'kineo', 'dam', 'daam', 'taka', 'tk', 'bkash', 'chhar', 'char dicchi', 'subscribe koro',
+];
+const SHAME = [
+  'disappointed', 'disappointing', 'lazy', 'failing', 'ashamed', 'shame', 'pathetic', 'friends', 'everyone else', 'others are ahead', 'falling behind', 'left behind',
+  'olosh', 'alsho', 'lojja', 'lojjar', 'faki', 'fanki', 'pichiye porcho', 'pichiye pore', 'pichiye jaccho', 'bondhura', 'bondhu ra', 'shobai egiye',
+];
 const SYMBOLS = ['৳', '$', 'nextband.app', 'http', 'www.'];
 const words = (list: string[]) => new RegExp(`(?<![\\p{L}\\p{N}])(${list.join('|')})(?![\\p{L}\\p{N}])`, 'iu');
 const SELLING_RE = words(SELLING);

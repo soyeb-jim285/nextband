@@ -566,6 +566,7 @@ export const streaks = pgTable('streaks', {
   freezes: integer('freezes').notNull().default(0),
   frozenDays: date('frozen_days', { mode: 'string' }).array().notNull().default(sql`'{}'::date[]`),
   repairUntil: timestamp('repair_until', { withTimezone: true }),
+  practisedAt: timestamp('practised_at', { withTimezone: true }), // the latest recordActivity: practising resets the push back-off (§5.4)
   updatedAt: updatedAt(),
 });
 
@@ -580,6 +581,7 @@ export const notificationDevices = pgTable('notification_devices', {
   locale: text('locale'), // BCP 47 from the device; picks the push language until the student chooses one
   createdAt: createdAt(),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  appOpenedAt: timestamp('app_opened_at', { withTimezone: true }), // the app came to the foreground (PUT foreground: true): resets the back-off (§5.4)
   disabledAt: timestamp('disabled_at', { withTimezone: true }), // FCM said UNREGISTERED / invalid: never sent to again until re-registered
 }, (t) => [index('notification_devices_user_idx').on(t.userId)]);
 

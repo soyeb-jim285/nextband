@@ -103,6 +103,7 @@ export async function recordActivity(userId: string, add: Add, at = new Date()):
       const set = Object.fromEntries(Object.entries(v).map(([k, n]) => [k, sql`${activityDays[k as keyof Add]} + ${n}`]));
       await tx.insert(activityDays).values({ userId, day: localDay(at, tz), ...v }).onConflictDoUpdate({ target: [activityDays.userId, activityDays.day], set });
       await settle(tx, userId, tz, at);
+      await tx.update(streaks).set({ practisedAt: sql`greatest(${streaks.practisedAt}, ${at.toISOString()}::timestamptz)` }).where(eq(streaks.userId, userId));
     });
     await markActed(userId, at);
   } catch (e) {

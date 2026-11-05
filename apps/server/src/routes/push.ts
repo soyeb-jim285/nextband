@@ -20,6 +20,7 @@ const Register = z
     platform: z.enum(['android', 'ios', 'web']),
     appVersion: z.string().max(40).optional(),
     locale: z.string().max(35).optional().openapi({ description: 'Device locale (BCP 47, e.g. bn-BD): push language until notifyLanguage is set' }),
+    foreground: z.boolean().optional().openapi({ description: 'The student opened the app (it came to the foreground). Resets the nudge back-off; a start in the background (an FCM wake-up) must not send it' }),
   })
   .openapi('PushRegister');
 
@@ -39,7 +40,7 @@ export function register(app: App) {
       const b = c.req.valid('json');
       // ponytail: no proof the caller owns this install. Taking another phone's FID (not public) only redirects pushes to it, and the app drops
       // any push whose data.uid isn't its signed-in user; that phone's next launch takes its row back. A per-token move limit if that's ever abused.
-      const row = { userId: me.id, kind: b.kind, platform: b.platform, appVersion: b.appVersion ?? null, locale: b.locale ?? null, lastSeenAt: new Date(), disabledAt: null };
+      const row = { userId: me.id, kind: b.kind, platform: b.platform, appVersion: b.appVersion ?? null, locale: b.locale ?? null, lastSeenAt: new Date(), disabledAt: null, ...(b.foreground && { appOpenedAt: new Date() }) };
       await db.insert(notificationDevices).values({ token: b.token, ...row }).onConflictDoUpdate({ target: notificationDevices.token, set: row });
       const keep = db.select({ token: notificationDevices.token }).from(notificationDevices).where(eq(notificationDevices.userId, me.id)).orderBy(desc(notificationDevices.lastSeenAt)).limit(MAX_DEVICES);
       await db.delete(notificationDevices).where(and(eq(notificationDevices.userId, me.id), notInArray(notificationDevices.token, keep)));

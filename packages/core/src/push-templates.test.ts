@@ -29,3 +29,12 @@ it('every type has English and Banglish copy, ids are unique across all push cop
   const ids = [...all.map((x) => x.t.id), ...Object.values(PUSH_TEMPLATES).flatMap((l) => Object.values(l).flat().map((t) => t.id))];
   expect(new Set(ids).size).toBe(ids.length);
 });
+
+it('every template reads right with the smallest facts too (no "1 tests", no "0 drills")', () => {
+  const MIN = { streak: '2', milestone: '3', due: '5', pattern: 'Spelling mistakes', skill: 'Reading', hits: '3', of: '3', days: '3', band: '4.0', idle: '3', weakest: 'Reading', active: '1', tests: '0', drills: '0', parts: 'Speaking' };
+  for (const { t } of all) {
+    const m = { title: fillTemplate(t.title, MIN), body: fillTemplate(t.body, MIN) };
+    expect(checkPush(m), t.id).toEqual([]);
+    expect(`${m.title} ${m.body}`, t.id).not.toMatch(/\b(0|1) (tests|drills|drill cards|cards|days)\b/);
+  }
+});

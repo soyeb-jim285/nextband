@@ -8,8 +8,8 @@ import { activityDays, analyses, attempts, cards, mistakes, notificationDevices,
 import { setFetch } from '../ai/openrouter';
 import { pushSweep, setFcmAccount } from '../push';
 import { getSettings } from '../settings';
-import { recordActivity } from '../streaks';
-import { candidates, nudgeSweep, templateStats } from './planner';
+import { getStreak, recordActivity } from '../streaks';
+import { candidates, nudgeSweep, remindAtFor, templateStats } from './planner';
 import { isHoldout } from './rules';
 
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -122,10 +122,61 @@ it('back-off: 8 ignored in a row sends the goodbye, then only the exam countdown
   expect((await logs(id)).at(-1)).toMatchObject({ type: 'exam', route: '/mock' });
   await db.update(notificationLog).set({ status: 'sent', sentAt: at(`${THU}T19:30`) }).where(eq(notificationLog.status, 'pending'));
   expect(await nudgeSweep(at('2026-10-30T14:30'))).toBe(0); // Friday: level 3, nothing allowed (and no exam day)
-  // the student opens the app: level 0 again, so the due drills come back (it's past Jumuah)
-  await db.update(notificationDevices).set({ lastSeenAt: at('2026-10-31T09:00') }).where(eq(notificationDevices.userId, id));
+  // the student opens the app (a foreground PUT): level 0 again, so the due drills come back (it's past Jumuah)
+  await db.update(notificationDevices).set({ appOpenedAt: at('2026-10-31T09:00') }).where(eq(notificationDevices.userId, id));
   expect(await nudgeSweep(at('2026-10-31T19:30'))).toBe(1);
   expect((await logs(id)).at(-1)).toMatchObject({ type: 'drills', route: '/improve/drill' });
+});
+
+it('back-off: an FCM wake-up after each push (last_seen_at moves, app never opened) does not reset it; only a foreground PUT does', async () => {
+  const id = await student();
+  for (let d = 9; d <= 16; d++) {
+    const when = new Date(at(`${THU}T19:30`).getTime() - d * DAY);
+    await sent(id, 'drills', when);
+    // the push woke the app process: AppGraph re-registers the device in the background, seconds later
+    await db.update(notificationDevices).set({ lastSeenAt: new Date(when.getTime() + 5000) }).where(eq(notificationDevices.userId, id));
+  }
+  expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(1);
+  expect((await logs(id)).at(-1)).toMatchObject({ type: 'goodbye' });
+
+  // the route: a background PUT leaves app_opened_at alone, a foreground one sets it
+  const g = await guestUser();
+  const put = (extra: object) => req('/api/push/token', { method: 'PUT', headers: g.headers, body: { token: `fid-${g.user.id}`, kind: 'fid', platform: 'android', ...extra } });
+  const opened = async () => (await db.select().from(notificationDevices).where(eq(notificationDevices.userId, g.user.id)))[0]!.appOpenedAt;
+  expect((await put({})).status).toBe(200);
+  expect(await opened()).toBeNull();
+  expect((await put({ foreground: true })).status).toBe(200);
+  const first = await opened();
+  expect(first).toBeInstanceOf(Date);
+  expect((await put({})).status).toBe(200);
+  expect(await opened()).toEqual(first);
+});
+
+it('back-off: practising after a push resets it, even later the same day', async () => {
+  const id = await student();
+  // 8 ignored pushes on the 20th (written straight into the log), then practice at 22:00 that day, outside their 2 h windows
+  for (let h = 10; h <= 17; h++) await sent(id, 'drills', at(`2026-10-20T${h}:00`));
+  await recordActivity(id, { drills: 5 }, at('2026-10-20T22:00'));
+  const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
+  await db.insert(cards).values(Array.from({ length: 5 }, (_, i) => ({ userId: id, front: `f${i}`, back: 'b', source: 'mistake', due: new Date('2026-10-01T00:00:00Z') })));
+  expect((await candidates(id, settings, 'Asia/Dhaka', at(`${THU}T19:30`))).map((c) => c.type)).toContain('drills');
+  expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(1);
+  expect((await logs(id)).at(-1)).toMatchObject({ type: 'drills' }); // level 0, not the goodbye
+});
+
+it('back-off at level 3 with practice reminders off: no goodbye, the exam countdown still goes', async () => {
+  const id = await student(false, { examDate: '2026-11-05', notifyPractice: false });
+  for (let d = 9; d <= 16; d++) await sent(id, 'drills', new Date(at(`${THU}T19:30`).getTime() - d * DAY));
+  expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(1);
+  expect((await logs(id)).at(-1)).toMatchObject({ type: 'exam' });
+});
+
+it('the holdout backs off like everyone else: 8 holdout rows since it last opened the app log a holdout goodbye', async () => {
+  const h = await student(true, { examDate: '2026-12-31' });
+  for (let d = 9; d <= 16; d++) await sent(h, 'drills', new Date(at(`${THU}T19:30`).getTime() - d * DAY), { status: 'skipped', holdout: true, sentAt: null });
+  await practised(h, '2026-10-27', '2026-10-28'); // activity days alone (no practised_at) reset nothing
+  expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(0);
+  expect((await logs(h)).at(-1)).toMatchObject({ type: 'goodbye', holdout: true, status: 'skipped' });
 });
 
 it("Jumu'ah: a Friday reminder time inside 12:30–14:00 moves out of it", async () => {
@@ -155,11 +206,12 @@ it('finds the candidates: drills due, a pattern, the exam countdown, a cold skil
   const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
   const c = await candidates(id, settings, 'Asia/Dhaka', now);
   expect(c.map((x) => x.type).sort()).toEqual(['cold', 'drills', 'exam', 'pattern', 'winback']);
-  expect(c.find((x) => x.type === 'pattern')).toMatchObject({ vars: { pattern: 'Articles', skill: 'Writing', hits: '3', of: '4' }, route: '/improve/drill?pattern=grammar.article' });
+  expect(c.find((x) => x.type === 'pattern')).toMatchObject({ vars: { pattern: 'Article mistakes', skill: 'Writing', hits: '3', of: '4' }, route: '/improve/drill?pattern=grammar.article' });
   expect(c.find((x) => x.type === 'cold')).toMatchObject({ vars: { skill: 'Speaking', idle: '10', band: '6.0' }, route: '/speaking' });
   expect(c.find((x) => x.type === 'exam')!.vars).toEqual({ days: '14', band: '6.5', weakest: 'Speaking' });
   expect(c.find((x) => x.type === 'winback')!.vars).toMatchObject({ idle: '3', band: '6.5' });
   expect(c.find((x) => x.type === 'drills')!.vars).toEqual({ due: '5' });
+  expect(c.some((x) => x.noDrill)).toBe(false); // 5 cards: drill copy is fine
   // P1 pattern and exam beat the rest; with both fresh the first listed wins
   expect(await nudgeSweep(now)).toBe(1);
   expect(['pattern', 'exam']).toContain((await logs(id))[0]!.type);
@@ -169,11 +221,56 @@ it('milestone near replaces the streak saver two practice days before a mileston
   const id = await student();
   await practised(id, '2026-10-28'); // a 1-day streak, today not yet: today and tomorrow make day 3
   const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
-  expect(await candidates(id, settings, 'Asia/Dhaka', at(`${THU}T19:30`))).toEqual([{ type: 'milestone', vars: { milestone: '3' }, route: '/streak' }]);
+  // no cards yet: only copy that doesn't send the student to drills
+  expect(await candidates(id, settings, 'Asia/Dhaka', at(`${THU}T19:30`))).toEqual([{ type: 'milestone', vars: { milestone: '3' }, route: '/streak', noDrill: true }]);
+  // 5 due cards make #5 a candidate too; the merged #3/#9 keeps the streak saver's P1 and wins
+  await db.insert(cards).values(Array.from({ length: 5 }, (_, i) => ({ userId: id, front: `f${i}`, back: 'b', source: 'mistake', due: new Date('2026-10-01T00:00:00Z') })));
   expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(1);
   const [row] = await logs(id);
   expect(row).toMatchObject({ type: 'milestone', templateId: expect.stringMatching(/^milestone-en-/) });
   expect(`${row!.title} ${row!.body}`).not.toContain('{');
+});
+
+it('pattern alert: "of" is how many marked tests there are, at most 4', async () => {
+  const id = await student();
+  const now = at(`${THU}T19:30`);
+  const w = await seedPrompt({ skill: 'writing', part: 2, type: 'opinion' });
+  for (let i = 0; i < 3; i++) {
+    const [a] = await db.insert(attempts).values({ userId: id, promptId: w.id, skill: 'writing', part: 2, text: 'x', status: 'done', createdAt: new Date(now.getTime() - (i + 1) * 3_600_000) }).returning();
+    await db.insert(analyses).values({ attemptId: a!.id, result: { errors: [] }, overall: 6.5, criteria: {}, models: {} });
+    await db.insert(mistakes).values({ userId: id, attemptId: a!.id, errorId: 'e', category: 'task.relevance', original: 'a', correction: 'b', explanation: 'x' });
+  }
+  const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
+  expect((await candidates(id, settings, 'Asia/Dhaka', now)).find((x) => x.type === 'pattern')!.vars).toEqual({ pattern: 'Going off topic', skill: 'Writing', hits: '3', of: '3' });
+});
+
+it('a saved freeze: the streak saver goes without FOMO copy', async () => {
+  const id = await student();
+  await practised(id, ...Array.from({ length: 8 }, (_, i) => `2026-10-${String(20 + i).padStart(2, '0')}`).concat('2026-10-28')); // 9 days: 1 freeze earned
+  const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
+  const [c] = await candidates(id, settings, 'Asia/Dhaka', at(`${THU}T19:30`));
+  expect(c).toMatchObject({ type: 'streak', noFomo: true });
+});
+
+it('remindAt (the app\'s local streak reminder): only with a streak at risk, its switch on, outside the holdout, back-off and caps', async () => {
+  const now = at(`${THU}T10:00`);
+  const remind = async (id: string) => (await getStreak(id, now), remindAtFor(id, now));
+  const ok = await student();
+  await practised(ok, '2026-10-27', '2026-10-28');
+  expect(await remind(ok)).toBe('19:30');
+  const none = await student(); // no streak
+  expect(await remind(none)).toBeNull();
+  const done = await student();
+  await practised(done, '2026-10-28', THU); // practised today: nothing at risk
+  expect(await remind(done)).toBeNull();
+  const off = await student(false, { notifyStreak: false });
+  const hold = await student(true);
+  const capped = await student();
+  const backedOff = await student();
+  for (const id of [off, hold, capped, backedOff]) await practised(id, '2026-10-27', '2026-10-28');
+  await sent(capped, 'drills', at(`${THU}T09:00`)); // today's nudge already went
+  for (let d = 9; d <= 13; d++) await sent(backedOff, 'drills', new Date(at(`${THU}T19:30`).getTime() - d * DAY)); // level 2, caps clear
+  for (const id of [off, hold, capped, backedOff]) expect(await remind(id), id).toBeNull();
 });
 
 it('bandit counts: sent, not holdout, at least 2 h old; wins are the ones practised after', async () => {
@@ -188,9 +285,9 @@ it('bandit counts: sent, not holdout, at least 2 h old; wins are the ones practi
   expect(Object.fromEntries(await templateStats(now))).toEqual({ 'drills-en-1': { sends: 2, wins: 1 } });
 });
 
-it('GET /api/streak tells the app when to remind: 19:30 by default', async () => {
+it('GET /api/streak returns remindAt (null: a new guest has no streak at risk)', async () => {
   const g = await guestUser();
   const r = await req('/api/streak', { headers: g.headers });
   expect(r.status).toBe(200);
-  expect(((await r.json()) as { remindAt: string }).remindAt).toBe('19:30');
+  expect(await r.json()).toMatchObject({ remindAt: null });
 });

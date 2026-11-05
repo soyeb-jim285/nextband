@@ -8836,7 +8836,7 @@
               "string",
               "null"
             ],
-            "description": "Today's reminder time, HH:MM local: the student's chosen time, else their usual practice time (20:30 at the latest while a streak is at risk), clear of quiet hours and Jumu'ah. The app schedules its local streak reminder for it; null = no time fits today"
+            "description": "Today's streak-reminder time, HH:MM local: the student's chosen time, else their usual practice time (20:30 at the latest), clear of quiet hours and Jumu'ah. The app schedules its local streak reminder for it. null = no reminder today: no streak at risk (under 2 days, or already practised), streak reminders off, the holdout group, a back-off level of 2 or more (incl. after the goodbye), or today's nudge cap already used (a nudge went today, or every other day at level 1)"
           },
           "justReached": {
             "type": "number",
@@ -8892,6 +8892,10 @@
             "type": "string",
             "maxLength": 35,
             "description": "Device locale (BCP 47, e.g. bn-BD): push language until notifyLanguage is set"
+          },
+          "foreground": {
+            "type": "boolean",
+            "description": "The student opened the app (it came to the foreground). Resets the nudge back-off; a start in the background (an FCM wake-up) must not send it"
           }
         },
         "required": [

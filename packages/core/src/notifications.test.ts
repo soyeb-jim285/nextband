@@ -20,7 +20,11 @@ it('push never sells or shames', () => {
   const bad = (body: string) => checkPush({ title: 'Hi', body });
   for (const s of ['Go Pro today', 'Upgrade now', 'Only ৳299', 'Just $3', 'Buy more tests', 'Subscribe for more', 'Visit our website', 'nextband.app/pricing', 'Tap the link', 'Pick a plan', 'Unlock mocks', 'See the price'])
     expect(bad(s).some((p) => p.startsWith('selling word')), s).toBe(true);
-  for (const s of ["Don't be lazy", 'We are disappointed', "You're failing"]) expect(bad(s).some((p) => p.startsWith('shaming word')), s).toBe(true);
+  for (const s of ['Ekhon kino', 'Pro kinun aj', 'Dam matro 299 taka', '299 tk te', 'Offer e pabe', 'bKash e pay koro'])
+    expect(bad(s).some((p) => p.startsWith('selling word')), s).toBe(true);
+  for (const s of ["Don't be lazy", 'We are disappointed', "You're failing", 'Your friends are ahead', "Don't fall into falling behind", 'Others are ahead of you',
+    'Eto olosh keno?', 'Lojja lage na?', 'Faki dio na', 'Tumi pichiye porcho', 'Tomar bondhura egiye geche', 'Shobai egiye jacche'])
+    expect(bad(s).some((p) => p.startsWith('shaming word')), s).toBe(true);
   // whole words only: progress, pronunciation, explanation are fine
   expect(bad('Your progress and pronunciation improved. Planned well')).toEqual([]);
 });
