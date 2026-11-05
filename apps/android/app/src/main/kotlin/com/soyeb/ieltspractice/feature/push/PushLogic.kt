@@ -59,6 +59,14 @@ fun seenKeysFor(target: PushTarget?): List<String> = when (target) {
     else -> emptyList()
 }
 
+/**
+ * Whether a message may be drawn on this phone. [messageUid] is the server's `data.uid` (the account it was sent to); [phoneUid] is the
+ * user signed in here (null = nobody, or not known yet). A message for another account, e.g. after a sign-out whose token delete never
+ * reached the server, is dropped. A message without uid (an older server) needs only a session.
+ */
+fun pushIsForThisPhone(messageUid: String?, phoneUid: String?, signedIn: Boolean): Boolean =
+    if (messageUid.isNullOrEmpty()) signedIn else signedIn && messageUid == phoneUid
+
 const val PRIMER_WAIT_MS = 7L * 24 * 60 * 60 * 1000
 const val PRIMER_MAX_REFUSALS = 2
 

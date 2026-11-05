@@ -130,7 +130,7 @@ fun SpeakingSessionScreen(route: SpeakingSession, nav: Nav) {
     // Every part uploaded: a mock test goes back to its hub, any other test opens its result (which polls until it is marked).
     LaunchedEffect(allDone) {
         if (!allDone) return@LaunchedEffect
-        if (vm.mockId != null) nav.back() else nav.replace(AttemptResult(doneIds))
+        if (vm.mockId != null) nav.back() else nav.replace(AttemptResult(doneIds, fresh = true))
     }
     // An upload refused for a limit (no tests left, scoring paused): the same sheet as at the start, and the recording is safe.
     LaunchedEffect(failedIds) {

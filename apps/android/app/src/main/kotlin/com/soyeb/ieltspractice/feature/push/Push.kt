@@ -16,7 +16,6 @@ import androidx.core.content.ContextCompat
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.soyeb.ieltspractice.BuildConfig
-import com.soyeb.ieltspractice.MainActivity
 import com.soyeb.ieltspractice.R
 import com.soyeb.ieltspractice.data.Prefs
 import com.soyeb.ieltspractice.data.currentUserId
@@ -30,6 +29,8 @@ import com.soyeb.ieltspractice.nav.NotificationsRoute
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -59,6 +60,8 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
             api.pushDevice = prefs.getString(FID)
             api.token.collect { if (it != null) sync() }
         }
+        // The signed-in user, kept for NbMessagingService (a cold start from FCM never loads /api/me). Cleared on sign-out ([forgetUser]).
+        scope.launch { api.me.mapNotNull { it?.user?.id }.distinctUntilChanged().collect { prefs.setString(UID, it) } }
         // Auto-init is off in the manifest, so the docs' pattern: register() on every start; onRegistered() hands us the FID.
         FirebaseMessaging.getInstance().register().addOnFailureListener { Log.w(TAG, "FCM registration failed", it) }
     }
@@ -70,18 +73,32 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
         sync()
     }
 
-    /** PUT /api/push/token for the current session; quiet on failure (the next launch or sign-in sends it again). */
+    /** Every sign-out (AppGraph): pushes still addressed to that account are dropped from now on. */
+    suspend fun forgetUser() = prefs.setString(UID, null)
+
+    @Volatile private var syncedEnabled: Boolean? = null
+
+    /**
+     * PUT /api/push/token for the current session while Android lets us notify, else DELETE it: FCM deprioritises apps whose
+     * high-priority messages show nothing. Quiet on failure (the next launch, sign-in or return to the app sends it again).
+     */
     suspend fun sync() {
         val fid = prefs.getString(FID) ?: return
         val session = api.token.value ?: return
+        val on = enabled()
         try {
-            api.pushRegister(fid, BuildConfig.VERSION_NAME, Locale.getDefault().toLanguageTag(), session)
+            if (on) api.pushRegister(fid, BuildConfig.VERSION_NAME, Locale.getDefault().toLanguageTag(), session)
+            else api.pushUnregister(fid, session)
+            syncedEnabled = on
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't register this device for push", e)
         }
     }
+
+    /** MainActivity.onStart: notifications were switched on or off in Android's settings since the last [sync]. */
+    fun resync() { if (available && enabled() != syncedEnabled) scope.launch { sync() } }
 
     fun enabled(): Boolean = NotificationManagerCompat.from(app).areNotificationsEnabled()
 
@@ -94,18 +111,11 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
 
     suspend fun refusals(): Int = prefs.getString(REFUSALS)?.toIntOrNull() ?: 0
 
-    /** "Not now", or the system dialog declined: wait 7 days; after the second, only the Settings row asks. */
-    suspend fun refused(now: Long = System.currentTimeMillis()) {
-        prefs.setString(REFUSALS, (refusals() + 1).toString())
+    /** "Not now", or the system dialog declined: wait 7 days; after the second, only the Settings row asks. [forGood]: Android won't
+     *  show its dialog again, so the explainer stops now and every "Turn on" goes to the app's notification settings. */
+    suspend fun refused(forGood: Boolean = false, now: Long = System.currentTimeMillis()) {
+        prefs.setString(REFUSALS, (if (forGood) PRIMER_MAX_REFUSALS else refusals() + 1).toString())
         prefs.setString(REFUSED_AT, now.toString())
-    }
-
-    /** From MainActivity (onCreate without saved state, onNewIntent): a tapped push. The extras are consumed so a rotation never reopens it. */
-    fun handle(intent: Intent?) {
-        if (intent == null || !intent.hasExtra(EXTRA_ROUTE) && !intent.hasExtra(EXTRA_ID)) return
-        opened.value = PushOpen(intent.getStringExtra(EXTRA_ID), intent.getStringExtra(EXTRA_ROUTE))
-        intent.removeExtra(EXTRA_ID)
-        intent.removeExtra(EXTRA_ROUTE)
     }
 
     /** Opens the push's screen over the current stack, reports the open, and marks its Updates rows read. Signed-out: just the app. */
@@ -136,6 +146,7 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
         const val FID = "push:fid"
         const val REFUSALS = "push:refusals"
         const val REFUSED_AT = "push:refusedAt"
+        const val UID = "push:uid"
         const val EXTRA_ID = "push_id"
         const val EXTRA_ROUTE = "push_route"
 
@@ -145,7 +156,7 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
             )
         }
 
-        /** Draws a data-only message (`id type channel title body route`) on its channel; a tap opens MainActivity with the route. */
+        /** Draws a data-only message (`id uid type channel title body route`) on its channel; a tap goes through PushOpenActivity. */
         @SuppressLint("MissingPermission") // areNotificationsEnabled() is false without POST_NOTIFICATIONS on Android 13+
         fun show(c: Context, data: Map<String, String>) {
             val nm = NotificationManagerCompat.from(c)
@@ -154,7 +165,7 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
             ensureChannels(c)
             val id = data["id"]
             val n = (id ?: title).hashCode()
-            val intent = Intent(c, MainActivity::class.java)
+            val intent = Intent(c, PushOpenActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(EXTRA_ID, id).putExtra(EXTRA_ROUTE, data["route"])
             val tap = PendingIntent.getActivity(c, n, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)

@@ -34,6 +34,14 @@
             </intent-filter>
         </activity>
 
+        <!-- A tapped push opens through this (feature/push/PushOpenActivity.kt): not exported, so other apps can't send push extras. -->
+        <activity
+            android:name=".feature.push.PushOpenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <!-- Push: Firebase Cloud Messaging only. Messages are data-only; NbMessagingService draws them on our channels. -->
         <service android:name=".feature.push.NbMessagingService" android:exported="false">
             <intent-filter>

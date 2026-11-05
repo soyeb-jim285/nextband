@@ -149,7 +149,7 @@ fun MockHubScreen(nav: Nav, route: MockHub) {
             if (m != null) {
                 val label = MockFlow.startLabel(m)
                 if (finished) StickyActionBar {
-                    NbButton("See your result", { nav.go(MockResult(m.id)) }, fill = true, size = BtnSize.Large)
+                    NbButton("See your result", { nav.go(MockResult(m.id, fresh = true)) }, fill = true, size = BtnSize.Large)
                 } else if (label != null) StickyActionBar {
                     NbButton(label, { start(m, m.next.orEmpty()) }, fill = true, size = BtnSize.Large, loading = busy, haptic = true)
                     if (m.next == "speaking") NbButton("Take Speaking later", { nav.back() }, kind = BtnKind.Text, fill = true)

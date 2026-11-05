@@ -196,7 +196,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
                 }
                 is LiveStage.Finished -> StickyActionBar {
                     if (route.mockId != null) NbButton("Back to your mock", nav::back, fill = true, size = BtnSize.Large)
-                    else NbButton("See my score", { nav.replace(AttemptResult(stage.ids)) }, fill = true, size = BtnSize.Large)
+                    else NbButton("See my score", { nav.replace(AttemptResult(stage.ids, fresh = true)) }, fill = true, size = BtnSize.Large)
                 }
                 else -> {}
             }
@@ -228,7 +228,7 @@ private fun LiveExamContent(route: LiveExam, nav: Nav, source: String?) {
     if (stage is LiveStage.Finished && demo == null) {
         LaunchedEffect(stage) {
             delay(2200)
-            if (route.mockId != null) nav.back() else nav.replace(AttemptResult(stage.ids))
+            if (route.mockId != null) nav.back() else nav.replace(AttemptResult(stage.ids, fresh = true))
         }
     }
     if (confirmEnd) {

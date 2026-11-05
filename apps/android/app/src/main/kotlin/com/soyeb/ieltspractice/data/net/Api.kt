@@ -514,6 +514,11 @@ class Api(
         }, asToken = asToken)
     }
 
+    /** DELETE /api/push/token: this install gets no pushes for the session [asToken] (notifications are off on the phone). */
+    suspend fun pushUnregister(fid: String, asToken: String) {
+        raw("DELETE", "/api/push/token", buildJsonObject { put("token", fid) }, asToken = asToken)
+    }
+
     /** POST /api/push/opened: the app was opened by tapping push [id]. */
     suspend fun pushOpened(id: String) { raw("POST", "/api/push/opened", buildJsonObject { put("id", id) }) }
 

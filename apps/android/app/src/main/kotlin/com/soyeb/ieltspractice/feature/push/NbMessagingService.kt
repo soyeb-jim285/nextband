@@ -14,10 +14,12 @@ class NbMessagingService : FirebaseMessagingService() {
         graph.scope.launch { graph.push.onFid(installationId) }
     }
 
-    // Runs on FCM's background thread. A push for an account that signed out here (its DELETE never reached the server)
-    // is dropped: no session on this phone, nothing to show.
+    // Runs on FCM's background thread. Drawn only for the account signed in here (pushIsForThisPhone): a push for one that signed
+    // out (its DELETE never reached the server) or for another account is dropped.
     override fun onMessageReceived(message: RemoteMessage) {
-        val signedIn = (application as App).graph.api.isSignedIn || runBlocking { KeystoreTokenStore(applicationContext).load() } != null
-        if (signedIn) Push.show(this, message.data)
+        val graph = (application as App).graph
+        val signedIn = graph.api.isSignedIn || runBlocking { KeystoreTokenStore(applicationContext).load() } != null
+        val uid = graph.api.me.value?.user?.id ?: runBlocking { graph.prefs.getString(Push.UID) }
+        if (pushIsForThisPhone(message.data["uid"], uid, signedIn)) Push.show(this, message.data)
     }
 }

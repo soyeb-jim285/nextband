@@ -52,8 +52,9 @@ import kotlinx.serialization.Serializable
 @Serializable data class SpeakingSession(val mode: String, val promptId: String? = null, val mockId: String? = null, val parentId: String? = null)
 @Serializable data class LiveExam(val mockId: String? = null)
 
-/** A speaking or writing result. Several ids = one multi-part session (full speaking test). */
-@Serializable data class AttemptResult(val ids: List<String>) {
+/** A speaking or writing result. Several ids = one multi-part session (full speaking test). [fresh]: opened right after the student submitted
+ *  it (the moment to offer push notifications, feature/push), not from History or a link. */
+@Serializable data class AttemptResult(val ids: List<String>, val fresh: Boolean = false) {
     companion object {
         fun of(vararg ids: String) = AttemptResult(ids.toList())
     }
@@ -62,4 +63,4 @@ import kotlinx.serialization.Serializable
 // Full mock (feature/mock)
 @Serializable data object MockStart
 @Serializable data class MockHub(val mockId: String)
-@Serializable data class MockResult(val mockId: String)
+@Serializable data class MockResult(val mockId: String, val fresh: Boolean = false) // fresh: AttemptResult

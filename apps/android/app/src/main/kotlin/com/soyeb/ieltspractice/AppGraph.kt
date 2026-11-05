@@ -69,6 +69,7 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
         if (demo == null) api.onSignedOut = { expired, lastUser ->
             // Cached audio includes this account's own recordings: gone on every sign-out (and account delete, which signs out).
             scope.launch(Dispatchers.IO) { MediaCache.clear(app) }
+            scope.launch { push.forgetUser() } // pushes still addressed to that account are dropped (NbMessagingService)
             // Unowned recordings never pass to another account: an expired session hands them to the account that made them,
             // anything else (or an unknown account) deletes them.
             scope.launch { if (expired && lastUser != null) pending.claimUnowned(lastUser) else pending.dropUnowned() }

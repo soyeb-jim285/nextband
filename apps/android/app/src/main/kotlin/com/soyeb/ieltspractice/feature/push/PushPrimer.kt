@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,9 +32,11 @@ import com.soyeb.ieltspractice.design.components.BtnKind
 import com.soyeb.ieltspractice.design.components.BtnSize
 import com.soyeb.ieltspractice.design.components.NbButton
 import com.soyeb.ieltspractice.design.components.NbSheet
+import com.soyeb.ieltspractice.feature.speaking.findActivity
 import kotlinx.coroutines.launch
 
-/** On a result screen (and after an exam date is set): opens the explainer when the rules allow (Push.askable). */
+/** On a writing, speaking or mock result opened right after submitting it (the route's `fresh`), and after an exam date is set: opens the
+ *  explainer when the rules allow (Push.askable). Not on Listening / Reading (marked instantly) or results opened from History. */
 @Composable
 fun PushAskAfterResult() {
     val push = LocalGraph.current.push
@@ -42,19 +46,32 @@ fun PushAskAfterResult() {
 /**
  * Asks Android 13+ for POST_NOTIFICATIONS; a decline counts as a "Not now" ([Push.refused]). After the second one Android
  * stops showing its dialog, so [request] opens the app's notification settings instead. Below Android 13 it always opens them.
+ * A decline with no rationale before or after the request means Android answered without a dialog (denied for good outside our
+ * count) or the dialog was swiped away: the tap still has to do something visible, so the settings page opens and the explainer stops.
  */
 @Composable
 fun rememberPushPermission(onGranted: () -> Unit = {}): () -> Unit {
     val push = LocalGraph.current.push
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val rationaleBefore = remember { BooleanArray(1) }
+    fun rationale() = context.findActivity()?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS) } ?: false
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) onGranted() else scope.launch { push.refused() }
+        when {
+            ok -> { scope.launch { push.sync() }; onGranted() } // the device row goes back on (Push.sync drops it while notifications are off)
+            !rationaleBefore[0] && !rationale() -> {
+                scope.launch { push.refused(forGood = true) }
+                context.startActivity(appNotificationSettings(context.packageName))
+            }
+            else -> scope.launch { push.refused() }
+        }
     }
     return {
         scope.launch {
-            if (Build.VERSION.SDK_INT >= 33 && push.refusals() < PRIMER_MAX_REFUSALS) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            else context.startActivity(appNotificationSettings(context.packageName))
+            if (Build.VERSION.SDK_INT >= 33 && push.refusals() < PRIMER_MAX_REFUSALS) {
+                rationaleBefore[0] = rationale()
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else context.startActivity(appNotificationSettings(context.packageName))
         }
     }
 }

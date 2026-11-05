@@ -123,7 +123,7 @@ fun SpeakingTabScreen(nav: Nav) {
     }
     LaunchedEffect(states) {
         val id = started.firstNotNullOfOrNull { (states[it] as? UploadState.Done)?.attemptId }
-        if (id != null) { started.clear(); nav.go(AttemptResult.of(id)) }
+        if (id != null) { started.clear(); nav.go(AttemptResult(listOf(id), fresh = true)) }
     }
 
     TabScreen(

@@ -314,7 +314,7 @@ private fun ExamBody(session: ExamSession, initial: Map<String, Draft>, store: D
                 store.clear(prompts.map { it.id })
                 graph.scope.launch { graph.prefs.setString(createdKey, null) }
                 hf.performHapticFeedback(HapticFeedbackType.LongPress)
-                if (session.mockId != null) nav.back() else nav.replace(AttemptResult(ids)) // a mock test goes back to its hub
+                if (session.mockId != null) nav.back() else nav.replace(AttemptResult(ids, fresh = true)) // a mock test goes back to its hub
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

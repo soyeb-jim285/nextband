@@ -50,6 +50,15 @@ class PushLogicTest {
         assertFalse(shouldAskForPush(34, false, 2, lastRefusedAt = 0, now = 100 * day), "two refusals: Settings row only")
     }
 
+    @Test fun aPushShowsOnlyForTheAccountSignedInHere() {
+        assertTrue(pushIsForThisPhone("u1", "u1", signedIn = true))
+        assertFalse(pushIsForThisPhone("u1", "u2", signedIn = true), "another account signed in since")
+        assertFalse(pushIsForThisPhone("u1", null, signedIn = true), "signed-in user not known yet")
+        assertFalse(pushIsForThisPhone("u1", "u1", signedIn = false), "signed out")
+        assertTrue(pushIsForThisPhone(null, null, signedIn = true), "an older server sends no uid")
+        assertFalse(pushIsForThisPhone("", "u1", signedIn = false))
+    }
+
     @Test fun clockTimes() {
         assertEquals(22 to 30, parseClock("22:30"))
         assertNull(parseClock("24:00"))

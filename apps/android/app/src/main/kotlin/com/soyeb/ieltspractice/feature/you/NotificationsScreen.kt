@@ -85,7 +85,7 @@ fun NotificationsScreen(nav: Nav) {
         onPauseOrDispose { }
     }
     LaunchedEffect(signedIn) { if (signedIn && me == null) runCatching { api.loadMe() } }
-    val request = rememberPushPermission { enabled = push.enabled(); scope.launch { push.sync() } }
+    val request = rememberPushPermission { enabled = push.enabled() } // it syncs the device itself
     var editing by remember { mutableStateOf(TimeField.entries.firstOrNull { it.name == demo?.tab }) }
     var testing by remember { mutableStateOf(false) }
 
@@ -103,15 +103,18 @@ fun NotificationsScreen(nav: Nav) {
 
     fun sendTest() = scope.launch {
         testing = true
-        push.sync() // a device row must exist first
         val msg = try {
+            push.sync() // a device row must exist first
             if (api.pushTest()) "Sent. It should arrive in a few seconds." else "Couldn't reach this phone. Try again in a minute."
         } catch (e: CancellationException) {
             throw e
         } catch (e: ApiError) {
             e.message
+        } catch (e: Exception) {
+            "Couldn't reach this phone. Try again in a minute."
+        } finally {
+            testing = false
         }
-        testing = false
         snack.showSnackbar(msg)
     }
 
