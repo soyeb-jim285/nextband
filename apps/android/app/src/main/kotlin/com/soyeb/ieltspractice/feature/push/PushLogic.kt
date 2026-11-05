@@ -10,7 +10,7 @@ data class PushChannel(val id: String, val name: String, val description: String
 /** The five channels of the plan (§6). The server names the channel in each message's `data.channel`. */
 val PUSH_CHANNELS = listOf(
     PushChannel("results", "Results", "Your band is ready, or a marking needs a retry", 3),
-    PushChannel("streak", "Streak", "Before your streak ends tonight", 4),
+    PushChannel("streak", "Streak", "Before your streak ends for the day", 4),
     PushChannel("practice", "Practice reminders", "Drills that are due and skills you haven't practised lately", 3),
     PushChannel("exam", "Exam", "Countdown to your exam date", 3),
     PushChannel("weekly", "Weekly recap", "A short summary of your week", 2),
