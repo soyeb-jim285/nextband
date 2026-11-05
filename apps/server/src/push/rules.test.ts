@@ -97,6 +97,10 @@ describe('usual time', () => {
     expect(sendMinute({ ...base, starts: owl })).toBe(t('22:15'));
     expect(sendMinute({ ...base, starts: owl, atRisk: true })).toBe(t('20:30')); // never moved past 20:30
     expect(sendMinute({ ...base, atRisk: true, quiet: [t('20:00'), t('08:00')] })).toBe(t('19:45')); // 20:30 is quiet: earlier, not later
+    const early = [t('07:30'), t('07:30'), t('07:30'), t('07:30')]; // usual 07:00, inside the morning quiet hours
+    expect(sendMinute({ ...base, starts: early })).toBe(t('08:15'));
+    expect(sendMinute({ ...base, starts: early, atRisk: true })).toBe(t('08:15')); // not wrapped back to 22:15
+    expect(sendMinute({ ...base, starts: early, atRisk: true, quiet: [t('20:00'), t('20:20')] })).toBe(t('07:00'));
   });
 });
 

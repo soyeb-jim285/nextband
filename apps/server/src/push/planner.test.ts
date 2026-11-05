@@ -4,7 +4,7 @@ import { fakeFetch, guestUser, json, req, seedPrompt } from '../test/helpers';
 import { generateKeyPairSync } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { activityDays, analyses, attempts, cards, mistakes, notificationDevices, notificationLog, user, userSettings } from '../db/schema';
+import { activityDays, analyses, attempts, cards, lrTests, mistakes, mockExams, notificationDevices, notificationLog, user, userSettings } from '../db/schema';
 import { setFetch } from '../ai/openrouter';
 import { pushSweep, setFcmAccount } from '../push';
 import { getSettings } from '../settings';
@@ -128,6 +128,18 @@ it('back-off: 8 ignored in a row sends the goodbye, then only the exam countdown
   expect((await logs(id)).at(-1)).toMatchObject({ type: 'drills', route: '/improve/drill' });
 });
 
+it('back-off: the goodbye holds after its rows age out of the 60 days; 61 days on, no opens, only the exam countdown', async () => {
+  const id = await student(false, { examDate: '2026-11-05' }); // 7 days after THU
+  await db.insert(cards).values(Array.from({ length: 6 }, (_, i) => ({ userId: id, front: `f${i}`, back: 'b', source: 'mistake', due: new Date('2026-10-01T00:00:00Z') })));
+  const ago = (d: number) => new Date(at(`${THU}T19:30`).getTime() - d * DAY);
+  for (let d = 70; d <= 77; d++) await sent(id, 'drills', ago(d), { createdAt: ago(d) });
+  await sent(id, 'goodbye', ago(62), { createdAt: ago(62) });
+  expect(await nudgeSweep(at('2026-10-28T19:30'))).toBe(0); // drills due, but no second goodbye and no drills
+  expect((await logs(id)).length).toBe(9);
+  expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(1);
+  expect((await logs(id)).at(-1)).toMatchObject({ type: 'exam' });
+});
+
 it('back-off: an FCM wake-up after each push (last_seen_at moves, app never opened) does not reset it; only a foreground PUT does', async () => {
   const id = await student();
   for (let d = 9; d <= 16; d++) {
@@ -190,7 +202,7 @@ it("Jumu'ah: a Friday reminder time inside 12:30–14:00 moves out of it", async
 it('finds the candidates: drills due, a pattern, the exam countdown, a cold skill, win-back', async () => {
   const id = await student(false, { examDate: '2026-11-12', remindAt: '19:30' }); // 14 days
   const now = at(`${THU}T19:30`);
-  await db.insert(cards).values(Array.from({ length: 5 }, (_, i) => ({ userId: id, front: `f${i}`, back: 'b', source: 'mistake', due: new Date('2026-10-01T00:00:00Z') })));
+  await db.insert(cards).values(Array.from({ length: 5 }, (_, i) => ({ userId: id, front: `f${i}`, back: 'b', source: 'mistake', category: 'grammar.article', due: new Date('2026-10-01T00:00:00Z') })));
   const w = await seedPrompt({ skill: 'writing', part: 2, type: 'opinion' });
   const s = await seedPrompt({ skill: 'speaking', part: 2 });
   // 4 essays this week, articles wrong in 3 of them
@@ -231,7 +243,7 @@ it('milestone near replaces the streak saver two practice days before a mileston
   expect(`${row!.title} ${row!.body}`).not.toContain('{');
 });
 
-it('pattern alert: "of" is how many marked tests there are, at most 4', async () => {
+it('pattern alert: "of" is how many marked tests there are, at most 4; no cards for it, no alert; under 5, no drill-promising copy', async () => {
   const id = await student();
   const now = at(`${THU}T19:30`);
   const w = await seedPrompt({ skill: 'writing', part: 2, type: 'opinion' });
@@ -241,7 +253,30 @@ it('pattern alert: "of" is how many marked tests there are, at most 4', async ()
     await db.insert(mistakes).values({ userId: id, attemptId: a!.id, errorId: 'e', category: 'task.relevance', original: 'a', correction: 'b', explanation: 'x' });
   }
   const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
-  expect((await candidates(id, settings, 'Asia/Dhaka', now)).find((x) => x.type === 'pattern')!.vars).toEqual({ pattern: 'Going off topic', skill: 'Writing', hits: '3', of: '3' });
+  const pattern = async () => (await candidates(id, settings, 'Asia/Dhaka', now)).find((x) => x.type === 'pattern');
+  // 5 cards, but none for this mistake (one is suspended)
+  await db.insert(cards).values(Array.from({ length: 5 }, (_, i) => ({ userId: id, front: `f${i}`, back: 'b', source: 'mistake', category: 'grammar.article' })));
+  await db.insert(cards).values({ userId: id, front: 'skipped', back: 'b', source: 'mistake', category: 'task.relevance', suspended: true });
+  expect(await pattern()).toBeUndefined();
+  await db.insert(cards).values(Array.from({ length: 2 }, (_, i) => ({ userId: id, front: `r${i}`, back: 'b', source: 'mistake', category: 'task.relevance' })));
+  expect(await pattern()).toMatchObject({ vars: { pattern: 'Going off topic', skill: 'Writing', hits: '3', of: '3' }, noDrill: true });
+  await db.insert(cards).values(Array.from({ length: 3 }, (_, i) => ({ userId: id, front: `s${i}`, back: 'b', source: 'mistake', category: 'task.relevance' })));
+  expect((await pattern())!.noDrill).toBeUndefined();
+});
+
+it('mock ready: only a mock with some sections done and some left, started over 24 h ago', async () => {
+  const id = await student();
+  const now = at(`${THU}T19:30`);
+  const test = async (skill: 'listening' | 'reading') =>
+    (await db.insert(lrTests).values({ slug: `push-${skill}-${id}`, skill, variant: 'academic', source: 'generated', ref: 'X', title: 'x', data: { sections: [] } as never, restricted: false }).returning())[0]!.id;
+  const [l, r] = [await test('listening'), await test('reading')];
+  const [m] = await db.insert(mockExams).values({ userId: id, variant: 'academic', source: 'generated', listeningTestId: l, readingTestId: r, writingPromptIds: [], writingSessionId: 'ws',
+    startedAt: new Date(now.getTime() - 2 * DAY), expiresAt: new Date(now.getTime() + 5 * DAY) }).returning();
+  const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
+  const mock = async () => (await candidates(id, settings, 'Asia/Dhaka', now)).find((x) => x.type === 'mock');
+  expect(await mock()).toBeUndefined(); // nothing begun: "your answers so far are saved" would be false
+  await db.update(mockExams).set({ listeningAttemptId: 'la' }).where(eq(mockExams.id, m!.id));
+  expect(await mock()).toMatchObject({ vars: { parts: 'Reading, Writing and Speaking' }, route: `/mock/${m!.id}` });
 });
 
 it('a saved freeze: the streak saver goes without FOMO copy', async () => {

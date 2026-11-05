@@ -11,7 +11,9 @@
 //
 // - Pattern labels name the mistake ("Article mistakes", "Going off topic"), so "came up in" never reads as praise.
 // - Counts that can be 0 or 1 (weekly tests, drills) use labels ("Tests: 1"), never "1 tests".
-// - `drill: true` marks copy whose only suggested action is drilling: not sent to a student with fewer than 5 cards (the server's fits).
+// - `drill: true` marks copy whose only suggested action is drilling, or that promises drills ("5 drills target it", "Drill ready"):
+//   not sent to a student with fewer than 5 cards (pattern: 5 cards for that mistake) (the server's fits).
+// - Streak saver and milestone copy goes at the student's usual or chosen time, which can be the morning: "today", never "tonight".
 //   FOMO-tone copy is not sent while a saved freeze would cover a missed day.
 //
 // The engine fills {vars} with fillTemplate and may only pick a template whose `vars` it has values for (e.g. a drill-only student has no {band}).
@@ -81,13 +83,13 @@ export type NudgeTemplate = { id: string; tone: NudgeTone; vars: readonly NudgeV
 export const NUDGE_TEMPLATES: Record<NudgeType, Record<PushLanguage, NudgeTemplate[]>> = {
   'streak-saver': {
     en: [
-      { id: 'saver-en-1', tone: 'fomo', vars: ['streak'], drill: true, title: '🔥 {streak} days and counting', body: 'One 2-minute drill keeps it alive tonight.' },
+      { id: 'saver-en-1', tone: 'fomo', vars: ['streak'], drill: true, title: '🔥 {streak} days and counting', body: 'One 2-minute drill keeps it alive today.' },
       { id: 'saver-en-2', tone: 'useful', vars: ['streak'], drill: true, title: 'Your {streak}-day streak needs one drill', body: 'Grade 5 drill cards and today counts. About 2 minutes.' },
-      { id: 'saver-en-3', tone: 'fun', vars: ['streak'], drill: true, title: 'Keep the {streak}-day streak rolling 🔥', body: 'A quick drill tonight does it. Five cards and done.' },
+      { id: 'saver-en-3', tone: 'fun', vars: ['streak'], drill: true, title: 'Keep the {streak}-day streak rolling 🔥', body: 'A quick drill today does it. Five cards and done.' },
       { id: 'saver-en-4', tone: 'warm', vars: ['streak'], title: '{streak} days in a row. Nice.', body: "Today isn't counted yet. One test part or a short drill keeps it going." },
-      { id: 'saver-en-5', tone: 'fomo', vars: ['streak'], title: 'Today still counts for your streak', body: '{streak} days so far. One Listening or Reading part tonight makes it one more.' },
+      { id: 'saver-en-5', tone: 'fomo', vars: ['streak'], title: 'Today still counts for your streak', body: '{streak} days so far. One Listening or Reading part today makes it one more.' },
       { id: 'saver-en-6', tone: 'useful', vars: ['streak'], drill: true, title: '2 minutes keeps {streak} days going', body: 'Open your drills, grade 5 cards, done. Your streak is safe for today.' },
-      { id: 'saver-en-7', tone: 'fun', vars: ['streak'], drill: true, title: 'Your streak called. It wants a drill', body: '{streak} days strong. Five quick cards tonight keep it that way 🔥' },
+      { id: 'saver-en-7', tone: 'fun', vars: ['streak'], drill: true, title: 'Your streak called. It wants a drill', body: '{streak} days strong. Five quick cards today keep it that way 🔥' },
       { id: 'saver-en-8', tone: 'useful', vars: ['streak'], drill: true, title: 'Busy day? 5 cards still count', body: 'Your {streak}-day streak only needs 5 drill cards today. About 2 minutes.' },
       { id: 'saver-en-9', tone: 'useful', vars: ['streak'], title: 'Keep your {streak} days going', body: 'A test part, 5 drill cards or 10 minutes of Listening or Reading all count.' },
       { id: 'saver-en-10', tone: 'warm', vars: ['streak'], title: 'One more day for your streak?', body: "You've practised {streak} days in a row. One Writing task or Speaking part keeps it going." },
@@ -104,7 +106,7 @@ export const NUDGE_TEMPLATES: Record<NudgeType, Record<PushLanguage, NudgeTempla
       { id: 'saver-bn-6', tone: 'useful', vars: ['streak'], title: 'Streak ta dhore rakho', body: '{streak} din hoye geche. Ekta test part ba 5 ta drill card, jekono ekta korlei hobe.' },
       { id: 'saver-bn-7', tone: 'useful', vars: ['streak'], title: 'Ekta Reading part, streak safe', body: '{streak} diner streak. Aj ekta Reading ba Listening part korlei count hobe.' },
       { id: 'saver-bn-8', tone: 'fun', vars: ['streak'], title: '{streak} din! Aj ekta Speaking part? 🎤', body: 'Koyek minute kotha bolle-i ajker din count hobe.' },
-      { id: 'saver-bn-9', tone: 'warm', vars: ['streak'], title: 'Shondhar ekta chhoto practice', body: 'Tomar {streak} diner streak er jonno jekono ekta test part jothesto.' },
+      { id: 'saver-bn-9', tone: 'warm', vars: ['streak'], title: 'Ajker ekta chhoto practice', body: 'Tomar {streak} diner streak er jonno jekono ekta test part jothesto.' },
       { id: 'saver-bn-10', tone: 'useful', vars: ['streak'], title: 'Ekta Writing task, aj count', body: '{streak} din cholche. Ekta Writing task submit korlei aj o streak e jog hobe.' },
       { id: 'saver-bn-11', tone: 'fomo', vars: ['streak'], title: 'Aj ekhono count hoyni', body: '{streak} diner streak. Ekta test part ba drill korlei aj count hobe.' },
     ],
@@ -159,28 +161,28 @@ export const NUDGE_TEMPLATES: Record<NudgeType, Record<PushLanguage, NudgeTempla
   },
   pattern: {
     en: [
-      { id: 'pattern-en-1', tone: 'useful', vars: ['skill', 'pattern', 'hits', 'of'], title: 'Spotted a pattern in your {skill}', body: '{pattern} came up in {hits} of your last {of} tests. 5 drills target it.' },
+      { id: 'pattern-en-1', tone: 'useful', vars: ['skill', 'pattern', 'hits', 'of'], drill: true, title: 'Spotted a pattern in your {skill}', body: '{pattern} came up in {hits} of your last {of} tests. 5 drills target it.' },
       { id: 'pattern-en-2', tone: 'useful', vars: ['pattern', 'hits', 'of', 'skill'], title: 'One mistake keeps coming back', body: '{pattern}: {hits} of your last {of} {skill} tests. A few drills will help.' },
       { id: 'pattern-en-3', tone: 'useful', vars: ['skill', 'pattern', 'hits', 'of'], title: 'Your next easy {skill} gain', body: '{pattern} showed up in {hits} of your last {of} tests. Fixing it helps every test.' },
-      { id: 'pattern-en-4', tone: 'fun', vars: ['pattern', 'hits', 'of', 'skill'], title: 'We found your sneaky mistake 🔍', body: '{pattern}, in {hits} of your last {of} {skill} tests. 5 drills to catch it?' },
+      { id: 'pattern-en-4', tone: 'fun', vars: ['pattern', 'hits', 'of', 'skill'], drill: true, title: 'We found your sneaky mistake 🔍', body: '{pattern}, in {hits} of your last {of} {skill} tests. 5 drills to catch it?' },
       { id: 'pattern-en-5', tone: 'useful', vars: ['skill', 'pattern', 'hits', 'of'], title: 'A quick fix for your {skill}', body: '{pattern} tripped you up in {hits} of your last {of} tests. A quick drill?' },
       { id: 'pattern-en-6', tone: 'useful', vars: ['hits', 'of', 'pattern', 'skill'], title: 'Same slip in {hits} of {of} tests', body: '{pattern} in your {skill}. A short drill now helps it stop repeating.' },
       { id: 'pattern-en-7', tone: 'warm', vars: ['pattern', 'hits', 'of', 'skill'], title: 'Small fix, real difference', body: '{pattern} came up in {hits} of your last {of} {skill} tests. Drills target it.' },
       { id: 'pattern-en-8', tone: 'warm', vars: ['pattern', 'hits', 'of', 'skill'], title: "This one's worth fixing", body: "{pattern}: {hits} of your last {of} {skill} tests. It's common and fixable." },
-      { id: 'pattern-en-9', tone: 'fun', vars: ['skill', 'pattern', 'hits', 'of'], title: 'Your {skill} has a habit', body: '{pattern} keeps showing up ({hits} of {of} tests). 5 drills to sort it out?' },
-      { id: 'pattern-en-10', tone: 'warm', vars: ['pattern', 'hits', 'of', 'skill'], title: "Let's fix this one together", body: '{pattern} came up in {hits} of your last {of} {skill} tests. Drills are ready.' },
+      { id: 'pattern-en-9', tone: 'fun', vars: ['skill', 'pattern', 'hits', 'of'], drill: true, title: 'Your {skill} has a habit', body: '{pattern} keeps showing up ({hits} of {of} tests). 5 drills to sort it out?' },
+      { id: 'pattern-en-10', tone: 'warm', vars: ['pattern', 'hits', 'of', 'skill'], drill: true, title: "Let's fix this one together", body: '{pattern} came up in {hits} of your last {of} {skill} tests. Drills are ready.' },
     ],
     banglish: [
-      { id: 'pattern-bn-1', tone: 'useful', vars: ['skill', 'pattern', 'of', 'hits'], title: 'Tomar {skill} e ekta pattern', body: '{pattern}: shesh {of} ta test er {hits} ta te esheche. 5 ta drill try korbe?' },
+      { id: 'pattern-bn-1', tone: 'useful', vars: ['skill', 'pattern', 'of', 'hits'], drill: true, title: 'Tomar {skill} e ekta pattern', body: '{pattern}: shesh {of} ta test er {hits} ta te esheche. 5 ta drill try korbe?' },
       { id: 'pattern-bn-2', tone: 'useful', vars: ['pattern', 'of', 'skill', 'hits'], title: 'Ek-i bhul bar bar asche', body: '{pattern}, shesh {of} ta {skill} test er {hits} ta te. Drill e thik kore nao.' },
-      { id: 'pattern-bn-3', tone: 'warm', vars: ['pattern', 'of', 'skill', 'hits'], title: 'Ekta easy fix ache', body: '{pattern}: shesh {of} ta {skill} test er {hits} ta te. Drill ready.' },
+      { id: 'pattern-bn-3', tone: 'warm', vars: ['pattern', 'of', 'skill', 'hits'], drill: true, title: 'Ekta easy fix ache', body: '{pattern}: shesh {of} ta {skill} test er {hits} ta te. Drill ready.' },
       { id: 'pattern-bn-4', tone: 'useful', vars: ['skill', 'pattern', 'hits', 'of'], title: '{skill} e ekta chhoto shomossha', body: '{pattern}: {hits}/{of} test e. 2 minuter drill korbe?' },
-      { id: 'pattern-bn-5', tone: 'warm', vars: ['pattern', 'of', 'hits'], title: 'Ei bhul ta thik kora shohoj', body: '{pattern} shesh {of} ta test er {hits} ta te. Tomar jonno drill banano ache.' },
-      { id: 'pattern-bn-6', tone: 'fun', vars: ['pattern', 'skill', 'hits', 'of'], title: 'Cholo eta thik kori 🔍', body: '{pattern} tomar {skill} e bar bar asche ({hits}/{of} test). 5 ta drill dekhbe?' },
+      { id: 'pattern-bn-5', tone: 'warm', vars: ['pattern', 'of', 'hits'], drill: true, title: 'Ei bhul ta thik kora shohoj', body: '{pattern} shesh {of} ta test er {hits} ta te. Tomar jonno drill banano ache.' },
+      { id: 'pattern-bn-6', tone: 'fun', vars: ['pattern', 'skill', 'hits', 'of'], drill: true, title: 'Cholo eta thik kori 🔍', body: '{pattern} tomar {skill} e bar bar asche ({hits}/{of} test). 5 ta drill dekhbe?' },
       { id: 'pattern-bn-7', tone: 'useful', vars: ['skill', 'pattern', 'of', 'hits'], title: '{skill} e ekta bhul bar bar', body: '{pattern}: shesh {of} ta test er {hits} ta te. Drill e eta thik kora shohoj.' },
       { id: 'pattern-bn-8', tone: 'warm', vars: ['pattern', 'hits', 'of', 'skill'], title: 'Ei jaygay marks katche', body: '{pattern}: {hits}/{of} {skill} test e marks kete niyeche. Drill korbe?' },
       { id: 'pattern-bn-9', tone: 'fun', vars: ['skill', 'pattern', 'hits', 'of'], title: 'Tomar {skill} er ekta obhyash', body: '{pattern}: {hits}/{of} test e. Koyekta drill e eta niye kaj kora jay.' },
-      { id: 'pattern-bn-10', tone: 'useful', vars: ['pattern', 'of', 'skill', 'hits'], title: 'Chhoto fix, boro labh', body: '{pattern} tomar shesh {of} ta {skill} test er {hits} ta te. Drill ready ache.' },
+      { id: 'pattern-bn-10', tone: 'useful', vars: ['pattern', 'of', 'skill', 'hits'], drill: true, title: 'Chhoto fix, boro labh', body: '{pattern} tomar shesh {of} ta {skill} test er {hits} ta te. Drill ready ache.' },
     ],
   },
   exam: {

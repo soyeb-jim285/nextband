@@ -38,3 +38,8 @@ it('every template reads right with the smallest facts too (no "1 tests", no "0 
     expect(`${m.title} ${m.body}`, t.id).not.toMatch(/\b(0|1) (tests|drills|drill cards|cards|days)\b/);
   }
 });
+
+it('copy sent at the usual or chosen time (which can be the morning) never says tonight or evening', () => {
+  for (const g of ['streak-saver', 'milestone-near', 'drills-due', 'pattern', 'exam', 'cold', 'win-back', 'goodbye', 'mock-ready'] as const)
+    for (const t of [...NUDGE_TEMPLATES[g].en, ...NUDGE_TEMPLATES[g].banglish]) expect(`${t.title} ${t.body}`, t.id).not.toMatch(/\b(tonight|evening|shondh\w*|aj rate)\b/i);
+});

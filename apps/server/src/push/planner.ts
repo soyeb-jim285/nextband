@@ -67,8 +67,12 @@ export async function candidates(userId: string, s: Settings, tz: string, now: D
     where t.rn <= 4 and m.category <> 'grammar.other' group by t.skill, m.category
     having count(distinct t.id) >= 3 and max(t.created_at) > ${new Date(now.getTime() - 7 * DAY).toISOString()}
     order by tests desc, max(t.created_at) desc limit 1`)) as unknown as { skill: Skill; category: string; tests: number; of: number }[];
-  if (pat && PATTERN_LABEL[pat.category])
-    out.push({ type: 'pattern', vars: { pattern: PATTERN_LABEL[pat.category]!, skill: SKILL_LABEL[pat.skill], hits: String(pat.tests), of: String(pat.of) }, route: `/improve/drill?pattern=${encodeURIComponent(pat.category)}` });
+  if (pat && PATTERN_LABEL[pat.category]) {
+    // the alert opens that mistake's drills: none to drill, no alert; fewer than 5, no copy promising "5 drills" or "drills are ready"
+    const [mine] = await db.select({ n: sql<number>`count(*)::int` }).from(cards).where(and(eq(cards.userId, userId), eq(cards.suspended, false), eq(cards.category, pat.category)));
+    if (n(mine?.n) > 0)
+      out.push({ type: 'pattern', vars: { pattern: PATTERN_LABEL[pat.category]!, skill: SKILL_LABEL[pat.skill], hits: String(pat.tests), of: String(pat.of) }, route: `/improve/drill?pattern=${encodeURIComponent(pat.category)}`, ...(n(mine?.n) < 5 && { noDrill: true }) });
+  }
 
   // #8 skill gone cold (7–30 days untouched while another skill was practised this week) and #12 win-back (3 / 7 / 14 days with nothing)
   const last = (await db.execute(sql`select skill, max(at) as at, (array_agg(band order by at desc))[1] as band from (
@@ -103,7 +107,8 @@ export async function candidates(userId: string, s: Settings, tz: string, now: D
   if (mock) {
     // ponytail: "not started" per section from the mock row; a section started and abandoned reads as done here
     const left = [!mock.listeningAttemptId && 'Listening', !mock.readingAttemptId && 'Reading', !mock.writingAttemptIds.length && !mock.writingStartedAt && 'Writing', !mock.speakingSessionId && 'Speaking'].filter((x): x is string => !!x);
-    if (left.length) out.push({ type: 'mock', vars: { parts: left.length > 1 ? `${left.slice(0, -1).join(', ')} and ${left.at(-1)}` : left[0]! }, route: `/mock/${mock.id}` });
+    // a mock with no section begun has no saved progress, which most of the copy claims
+    if (left.length && left.length < 4) out.push({ type: 'mock', vars: { parts: left.length > 1 ? `${left.slice(0, -1).join(', ')} and ${left.at(-1)}` : left[0]! }, route: `/mock/${mock.id}` });
   }
   // fewer than 5 cards: drill-only copy ("5 drill cards keep it") can't be followed, so only copy offering a test part (templates.ts fits)
   return n(deck?.n) >= 5 ? out : out.map((c) => ({ ...c, noDrill: true }));
@@ -133,12 +138,16 @@ async function nudgeState(x: Reader, userId: string, tz: string, now: Date) {
   const [reset] = (await x.execute(sql`select
       (select max(opened_at) from notification_log where user_id = ${userId}) as opened,
       (select max(app_opened_at) from notification_devices where user_id = ${userId}) as app,
-      (select practised_at from streaks where user_id = ${userId}) as practised`)) as unknown as Record<'opened' | 'app' | 'practised', Date | string | null>[];
+      (select practised_at from streaks where user_id = ${userId}) as practised,
+      (select max(coalesce(sent_at, scheduled_for)) from notification_log where user_id = ${userId} and type = 'goodbye' and holdout = ${holdout}
+        and (holdout or status in ('sent', 'pending'))) as bye`)) as unknown as Record<'opened' | 'app' | 'practised' | 'bye', Date | string | null>[];
   const resetAt = Math.max(...(['opened', 'app', 'practised'] as const).map((k) => (reset?.[k] ? +new Date(reset[k]) : 0)));
   const since = rows.filter((r) => +at(r) > resetAt);
-  const level = backoffLevel(since.length);
+  // the goodbye holds until a reset, however old: its unopened rows age out of the 60 days, the promise doesn't (§5.4)
+  const bye = !!reset?.bye && +new Date(reset.bye) > resetAt;
+  const level = bye ? 3 : backoffLevel(since.length);
   const open = underCaps(level, localClock(now, tz).day, rows.filter((r) => +at(r) > now.getTime() - 7 * DAY).map((r) => localClock(at(r), tz).day));
-  return { holdout, rows, at, since, level, open };
+  return { holdout, rows, at, bye, level, open };
 }
 
 // ---------- one student ----------
@@ -155,12 +164,12 @@ export async function planUser(userId: string, s: Settings, tz: string, now: Dat
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
     if ((await planned(tx)).length) return null;
-    const { holdout, rows, at, since, level, open } = await nudgeState(tx, userId, tz, now);
+    const { holdout, rows, at, bye, level, open } = await nudgeState(tx, userId, tz, now);
     if (!open) return null;
 
     let pick: Candidate | null;
     // level 3: the goodbye once (when its switch is on), then only what allowedAt(3) lets through
-    if (level === 3 && s[NUDGE_SWITCH.goodbye] && !since.some((r) => r.type === 'goodbye')) pick = { type: 'goodbye', vars: {}, route: '/' };
+    if (level === 3 && s[NUDGE_SWITCH.goodbye] && !bye) pick = { type: 'goodbye', vars: {}, route: '/' };
     else {
       const recent = rows.filter((r) => +at(r) > now.getTime() - 14 * DAY);
       const history: Partial<Record<NudgeType, TypeHistory>> = {};

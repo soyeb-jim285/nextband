@@ -25,6 +25,12 @@ it('push never sells or shames', () => {
   for (const s of ["Don't be lazy", 'We are disappointed', "You're failing", 'Your friends are ahead', "Don't fall into falling behind", 'Others are ahead of you',
     'Eto olosh keno?', 'Lojja lage na?', 'Faki dio na', 'Tumi pichiye porcho', 'Tomar bondhura egiye geche', 'Shobai egiye jacche'])
     expect(bad(s).some((p) => p.startsWith('shaming word')), s).toBe(true);
+  // review round C probes: selling and guilt the first lists missed (the guardrail for §5.6 AI copy)
+  for (const s of ['Practise unlimited today', 'Start your free trial', 'Limited time only', 'Get it on Play Store', 'Membership perks', 'NextBand Plus', 'Get 50% more', 'Use coupon NB10', 'Promo inside'])
+    expect(bad(s).some((p) => p.startsWith('selling word')), s).toBe(true);
+  for (const s of ['You broke your streak 😢', 'You lost your streak', "Don't give up now", 'No excuses tonight', "Why haven't you practised?", 'Why haven’t you practised?',
+    'You missed yesterday', 'Tumi bhule gecho?', 'Keno practice koroni?', 'Streak hariye felecho', 'Streak is waiting 😞', 'Hmm 💔'])
+    expect(bad(s).some((p) => p.startsWith('shaming word')), s).toBe(true);
   // whole words only: progress, pronunciation, explanation are fine
   expect(bad('Your progress and pronunciation improved. Planned well')).toEqual([]);
 });

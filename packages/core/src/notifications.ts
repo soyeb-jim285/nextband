@@ -62,13 +62,17 @@ export function renderPush(type: PushType, lang: PushLanguage, vars: Record<stri
 // case-insensitive. SHAME also covers §2 rule 5's comparison guilt ("your friends are ahead").
 const SELLING = [
   'pro', 'premium', 'upgrade', 'upgrades', 'price', 'prices', 'pricing', 'buy', 'subscribe', 'subscription', 'website', 'link', 'plan', 'plans', 'unlock', 'discount', 'offer', 'offers', 'sale', 'purchase', 'pay', 'payment',
+  'unlimited', 'trial', 'free trial', 'limited time', 'membership', 'plus', 'play store', 'coupon', 'promo',
   'kino', 'kinun', 'kinte', 'kineo', 'dam', 'daam', 'taka', 'tk', 'bkash', 'chhar', 'char dicchi', 'subscribe koro',
 ];
 const SHAME = [
   'disappointed', 'disappointing', 'lazy', 'failing', 'ashamed', 'shame', 'pathetic', 'friends', 'everyone else', 'others are ahead', 'falling behind', 'left behind',
+  'you missed', 'you broke', 'lost your streak', 'give up', 'giving up', 'no excuses', "why haven't you", "why didn't you",
   'olosh', 'alsho', 'lojja', 'lojjar', 'faki', 'fanki', 'pichiye porcho', 'pichiye pore', 'pichiye jaccho', 'bondhura', 'bondhu ra', 'shobai egiye',
+  'bhule gecho', 'bhule gele', 'koroni', 'korli na', 'hariye',
 ];
-const SYMBOLS = ['৳', '$', 'nextband.app', 'http', 'www.'];
+const SYMBOLS = ['৳', '$', '%', 'nextband.app', 'http', 'www.'];
+const GUILT_EMOJI = /[😢😞😔💔😭😟☹🙁]/u;
 const words = (list: string[]) => new RegExp(`(?<![\\p{L}\\p{N}])(${list.join('|')})(?![\\p{L}\\p{N}])`, 'iu');
 const SELLING_RE = words(SELLING);
 const SHAME_RE = words(SHAME);
@@ -76,7 +80,7 @@ const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 
 /** Problems with a push's copy; empty = OK to send. Used by every send (server push.ts) and every template (tests). */
 export function checkPush(m: { title: string; body: string }): string[] {
-  const text = `${m.title}\n${m.body}`;
+  const text = `${m.title}\n${m.body}`.replace(/[‘’]/g, "'");
   const out: string[] = [];
   if (!m.title.trim() || !m.body.trim()) out.push('empty');
   if ([...m.title].length > 40) out.push('title over 40 characters');
@@ -85,7 +89,7 @@ export function checkPush(m: { title: string; body: string }): string[] {
   if (/\{\w+\}/.test(text)) out.push('unfilled variable');
   const sell = text.match(SELLING_RE)?.[1] ?? SYMBOLS.find((s) => text.toLowerCase().includes(s));
   if (sell) out.push(`selling word: ${sell}`);
-  const shame = text.match(SHAME_RE)?.[1];
+  const shame = text.match(SHAME_RE)?.[1] ?? text.match(GUILT_EMOJI)?.[0];
   if (shame) out.push(`shaming word: ${shame}`);
   return out;
 }

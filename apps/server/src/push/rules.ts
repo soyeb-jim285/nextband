@@ -57,7 +57,7 @@ const inRange = (m: number, [a, b]: [number, number]) => (a <= b ? m >= a && m <
 export const blocked = (minute: number, weekday: number, quiet: [number, number]) => inRange(minute, quiet) || (weekday === 5 && inRange(minute, JUMUAH));
 
 /** The send time nearest `want` whose whole ±15 min window is outside quiet hours and Jumu'ah; null when no such time exists.
- *  `notLater`: only `want` or earlier (the streak saver's 20:30 at the latest). */
+ *  `notLater`: only `want` or earlier the same day (the streak saver's 20:30 at the latest), never wrapped back past midnight. */
 export function placeSend(want: number, weekday: number, quiet: [number, number], notLater = false): number | null {
   const clear = (t: number) => {
     for (let m = t - WINDOW; m < t + WINDOW; m++) if (blocked((m + DAY_MIN) % DAY_MIN, weekday, quiet)) return false;
@@ -65,6 +65,7 @@ export function placeSend(want: number, weekday: number, quiet: [number, number]
   };
   for (let d = 0; d <= DAY_MIN / 2; d += 5)
     for (const t of d ? (notLater ? [want - d] : [want - d, want + d]) : [want]) {
+      if (notLater && t < 0) return null;
       const m = (t + DAY_MIN) % DAY_MIN;
       if (clear(m)) return m;
     }
@@ -76,8 +77,13 @@ export function placeSend(want: number, weekday: number, quiet: [number, number]
 export function sendMinute(o: { remindAt: string | null; starts: number[]; atRisk: boolean; weekday: number; quiet: [number, number] }): number | null {
   if (o.remindAt) return placeSend(hhmm(o.remindAt), o.weekday, o.quiet);
   const usual = usualMinute(o.starts);
-  // at risk: 20:30 at the latest, and a usual time after midnight (a night owl) is later than that too; moved only earlier
-  if (o.atRisk) return placeSend(usual < NIGHT_END ? STREAK_LATEST : Math.min(usual, STREAK_LATEST), o.weekday, o.quiet, true);
+  // at risk: 20:30 at the latest, and a usual time after midnight (a night owl) is later than that too; moved earlier, or (a usual
+  // time in the morning quiet hours) to the nearest clear time after it, still by 20:30
+  if (o.atRisk) {
+    const want = usual < NIGHT_END ? STREAK_LATEST : Math.min(usual, STREAK_LATEST);
+    const t = placeSend(want, o.weekday, o.quiet, true) ?? placeSend(want, o.weekday, o.quiet);
+    return t != null && t <= STREAK_LATEST ? t : null;
+  }
   return placeSend(usual, o.weekday, o.quiet);
 }
 
