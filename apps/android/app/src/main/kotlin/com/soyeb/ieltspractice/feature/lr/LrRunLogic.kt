@@ -176,3 +176,6 @@ fun pendingJson(p: PendingAnswers): String = AppJson.encodeToString(PendingAnswe
  */
 fun withPending(a: LrAttempt, p: PendingAnswers?): LrAttempt =
     if (p != null && p.elapsed >= a.elapsedS) a.copy(responses = p.responses, elapsedS = p.elapsed) else a
+
+/** Passage text convention (as the web's Passage.tsx): a paragraph starting "### " is a text heading, e.g. a notice title. */
+fun passageHeading(text: String): String? = if (text.startsWith("### ")) text.removePrefix("### ").trim() else null

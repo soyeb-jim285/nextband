@@ -94,6 +94,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -775,7 +776,9 @@ fun PassageView(section: LrSection, hl: Marks?, modifier: Modifier = Modifier, e
         Text(p.title, style = title, color = c.ink, modifier = Modifier.semantics { heading() })
         p.subtitle?.takeIf { it.isNotBlank() }?.let { Text(it, style = NB.type.readingSmall.copy(fontStyle = FontStyle.Italic), color = c.muted) }
         p.paragraphs.forEachIndexed { i, para ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val h = passageHeading(para.text)
+            if (h != null) Text(h, style = body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.padding(top = 4.dp).semantics { heading() })
+            else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (hasLabels) Box(Modifier.widthIn(min = 22.dp).padding(top = 2.dp)) {
                     Text(para.label.orEmpty(), style = NB.type.num, color = c.brandText, modifier = Modifier.semantics { contentDescription = "Paragraph ${para.label.orEmpty()}" })
                 }

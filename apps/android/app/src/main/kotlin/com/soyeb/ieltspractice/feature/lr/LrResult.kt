@@ -44,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -540,7 +541,9 @@ private fun TextTab(
             } else {
                 section.passage?.paragraphs?.forEachIndexed { i, para ->
                     item(key = "p$i") {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val h = passageHeading(para.text)
+                        if (h != null) Text(h, style = NB.type.reading.copy(fontWeight = FontWeight.SemiBold), color = c.ink, modifier = Modifier.padding(top = 4.dp).semantics { heading() })
+                        else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (!para.label.isNullOrBlank()) Text(para.label, Modifier.width(22.dp).padding(top = 2.dp), style = NB.type.num, color = c.brandText)
                             if (span != null && span.p == i) EvidenceText(para.text, span.s, span.e, NB.type.reading, Modifier.weight(1f))
                             else Text(para.text, style = NB.type.reading, color = c.ink, modifier = Modifier.weight(1f))

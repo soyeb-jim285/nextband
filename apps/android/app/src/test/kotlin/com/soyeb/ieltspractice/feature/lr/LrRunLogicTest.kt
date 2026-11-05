@@ -72,6 +72,12 @@ class LrRunLogicTest {
         assertTrue(locateSelection(regions, "absent").isEmpty())
     }
 
+    @Test fun hashHeadingsAreTextHeadings() {
+        assertEquals("Library hours", passageHeading("### Library hours"))
+        assertEquals(null, passageHeading("Plain"))
+        assertEquals(null, passageHeading("#3 is not a heading"))
+    }
+
     @Test fun settingsDefaultsAndScale() {
         assertEquals(LrSettings(), parseSettings(null))
         assertEquals(LrSettings(), parseSettings("""{"size":"huge","scheme":"neon"}"""))
