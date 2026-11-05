@@ -11,6 +11,7 @@ import { analyses, attempts, liveSessions, lrAttempts, lrTests, mockExams, promp
 import { ApiError } from '../errors';
 import { clientIpHash } from '../ip';
 import { checkStart, payerOf, quotaSnapshot, requireLive } from '../quota';
+import { markSeen } from '../push';
 import { lrSaveLimit } from '../ratelimit';
 import type { App, SessionUser } from '../types';
 import { CodedError, QuotaFields } from './community';
@@ -336,7 +337,11 @@ export function register(app: App) {
 
   app.openapi(
     createRoute({ ...common, method: 'get', path: '/api/mock/{id}', summary: 'One mock test with the state and band of each section', request: { params: Id }, responses: { 200: json(MockSchema, 'Mock'), ...notFound } }),
-    async (c) => c.json(toMock(await loadMock(currentUser(c).id, c.req.valid('param').id)), 200),
+    async (c) => {
+      const m = await loadMock(currentUser(c).id, c.req.valid('param').id);
+      for (const ref of [m.m.writingSessionId, m.m.speakingSessionId]) await markSeen(m.m.userId, ref); // the mock page shows the section bands: their pushes are not needed
+      return c.json(toMock(m), 200);
+    },
   );
 
   app.openapi(

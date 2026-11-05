@@ -2,7 +2,7 @@
 // The plugin deletes the anonymous user right after, which would cascade-delete these rows.
 import { and, eq } from 'drizzle-orm';
 import { db } from './db/client';
-import { attempts, cards, feedback, guestConversions, liveSessions, lrAttempts, mistakes, quotaUsage, replaySessions, user } from './db/schema';
+import { attempts, cards, feedback, notificationDevices, notificationLog, guestConversions, liveSessions, lrAttempts, mistakes, quotaUsage, replaySessions, user } from './db/schema';
 import { storage } from './storage';
 import { mergeDays, refreshStreak } from './streaks';
 
@@ -19,6 +19,8 @@ export async function linkGuest(anonId: string, newId: string) {
     await tx.update(mistakes).set({ userId: newId }).where(eq(mistakes.userId, anonId));
     await tx.update(lrAttempts).set({ userId: newId }).where(eq(lrAttempts.userId, anonId)); // Listening & Reading tests
     await tx.update(cards).set({ userId: newId }).where(eq(cards.userId, anonId)); // spelling cards made on L/R submit
+    await tx.update(notificationDevices).set({ userId: newId }).where(eq(notificationDevices.userId, anonId)); // this phone keeps getting pushes
+    await tx.update(notificationLog).set({ userId: newId }).where(eq(notificationLog.userId, anonId)); // queued result pushes and open tracking
     await mergeDays(tx, anonId, newId); // streak days add onto the account's
     return tx.update(attempts).set({ userId: newId }).where(eq(attempts.userId, anonId)).returning({ id: attempts.id, audioKey: attempts.audioKey });
   });

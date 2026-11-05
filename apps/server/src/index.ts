@@ -12,6 +12,7 @@ import { reconcileCosts } from './ai/cost';
 import { coachSweep } from './coach/report';
 import { weeklySweep } from './coach/weekly';
 import { planReminderSweep } from './plan-reminders';
+import { pushSweep } from './push';
 import { settlePending } from './routes/pay';
 import { purgeReplays } from './replay';
 import { isKnownPath } from '@ielts/core';
@@ -64,6 +65,8 @@ if (env.NODE_ENV === 'production') {
   setInterval(coach, 3_600_000).unref();
   setTimeout(coach, 5 * 60_000).unref(); // once soon after boot, so frequent deploys do not starve the hourly sweep
 }
+// queued pushes (results 2 min after marking, retries); a no-op without FCM_SERVICE_ACCOUNT_JSON. Rows are claimed with SKIP LOCKED, so every instance may run it.
+setInterval(() => void pushSweep(), 30_000).unref();
 const grants = () => loadCambridgeGrants().catch((e) => console.error('loadCambridgeGrants failed', e));
 await grants();
 setInterval(grants, 60_000).unref(); // another process's toggle is honoured within a minute

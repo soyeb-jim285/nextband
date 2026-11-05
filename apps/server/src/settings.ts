@@ -21,6 +21,8 @@ export const isTimeZone = (tz: string): boolean => {
   }
 };
 
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM, 24-hour');
+
 export const SettingsSchema = z.object({
   targetBand: z.number().min(4).max(9).multipleOf(0.5),
   writingAutoSubmit: z.boolean(),
@@ -28,13 +30,25 @@ export const SettingsSchema = z.object({
   productEmails: z.boolean(), // product news and practice tips by email (campaigns); account emails are always sent
   examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), // YYYY-MM-DD, for the coach
   timeZone: z.string().refine(isTimeZone, 'Unknown time zone'), // IANA zone: the student's local day for the coach
+  // Push notifications (docs/engagement/notifications-and-streaks.md §5.1, §6): one switch per kind, quiet hours, reminder time, language
+  notifyResults: z.boolean(), // result ready, marking failed, new personal best
+  notifyStreak: z.boolean(),
+  notifyPractice: z.boolean(), // drills due, skill gone cold, win-back, mock not finished
+  notifyExam: z.boolean(),
+  notifyWeekly: z.boolean(),
+  quietStart: HHMM, // local time; no nudges from quietStart to quietEnd
+  quietEnd: HHMM,
+  remindAt: HHMM.nullable(), // "Best time to remind me"; null = Auto (the student's usual time)
+  notifyLanguage: z.enum(['en', 'banglish']).nullable(), // null = from the device locale (bn → Banglish)
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
 export const SettingsPatchSchema = SettingsSchema.partial();
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
 
-export const DEFAULT_SETTINGS: Settings = { targetBand: 7, writingAutoSubmit: true, blockPaste: true, productEmails: true, examDate: null, timeZone: 'UTC' };
+export const DEFAULT_SETTINGS: Settings = { targetBand: 7, writingAutoSubmit: true, blockPaste: true, productEmails: true, examDate: null, timeZone: 'UTC',
+  notifyResults: true, notifyStreak: true, notifyPractice: true, notifyExam: true, notifyWeekly: true, quietStart: '22:30', quietEnd: '08:00', remindAt: null, notifyLanguage: null,
+};
 
 /** Stored rows may still carry removed fields (models, liveProvider): the schema drops them. */
 export const mergeSettings = (patch: SettingsPatch | Record<string, unknown> | undefined): Settings => SettingsSchema.parse({ ...DEFAULT_SETTINGS, ...patch });

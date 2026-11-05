@@ -568,3 +568,43 @@ export const streaks = pgTable('streaks', {
   repairUntil: timestamp('repair_until', { withTimezone: true }),
   updatedAt: updatedAt(),
 });
+
+// ---------- Push notifications (docs/engagement/notifications-and-streaks.md §5; src/push.ts) ----------
+// One row per app install: an FCM registration token (or a Firebase Installation ID, kind 'fid'). A token moves to whoever registered it last.
+export const notificationDevices = pgTable('notification_devices', {
+  token: text('token').primaryKey(),
+  kind: text('kind').$type<'token' | 'fid'>().notNull().default('token'), // FCM v1 target field: message.token or message.fid
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  platform: text('platform').$type<'android' | 'ios' | 'web'>().notNull(),
+  appVersion: text('app_version'),
+  locale: text('locale'), // BCP 47 from the device; picks the push language until the student chooses one
+  createdAt: createdAt(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  disabledAt: timestamp('disabled_at', { withTimezone: true }), // FCM said UNREGISTERED / invalid: never sent to again until re-registered
+}, (t) => [index('notification_devices_user_idx').on(t.userId)]);
+
+// Every push: queued (pending, scheduled_for), then sent / cancelled (the student saw it in the app) / skipped / rejected (copy failed checkPush) / failed.
+// dedupe_key is unique among pending rows, so an event that fires twice queues once; sent rows stay as history.
+export const notificationLog = pgTable('notification_log', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // @ielts/core PushType: result | failed | best | test (round C adds the nudges)
+  templateId: text('template_id'),
+  channel: text('channel').notNull().default('push'),
+  dedupeKey: text('dedupe_key').notNull(), // result:<sessionId or attemptId>, test:<uuid>
+  status: text('status').$type<'pending' | 'sent' | 'cancelled' | 'skipped' | 'rejected' | 'failed'>().notNull().default('pending'),
+  title: text('title'),
+  body: text('body'),
+  route: text('route'), // deep link, a web path such as /writing/result/<id>
+  tries: integer('tries').notNull().default(0),
+  scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull().defaultNow(),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  openedAt: timestamp('opened_at', { withTimezone: true }),
+  actedAt: timestamp('acted_at', { withTimezone: true }), // round C: practised within 2 h of the send
+  holdout: boolean('holdout').notNull().default(false), // round C: the 10% that gets no engagement pushes
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex('notification_log_pending_key_idx').on(t.dedupeKey).where(sql`status = 'pending'`),
+  index('notification_log_due_idx').on(t.scheduledFor).where(sql`status = 'pending'`),
+  index('notification_log_user_idx').on(t.userId, t.createdAt),
+]);

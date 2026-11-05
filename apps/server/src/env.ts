@@ -48,6 +48,8 @@ const Env = z.object({
   R2_DIRECT: z.string().optional().transform((v) => v === 'true'),
   /** Public custom domain on the R2 bucket (https://media.nextband.app). A WAF rule there lets only lr/ and speaking/ through; those shared files skip the relay. */
   MEDIA_URL: z.string().url().optional(),
+  // Firebase service account key (JSON) for FCM HTTP v1 push (src/push.ts). Unset: push is off and every send is a no-op.
+  FCM_SERVICE_ACCOUNT_JSON: z.string().optional().transform((v) => v || undefined),
   RESEND_API_KEY: z.string().optional().transform((v) => v || undefined),
   EMAIL_FROM: z.string().default('NextBand <noreply@example.com>'),
   CAMBRIDGE_ALLOWED_EMAILS: z

@@ -14,7 +14,10 @@ export type ErrorCode =
   | 'mock_closed' // 409: the mock is finished or closed
   | 'out_of_order' // 409: a mock section started before the one(s) before it were submitted
   | 'section_done' // 409: that mock section was already submitted
-  | 'no_complete_set'; // 404: not enough content for a complete mock
+  | 'no_complete_set' // 404: not enough content for a complete mock
+  | 'push_off' // 503: FCM is not configured on this server
+  | 'push_no_device' // 409: POST /api/push/test with no registered device
+  | 'push_rate_limited'; // 429: a test push less than 30 s ago
 
 export type ErrorBody = { error: string; code: ErrorCode; [k: string]: unknown };
 

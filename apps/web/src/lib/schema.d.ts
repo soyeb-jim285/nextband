@@ -152,7 +152,10 @@ export interface paths {
                 };
             };
         };
-        /** Update settings (partial) */
+        /**
+         * Update settings (partial)
+         * @description Guests may change only the push notification fields (notify*, quietStart, quietEnd, remindAt): 403 account_required otherwise.
+         */
         put: {
             parameters: {
                 query?: never;
@@ -174,6 +177,13 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["Settings"];
                     };
+                };
+                /** @description A guest changing a non-notification setting (account_required) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -5448,6 +5458,179 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/push/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register or refresh this device for push (idempotent; call on every app start and on a new token). Guests too.
+         * @description A token already registered to another user moves to the caller (a different account signed in on this phone). Re-registering a token FCM had rejected turns it back on.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PushRegister"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Forget this device (call before signing out). Only the caller's own token is removed; an unknown token is still 200. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PushUnregister"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/opened": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The student opened the app from a push: `id` is the data payload's id. Idempotent; the first open counts. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PushOpened"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settings → "Send me a test notification" to every registered device of the caller (at most one every 30 s) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description sent: FCM accepted it for at least one device */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PushTest"];
+                    };
+                };
+                /** @description No device registered (push_no_device) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A test was sent less than 30 s ago (push_rate_limited) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Push is not set up on this server (push_off) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5469,6 +5652,16 @@ export interface components {
                 productEmails: boolean;
                 examDate: string | null;
                 timeZone: string;
+                notifyResults: boolean;
+                notifyStreak: boolean;
+                notifyPractice: boolean;
+                notifyExam: boolean;
+                notifyWeekly: boolean;
+                quietStart: string;
+                quietEnd: string;
+                remindAt: string | null;
+                /** @enum {string|null} */
+                notifyLanguage: "en" | "banglish" | null;
             };
             cambridgeAccess: boolean;
             /** @description The site owner: shows the Admin area */
@@ -5519,6 +5712,16 @@ export interface components {
             productEmails: boolean;
             examDate: string | null;
             timeZone: string;
+            notifyResults: boolean;
+            notifyStreak: boolean;
+            notifyPractice: boolean;
+            notifyExam: boolean;
+            notifyWeekly: boolean;
+            quietStart: string;
+            quietEnd: string;
+            remindAt: string | null;
+            /** @enum {string|null} */
+            notifyLanguage: "en" | "banglish" | null;
         };
         SettingsPatch: {
             targetBand?: number;
@@ -5527,6 +5730,16 @@ export interface components {
             productEmails?: boolean;
             examDate?: string | null;
             timeZone?: string;
+            notifyResults?: boolean;
+            notifyStreak?: boolean;
+            notifyPractice?: boolean;
+            notifyExam?: boolean;
+            notifyWeekly?: boolean;
+            quietStart?: string;
+            quietEnd?: string;
+            remindAt?: string | null;
+            /** @enum {string|null} */
+            notifyLanguage?: "en" | "banglish" | null;
         };
         PromptPage: {
             items: components["schemas"]["Prompt"][];
@@ -7612,6 +7825,31 @@ export interface components {
             } | null;
             /** @description A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today */
             justReached?: number;
+        };
+        PushRegister: {
+            /** @description FCM registration token, or the Firebase Installation ID when kind is fid */
+            token: string;
+            /**
+             * @description How FCM addresses this install: message.token (default) or message.fid
+             * @default token
+             * @enum {string}
+             */
+            kind: "token" | "fid";
+            /** @enum {string} */
+            platform: "android" | "ios" | "web";
+            appVersion?: string;
+            /** @description Device locale (BCP 47, e.g. bn-BD): push language until notifyLanguage is set */
+            locale?: string;
+        };
+        PushUnregister: {
+            /** @description FCM registration token, or the Firebase Installation ID when kind is fid */
+            token: string;
+        };
+        PushOpened: {
+            id: string;
+        };
+        PushTest: {
+            sent: boolean;
         };
     };
     responses: never;

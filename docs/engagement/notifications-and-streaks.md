@@ -157,11 +157,11 @@ Email uses the existing unsubscribe and campaign system.
 ## 5. The engine (server)
 
 ### 5.1 Pieces
-- `notification_devices(user_id, token, platform, app_version, locale, created_at, last_seen)`, filled by `POST /api/notifications/devices`.
-- `notification_prefs(user_id, results, practice, streak, exam, weekly, email_tips, quiet_start, quiet_end, language)`.
-  - `results`, `practice`, `streak`, `exam` and `weekly` are on/off switches for the matching notification types.
+- `notification_devices(token pk, kind token|fid, user_id, platform, app_version, locale, created_at, last_seen_at, disabled_at)`, filled by `PUT /api/push/token` (every app start; a token moves to whoever registered it last) and emptied by `DELETE /api/push/token` (sign-out). At most 10 per student.
+- Preferences live in the existing settings (`PUT /api/settings`, guests too for these fields): `notifyResults`, `notifyPractice`, `notifyStreak`, `notifyExam`, `notifyWeekly`, `quietStart`, `quietEnd`, `remindAt` (null = Auto), `notifyLanguage` (null = from the device locale). Email tips stay `productEmails`.
   - Defaults: everything on, quiet hours 22:30–08:00, language from the device.
-- `notification_log(id, user_id, type, template_id, channel, dedupe_key unique, scheduled_for, sent_at, opened_at, acted_at, holdout bool)`.
+- `notification_log(id, user_id, type, template_id, channel, dedupe_key, status, title, body, route, tries, scheduled_for, sent_at, opened_at, acted_at, holdout bool)`. `dedupe_key` is unique among `pending` rows; sent rows stay as history. `POST /api/push/opened` sets `opened_at`.
+- Built in round B: `src/push.ts` (FCM v1 sender, queue, P0 #1/#2/#10 with #10 merged into #1), `@ielts/core` `notifications.ts` (templates, `checkPush`). Pushes are data-only FCM messages; the app draws them. P0 pushes ignore quiet hours: they answer something the student just submitted.
 - **Event triggers:** attempt analysed/failed, card due, exam date set, and new personal best. These enqueue P0 notifications immediately.
 - **Sweep every 15 min:** for users whose *send window* (§5.2) falls in the next 15 min, build the candidate list from §4, apply caps, back-off and quiet hours, and pick one.
 - **Sender:**

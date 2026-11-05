@@ -12,6 +12,7 @@ import { keyCtx } from './ai/keyctx';
 import { analyzeSpeaking, spokenQuestions } from './ai/speaking';
 import type { AnalysisPartial, AnalysisResult, AnalysisStage, CriterionKey } from './ai/types';
 import { analyzeWriting } from './ai/writing';
+import { queueResult } from './push';
 import { refundAttempt } from './quota';
 import { MODELS } from './settings';
 import { storage, uploadError } from './storage';
@@ -63,6 +64,7 @@ async function analyzeAs(a: typeof attempts.$inferSelect, tries: number): Promis
 
 /** Final failure: the user sees `error` and gets the test back (a retry reserves it again). */
 async function fail(a: typeof attempts.$inferSelect, error: string, errorRetryable: boolean) {
+  await queueResult(a); // #2 marking failed: queued before the status changes (push.ts markSeen)
   await db.update(attempts).set({ status: 'failed', error, errorRetryable, stage: null, partial: null, ...DONE_QUEUE }).where(eq(attempts.id, a.id)).catch((e2) => console.error('could not mark attempt failed', a.id, e2));
   await refundAttempt(a);
 }
@@ -131,6 +133,7 @@ async function analyzeAttempt(a: typeof attempts.$inferSelect, tries: number): P
 
     // which mistakes become drill cards: judged before the save, so the result page can say so the moment it opens
     const drills = result.errors.length ? await chooseDrills(a.userId, attemptId, result.errors).catch((e) => (console.error('chooseDrills failed', attemptId, e), [])) : [];
+    await queueResult(a); // #1 result ready / #10 new best: queued before the status changes (push.ts markSeen)
     await db.transaction(async (tx) => {
       const ownerId = (await tx.select({ userId: attempts.userId }).from(attempts).where(eq(attempts.id, attemptId)))[0]?.userId ?? a.userId; // not a.userId: a guest may have signed up meanwhile
       const row = { result, overall: result.overall, criteria: bands(result) as Record<string, number>, models };
@@ -223,7 +226,10 @@ export async function recoverStale(): Promise<void> {
     .set({ status: 'failed', error: 'Interrupted, retry', errorRetryable: true, stage: null, partial: null, ...DONE_QUEUE })
     .where(and(eq(attempts.status, 'analyzing'), lt(attempts.updatedAt, sql`now() - interval '30 minutes'`)))
     .returning();
-  for (const a of stale) await refundAttempt(a);
+  for (const a of stale) {
+    await refundAttempt(a);
+    await queueResult(a);
+  }
 }
 
 const GUEST_KEEP_DAYS = 30;

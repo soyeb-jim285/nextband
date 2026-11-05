@@ -71,6 +71,47 @@
               },
               "timeZone": {
                 "type": "string"
+              },
+              "notifyResults": {
+                "type": "boolean"
+              },
+              "notifyStreak": {
+                "type": "boolean"
+              },
+              "notifyPractice": {
+                "type": "boolean"
+              },
+              "notifyExam": {
+                "type": "boolean"
+              },
+              "notifyWeekly": {
+                "type": "boolean"
+              },
+              "quietStart": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "quietEnd": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "remindAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "notifyLanguage": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "en",
+                  "banglish",
+                  null
+                ]
               }
             },
             "required": [
@@ -79,7 +120,16 @@
               "blockPaste",
               "productEmails",
               "examDate",
-              "timeZone"
+              "timeZone",
+              "notifyResults",
+              "notifyStreak",
+              "notifyPractice",
+              "notifyExam",
+              "notifyWeekly",
+              "quietStart",
+              "quietEnd",
+              "remindAt",
+              "notifyLanguage"
             ]
           },
           "cambridgeAccess": {
@@ -268,6 +318,47 @@
           },
           "timeZone": {
             "type": "string"
+          },
+          "notifyResults": {
+            "type": "boolean"
+          },
+          "notifyStreak": {
+            "type": "boolean"
+          },
+          "notifyPractice": {
+            "type": "boolean"
+          },
+          "notifyExam": {
+            "type": "boolean"
+          },
+          "notifyWeekly": {
+            "type": "boolean"
+          },
+          "quietStart": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "quietEnd": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "remindAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "notifyLanguage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "en",
+              "banglish",
+              null
+            ]
           }
         },
         "required": [
@@ -276,7 +367,16 @@
           "blockPaste",
           "productEmails",
           "examDate",
-          "timeZone"
+          "timeZone",
+          "notifyResults",
+          "notifyStreak",
+          "notifyPractice",
+          "notifyExam",
+          "notifyWeekly",
+          "quietStart",
+          "quietEnd",
+          "remindAt",
+          "notifyLanguage"
         ]
       },
       "SettingsPatch": {
@@ -305,6 +405,47 @@
           },
           "timeZone": {
             "type": "string"
+          },
+          "notifyResults": {
+            "type": "boolean"
+          },
+          "notifyStreak": {
+            "type": "boolean"
+          },
+          "notifyPractice": {
+            "type": "boolean"
+          },
+          "notifyExam": {
+            "type": "boolean"
+          },
+          "notifyWeekly": {
+            "type": "boolean"
+          },
+          "quietStart": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "quietEnd": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "remindAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "notifyLanguage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "en",
+              "banglish",
+              null
+            ]
           }
         }
       },
@@ -8708,6 +8849,85 @@
           "nextMilestone",
           "repair"
         ]
+      },
+      "PushRegister": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "FCM registration token, or the Firebase Installation ID when kind is fid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "token",
+              "fid"
+            ],
+            "default": "token",
+            "description": "How FCM addresses this install: message.token (default) or message.fid"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios",
+              "web"
+            ]
+          },
+          "appVersion": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 35,
+            "description": "Device locale (BCP 47, e.g. bn-BD): push language until notifyLanguage is set"
+          }
+        },
+        "required": [
+          "token",
+          "platform"
+        ]
+      },
+      "PushUnregister": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "FCM registration token, or the Firebase Installation ID when kind is fid"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "PushOpened": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "PushTest": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sent"
+        ]
       }
     },
     "parameters": {}
@@ -8834,6 +9054,7 @@
           "Settings"
         ],
         "summary": "Update settings (partial)",
+        "description": "Guests may change only the push notification fields (notify*, quietStart, quietEnd, remindAt): 403 account_required otherwise.",
         "security": [
           {
             "bearer": []
@@ -8859,6 +9080,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "A guest changing a non-notification setting (account_required)"
           }
         }
       }
@@ -14837,6 +15061,177 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/push/token": {
+      "put": {
+        "tags": [
+          "Push"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register or refresh this device for push (idempotent; call on every app start and on a new token). Guests too.",
+        "description": "A token already registered to another user moves to the caller (a different account signed in on this phone). Re-registering a token FCM had rejected turns it back on.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushRegister"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Push"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Forget this device (call before signing out). Only the caller's own token is removed; an unknown token is still 200.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushUnregister"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/opened": {
+      "post": {
+        "tags": [
+          "Push"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The student opened the app from a push: `id` is the data payload's id. Idempotent; the first open counts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushOpened"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/test": {
+      "post": {
+        "tags": [
+          "Push"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Settings → \"Send me a test notification\" to every registered device of the caller (at most one every 30 s)",
+        "responses": {
+          "200": {
+            "description": "sent: FCM accepted it for at least one device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTest"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No device registered (push_no_device)"
+          },
+          "429": {
+            "description": "A test was sent less than 30 s ago (push_rate_limited)"
+          },
+          "503": {
+            "description": "Push is not set up on this server (push_off)"
           }
         }
       }

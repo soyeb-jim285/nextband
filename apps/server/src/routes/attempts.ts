@@ -9,6 +9,7 @@ import { analyses, attempts, mockExams, prompts } from '../db/schema';
 import { ApiError } from '../errors';
 import { clientIpHash } from '../ip';
 import { runAnalysis } from '../jobs';
+import { markSeen } from '../push';
 import { checkAttempt, payerOf, reserveAttempt } from '../quota';
 import { aiLimit, lrSaveLimit } from '../ratelimit';
 import { storage, uploadError } from '../storage';
@@ -149,7 +150,13 @@ async function ownAttempt(id: string, userId: string) {
 }
 
 /** Read-only lookup: the owner may open anyone's attempt (admin area); everyone else only their own. Writes keep using ownAttempt. */
-const viewAttempt = (id: string, user: Parameters<typeof isOwner>[0] & { id: string }) => (isOwner(user) ? db.query.attempts.findFirst({ where: eq(attempts.id, id) }).then((a) => a ?? Promise.reject(new HTTPException(404, { message: 'Attempt not found' }))) : ownAttempt(id, user.id));
+const findAttempt = (id: string, user: Parameters<typeof isOwner>[0] & { id: string }) => (isOwner(user) ? db.query.attempts.findFirst({ where: eq(attempts.id, id) }).then((a) => a ?? Promise.reject(new HTTPException(404, { message: 'Attempt not found' }))) : ownAttempt(id, user.id));
+/** The attempt as its viewer sees it. The student seeing their own finished result cancels its queued push (push.ts markSeen). */
+async function viewAttempt(id: string, user: Parameters<typeof isOwner>[0] & { id: string }) {
+  const a = await findAttempt(id, user);
+  if (a.userId === user.id && (a.status === 'done' || a.status === 'failed')) await markSeen(user.id, a.sessionId ?? a.id);
+  return a;
+}
 
 export function register(app: App) {
   app.openapi(

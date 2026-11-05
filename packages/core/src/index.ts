@@ -13,3 +13,4 @@ export * from './seo';
 export * from './seo-copy';
 export * from './livekit';
 export * from './pricing';
+export * from './notifications';
