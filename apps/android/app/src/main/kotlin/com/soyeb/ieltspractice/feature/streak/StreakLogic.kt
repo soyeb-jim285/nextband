@@ -149,22 +149,23 @@ fun weekDayDescription(day: String, state: String): String {
 /** "M" for a Monday. */
 fun weekLetter(day: String): String = date(day)?.dayOfWeek?.name?.take(1).orEmpty()
 
+// Headlines: one clause each, no full stop (a mid-line stop read as two broken sentences).
 private val CHEERS = listOf(
-    "Day %d. You're on fire",
-    "%d days in a row. Keep it going",
-    "Day %d done. Your band thanks you",
-    "%d days straight. That's how bands move",
-    "Day %d. Small steps, every day",
+    "Day %d and you're on fire",
+    "%d days in a row, keep it going",
+    "Day %d done, your band thanks you",
+    "%d days straight: that's how bands move",
+    "Day %d of small, steady steps",
     "%d days and counting",
     "Day %d in the bag",
-    "%d days. You keep showing up",
+    "You've shown up %d days running",
 )
 
 /** The celebration headline. Day 1 and 2 have their own lines; milestones say so; the rest rotate by day. */
 fun celebrationLine(n: Int): String = when {
-    n <= 1 -> "Day 1. A new streak starts here"
-    n == 2 -> "Back-to-back days! 2 in a row"
-    n in MILESTONES -> "$n-day milestone. Brilliant work"
+    n <= 1 -> "A new streak starts today"
+    n == 2 -> "Back-to-back days: 2 in a row"
+    n in MILESTONES -> "Brilliant work: $n days in a row"
     else -> CHEERS[n % CHEERS.size].format(n)
 }
 

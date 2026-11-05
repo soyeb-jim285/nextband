@@ -91,11 +91,14 @@ internal fun Flame(done: Boolean, size: Dp, modifier: Modifier = Modifier, tint:
 internal fun countColor(done: Boolean): Color = if (done) NB.colors.warnText else NB.colors.ink
 
 /**
- * One heatmap square. Today is outlined until it's done. A tapped square gets an ink ring with a gap before the fill, so the
- * ring reads against the card whatever the fill.
+ * One heatmap square. Today ([pending]: not practised yet) gets a brand ring, a tapped square an ink one; both sit outside a
+ * gap before the fill, so the ring reads against the card whatever the fill (a week cell on the Today card can be full).
  */
 @Composable
-internal fun HeatCell(d: StreakDay?, today: String?, size: Dp, modifier: Modifier = Modifier, selected: Boolean = false) {
+internal fun HeatCell(
+    d: StreakDay?, today: String?, size: Dp, modifier: Modifier = Modifier, selected: Boolean = false,
+    pending: Boolean = d != null && d.day == today && d.level <= 0,
+) {
     val shape = RoundedCornerShape(size * 0.22f)
     if (d == null) { Spacer(modifier.size(size)); return }
     val role = heatRole(d)
@@ -103,7 +106,7 @@ internal fun HeatCell(d: StreakDay?, today: String?, size: Dp, modifier: Modifie
     Box(
         when {
             selected -> base.border(2.dp, NB.colors.ink, shape).padding(3.dp).background(heatFill(role), RoundedCornerShape((size - 6.dp) * 0.22f))
-            d.day == today && d.level <= 0 -> base.background(heatFill(role), shape).border(1.5.dp, NB.colors.brand, shape)
+            pending -> (size * 0.14f).let { g -> base.border(1.5.dp, NB.colors.brand, shape).padding(g).background(heatFill(role), RoundedCornerShape((size - g * 2) * 0.22f)) }
             else -> base.background(heatFill(role), shape)
         },
         contentAlignment = Alignment.Center,
@@ -115,11 +118,12 @@ internal fun HeatCell(d: StreakDay?, today: String?, size: Dp, modifier: Modifie
 private val ROW_LABELS = listOf("Mon", "", "Wed", "", "Fri", "", "")
 
 /**
- * Week columns (Monday at the top) that share the width up to [maxCell] a square, centred when capped: nothing scrolls.
+ * Week columns (Monday at the top) that share the width up to [maxCell] a square, placed by [align] when capped: nothing scrolls.
  * Month names sit over the column holding the 1st ([months], one per column); one that would touch the label before it is
  * dropped. The label sizes come from the text, so large fonts don't clip. A column may hold fewer than 7 squares.
  * [onSelect]: a tap anywhere on the grid picks the nearest square (one target, not 91 tiny ones). TalkBack reads one
- * summary per week; the caller can clear that and label the whole map instead.
+ * summary per week; the caller can clear that and label the whole map instead. [todayDone]: whether the cell keyed [today] is
+ * done, for a map whose cells aren't days (the Today card's weeks); by default a day cell is pending while its level is 0.
  */
 @Composable
 internal fun Heatmap(
@@ -132,6 +136,8 @@ internal fun Heatmap(
     selected: String? = null,
     months: List<String?> = remember(cols) { monthLabels(cols) },
     onSelect: ((StreakDay) -> Unit)? = null,
+    align: Alignment = Alignment.TopCenter,
+    todayDone: Boolean? = null,
 ) {
     if (cols.isEmpty()) return
     val weeks = remember(cols, today) { cols.map { weekDescription(it, today) } }
@@ -149,7 +155,7 @@ internal fun Heatmap(
         val lead = if (rowLabels) labelWidth + gap else 0.dp
         // ponytail: half a dp of slack so rounding never pushes the last column a pixel past the edge.
         val cell = ((maxWidth - lead - gap * (cols.size - 1) - 0.5.dp) / cols.size).coerceAtMost(maxCell)
-        Row(Modifier.align(Alignment.TopCenter), horizontalArrangement = Arrangement.spacedBy(gap)) {
+        Row(Modifier.align(align), horizontalArrangement = Arrangement.spacedBy(gap)) {
             if (rowLabels) Column(Modifier.width(labelWidth).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(gap)) {
                 Spacer(Modifier.height(monthRow))
                 // Taller than a square at large font sizes: the label spills into the empty rows around it, never clipped.
@@ -190,7 +196,10 @@ internal fun Heatmap(
                             Modifier.clearAndSetSemantics { if (weeks[i].isNotEmpty()) contentDescription = weeks[i] },
                             verticalArrangement = Arrangement.spacedBy(gap),
                         ) {
-                            col.forEach { d -> HeatCell(d, today, cell, selected = d != null && d.day == selected) }
+                            col.forEach { d ->
+                                val pending = d != null && d.day == today && (todayDone?.not() ?: (d.level <= 0))
+                                HeatCell(d, today, cell, selected = d != null && d.day == selected, pending = pending)
+                            }
                         }
                     }
                 }
@@ -242,7 +251,7 @@ internal fun WeekStrip(week: List<StreakWeekDay>, modifier: Modifier = Modifier)
     }
 }
 
-/** "❄ 1" */
+/** "❄ 1 freeze" */
 @Composable
 internal fun FreezeCount(n: Int) {
     Row(
@@ -254,14 +263,15 @@ internal fun FreezeCount(n: Int) {
         Spacer(Modifier.width(8.dp))
         Icon(Icons.Rounded.AcUnit, null, Modifier.size(14.dp), tint = NB.colors.ice)
         Spacer(Modifier.width(4.dp))
-        Text("$n", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = NB.colors.ink)
+        Text("$n ${plural(n, "freeze")}", style = NB.type.label.copy(fontFeatureSettings = "tnum"), color = NB.colors.ink)
         Spacer(Modifier.width(10.dp))
     }
 }
 
 /**
  * The Today card: flame and count with the freezes, the practised line, and 12 weeks as one row of squares (one per week,
- * darker = more practice days) so the mock hero below stays in view; the streak page keeps the day-by-day grid.
+ * darker = more practice days; this week is ringed until today is done) so the mock hero below stays in view; the streak page
+ * keeps the day-by-day grid. The row starts under the text, not centred.
  * At risk (after 18:00, nothing done, a streak of 2+) the line warns and a Drill button saves it. The card opens the streak screen.
  */
 @Composable
@@ -289,7 +299,10 @@ fun StreakCard(s: Streak, nav: Nav, hour: Int = hourNow()) {
         Text(practisedLine(s, risk, n), style = NB.type.bodySmall, color = if (risk) NB.colors.ink else NB.colors.muted)
         Spacer(Modifier.height(14.dp))
         // The line above already says it for TalkBack.
-        Heatmap(weeks, localToday(s), gap = 4.dp, maxCell = 24.dp, months = months, modifier = Modifier.clearAndSetSemantics {})
+        Heatmap(
+            weeks, weeks.lastOrNull()?.firstOrNull()?.day, gap = 4.dp, maxCell = 24.dp, months = months,
+            modifier = Modifier.clearAndSetSemantics {}, align = Alignment.TopStart, todayDone = s.done,
+        )
         if (risk) {
             Spacer(Modifier.height(14.dp))
             NbButton("Drill", { nav.requireAccount("Create an account to drill your mistakes.") { nav.go(Review()) } }, kind = BtnKind.Secondary, fill = true)

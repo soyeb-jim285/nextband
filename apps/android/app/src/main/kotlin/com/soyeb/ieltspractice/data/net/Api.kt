@@ -521,6 +521,13 @@ class Api(
         raw("DELETE", "/api/push/token", buildJsonObject { put("token", fid) }, asToken = asToken)
     }
 
+    /** POST /api/push/forget, without a session: a push for account [uid] reached this phone after it signed out (the sign-out's
+     *  DELETE never arrived), so the server stops sending them. Removes the row only while it is still [uid]'s. */
+    suspend fun pushForget(fid: String, uid: String) {
+        val body = AppJson.encodeToString(JsonElement.serializer(), buildJsonObject { put("token", fid); put("uid", uid) }).toRequestBody(JSON_MEDIA)
+        execute(Request.Builder().url(baseUrl + "/api/push/forget").post(body).build(), "offline")
+    }
+
     /** POST /api/push/opened: the app was opened by tapping push [id]. */
     suspend fun pushOpened(id: String) { raw("POST", "/api/push/opened", buildJsonObject { put("id", id) }) }
 

@@ -62,6 +62,14 @@ class PushLogicTest {
         assertFalse(pushIsForThisPhone("", "u1", signedIn = false))
     }
 
+    @Test fun aDroppedPushAsksTheServerToForgetThisPhone() {
+        assertTrue(shouldForgetPush("u1", null, signedIn = false), "signed out")
+        assertTrue(shouldForgetPush("u1", "u2", signedIn = true), "another account signed in since")
+        assertFalse(shouldForgetPush("u1", null, signedIn = true), "signed in, user id not loaded yet: may be ours")
+        assertFalse(shouldForgetPush("u1", "u1", signedIn = true))
+        assertFalse(shouldForgetPush(null, null, signedIn = false), "an older server sends no uid")
+    }
+
     @Test fun clockTimes() {
         assertEquals(22 to 30, parseClock("22:30"))
         assertNull(parseClock("24:00"))

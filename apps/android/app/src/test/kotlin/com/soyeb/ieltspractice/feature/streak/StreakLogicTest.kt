@@ -63,9 +63,10 @@ class StreakLogicTest {
     }
 
     @Test fun copy() {
-        assertEquals("Day 1. A new streak starts here", celebrationLine(1))
-        assertEquals("Back-to-back days! 2 in a row", celebrationLine(2))
-        assertEquals("7-day milestone. Brilliant work", celebrationLine(7))
+        assertEquals("A new streak starts today", celebrationLine(1))
+        assertEquals("Back-to-back days: 2 in a row", celebrationLine(2))
+        assertEquals("Brilliant work: 7 days in a row", celebrationLine(7))
+        (4..40).forEach { n -> assertFalse(celebrationLine(n).contains(". ") || celebrationLine(n).endsWith("."), celebrationLine(n)) }
         assertTrue(celebrationLine(12).contains("12"))
         assertEquals("next at day 14", freezeNote(Streak(current = 12, freezes = 1)))
         assertEquals("next at day 7", freezeNote(Streak(current = 3)))

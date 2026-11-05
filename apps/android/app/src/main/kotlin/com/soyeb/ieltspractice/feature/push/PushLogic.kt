@@ -67,6 +67,11 @@ fun seenKeysFor(target: PushTarget?): List<String> = when (target) {
 fun pushIsForThisPhone(messageUid: String?, phoneUid: String?, signedIn: Boolean): Boolean =
     if (messageUid.isNullOrEmpty()) signedIn else signedIn && messageUid == phoneUid
 
+/** A dropped push for [messageUid] asks the server to forget this phone for that account: when signed out, or signed in as someone
+ *  known to be else. Not while signed in with the user id not loaded yet (that push may well be ours). */
+fun shouldForgetPush(messageUid: String?, phoneUid: String?, signedIn: Boolean): Boolean =
+    !messageUid.isNullOrEmpty() && (!signedIn || (phoneUid != null && phoneUid != messageUid))
+
 const val PRIMER_WAIT_MS = 7L * 24 * 60 * 60 * 1000
 const val PRIMER_MAX_REFUSALS = 2
 
