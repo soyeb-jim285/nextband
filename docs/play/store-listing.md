@@ -92,7 +92,7 @@ NextBand একটি স্বাধীন অ্যাপ। British Council, 
 |---|---|---|
 | App icon | `icon-512.png` | 512 × 512 PNG |
 | Feature graphic | `feature-graphic.png` | 1024 × 500 PNG |
-| Phone screenshots (upload in this order) | `phone-01.png` … `phone-08.png` | 1080 × 2160 (2:1, the most Play allows) |
+| Phone screenshots (upload in this order) | `phone-01.png` … `phone-08.png` | 1080 × 1920 (9:16; Play takes only 16:9 or 9:16 now) |
 
 Captions, in order: a band score for every criterion; every mistake marked in your essay; talk to a live AI examiner; see your pace, pauses and fluency; Listening and Reading, timed like the exam; find out why you lost each mark; drill the mistakes you actually make; a few minutes a day, every day.
 Regenerate after a UI change: download `android-screens.zip` from the `android-android-v2-latest` release, unzip it and run `python3 scripts/play-store-assets.py <that folder>`.

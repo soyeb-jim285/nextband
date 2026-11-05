@@ -25,10 +25,10 @@ def render(html, name, w, h):
     f=f'{SP}/store-{name}.html'; open(f,'w').write(html)
     subprocess.run(['/usr/bin/google-chrome-stable','--headless=new','--disable-gpu','--hide-scrollbars','--virtual-time-budget=8000',f'--window-size={w},{h}',f'--screenshot={OUT}/{name}.png',f'file://{f}'],check=True,capture_output=True)
 for i,(shot,cap) in enumerate(SHOTS,1):
-    W,H=1080,2160
+    W,H=1080,1920 # Play: phone screenshots must be 9:16
     html=f'''<!doctype html><html><head><meta charset="utf-8">{FONTS}<style>{CSS%(W,H)}
-h1{{position:absolute;left:90px;right:90px;top:150px;font-size:88px;line-height:1.08;text-align:center}}
-.phone{{left:110px;width:860px;top:520px}}</style></head><body>
+h1{{position:absolute;left:90px;right:90px;top:120px;font-size:84px;line-height:1.08;text-align:center}}
+.phone{{left:110px;width:860px;top:430px}}</style></head><body>
 <h1>{cap}</h1><div class="phone"><img src="file://{Z}/{shot}.png"></div></body></html>'''
     render(html,f'phone-{i:02d}',W,H)
 W,H=1024,500
