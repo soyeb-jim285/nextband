@@ -123,8 +123,8 @@ it('marking an attempt queues a result push for 2 minutes; the FCM v1 message is
   expect(m.token).toBe(token);
   expect(m.notification).toBeUndefined();
   expect(m.android).toEqual({ priority: 'HIGH', ttl: '86400s', collapse_key: 'result' });
-  expect(Object.keys(m.data).sort()).toEqual(['body', 'channel', 'id', 'route', 'title', 'type']);
-  expect(m.data).toMatchObject({ id: row!.id, type: 'result', channel: 'results', route: `/speaking/result/${a!.id}` });
+  expect(Object.keys(m.data).sort()).toEqual(['body', 'channel', 'id', 'route', 'title', 'type', 'uid']);
+  expect(m.data).toMatchObject({ id: row!.id, uid: a!.userId, type: 'result', channel: 'results', route: `/speaking/result/${a!.id}` });
   expect(`${m.data.title} ${m.data.body}`).toMatch(/Speaking Part 1.*6\.5|6\.5.*Speaking Part 1/s);
   expect((await logs(user.id))[0]).toMatchObject({ status: 'sent', title: m.data.title, body: m.data.body, route: m.data.route });
   expect((await logs(user.id))[0]!.sentAt).not.toBeNull();
