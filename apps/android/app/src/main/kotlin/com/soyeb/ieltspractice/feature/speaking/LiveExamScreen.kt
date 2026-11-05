@@ -14,12 +14,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -371,14 +373,16 @@ private fun Stage(exam: LiveModel, now: Long, captions: Boolean, connecting: Boo
         else -> OrbMode.Idle
     }
     val status = if (connecting) "Connecting to your examiner" else exam.statusText
-    Column(
-        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).padding(horizontal = NB.space.gutter, vertical = 8.dp),
+    // Part 2: the cue card is the focus, so the examiner shrinks to one row beside its status (as on the web).
+    val compact = part2 && card != null
+    // heightIn(min) lets the weighted spacers centre the voice card in Parts 1 and 3 while the column still scrolls when it overflows.
+    BoxWithConstraints(Modifier.fillMaxSize()) { Column(
+        Modifier.fillMaxSize().readable().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(horizontal = NB.space.gutter, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         PartStepper(exam.phase)
         Text(phaseLabel(exam.phase), style = NB.type.label, color = c.muted, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-        // Part 2: the cue card is the focus, so the examiner shrinks to one row beside its status (as on the web).
-        val compact = part2 && card != null
+        if (!compact) Spacer(Modifier.weight(1f))
         NbCard(Modifier.fillMaxWidth(), padding = if (compact) PaddingValues(horizontal = 20.dp, vertical = 12.dp) else PaddingValues(vertical = 24.dp, horizontal = 20.dp)) {
             val bars = @Composable { VoiceBars(mode, { exam.level.toFloat() }, voice = exam::examinerVoice, compact = compact) }
             val line = @Composable { m: Modifier ->
@@ -419,8 +423,9 @@ private fun Stage(exam: LiveModel, now: Long, captions: Boolean, connecting: Boo
                 ) { Text(clockText(s.toLong()), style = NB.type.band(24), color = c.ink) }
             }
         }
+        if (!compact) Spacer(Modifier.weight(1.3f)) // a little above centre reads as centred
         Spacer(Modifier.height(8.dp))
-    }
+    } }
 }
 
 /** Whose turn it is, above the bars (web LiveStage WHO). */
