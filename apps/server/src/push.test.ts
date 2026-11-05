@@ -8,7 +8,8 @@ import { analyses, attempts, notificationDevices, notificationLog } from './db/s
 import { setFetch } from './ai/openrouter';
 import { speakingLlm, sttWords } from './ai/fixtures';
 import { recoverStale, runAnalysis } from './jobs';
-import { pushSweep, queueResult, setFcmAccount } from './push';
+import { markSeen, pushSweep, queueResult, setFcmAccount } from './push';
+import { linkGuest } from './link';
 import { storage } from './storage';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -122,7 +123,7 @@ it('marking an attempt queues a result push for 2 minutes; the FCM v1 message is
   const m = send!.body.message;
   expect(m.token).toBe(token);
   expect(m.notification).toBeUndefined();
-  expect(m.android).toEqual({ priority: 'HIGH', ttl: '86400s', collapse_key: 'result' });
+  expect(m.android).toEqual({ priority: 'HIGH', ttl: '86400s' }); // no collapse_key: an offline phone keeps every result
   expect(Object.keys(m.data).sort()).toEqual(['body', 'channel', 'id', 'route', 'title', 'type', 'uid']);
   expect(m.data).toMatchObject({ id: row!.id, uid: a!.userId, type: 'result', channel: 'results', route: `/speaking/result/${a!.id}` });
   expect(`${m.data.title} ${m.data.body}`).toMatch(/Speaking Part 1.*6\.5|6\.5.*Speaking Part 1/s);
@@ -245,4 +246,44 @@ it('guests may change only the notification settings', async () => {
   expect(await ok.json()).toMatchObject({ notifyResults: false, quietStart: '23:00', notifyLanguage: 'banglish', notifyStreak: true, remindAt: null });
   expect((await req('/api/settings', { method: 'PUT', headers: g.headers, body: { targetBand: 8 } })).status).toBe(403);
   expect((await req('/api/settings', { method: 'PUT', headers: g.headers, body: { quietEnd: '25:00' } })).status).toBe(400);
+});
+
+it('a 400 about the message keeps the device; a 400 naming the token disables it', async () => {
+  const { headers, user } = await testUser();
+  await device(headers, 'phone');
+  let message = "Invalid value at 'message.android.ttl'";
+  fakeFcm(() => json({ error: { code: 400, status: 'INVALID_ARGUMENT', message } }, 400));
+  expect(await (await req('/api/push/test', { method: 'POST', headers })).json()).toEqual({ sent: false });
+  expect((await devices(user.id))[0]!.disabledAt).toBeNull();
+  await db.delete(notificationLog);
+  message = 'The registration token is not a valid FCM registration token';
+  await req('/api/push/test', { method: 'POST', headers });
+  expect((await devices(user.id))[0]!.disabledAt).not.toBeNull();
+});
+
+it('two test taps at once send one push', async () => {
+  const f = fakeFcm();
+  const { headers } = await testUser();
+  await device(headers);
+  const codes = (await Promise.all([1, 2, 3].map(() => req('/api/push/test', { method: 'POST', headers })))).map((r) => r.status).sort();
+  expect(codes).toEqual([200, 429, 429]);
+  expect(fcmCalls(f)).toHaveLength(1);
+});
+
+it('a guest who signs up after a result was queued: the moved row is still cancelled when the result is seen, and queuing after the link uses the account', async () => {
+  fakeFcm();
+  const g = await guestUser();
+  await device(g.headers);
+  const a = await marked(g.user.id, 6);
+  await queueResult(a);
+  const acct = await testUser();
+  await linkGuest(g.user.id, acct.user.id);
+  const [row] = await logs(acct.user.id);
+  expect(row!.dedupeKey).toBe(`result:${acct.user.id}:${a.id}`);
+  await markSeen(acct.user.id, a.id);
+  expect((await logs(acct.user.id))[0]!.status).toBe('cancelled');
+
+  const b = await marked(acct.user.id, 7);
+  await queueResult({ ...b, userId: g.user.id }); // a stale userId from before the link
+  expect((await logs(acct.user.id)).find((r) => r.dedupeKey === `result:${acct.user.id}:${b.id}`)).toBeTruthy();
 });

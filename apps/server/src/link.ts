@@ -1,6 +1,7 @@
 // Guest → account: when an anonymous user signs up or signs in (Better Auth anonymous plugin onLinkAccount), everything they made moves to the real account.
 // The plugin deletes the anonymous user right after, which would cascade-delete these rows.
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { resultKey } from './push';
 import { db } from './db/client';
 import { attempts, cards, feedback, notificationDevices, notificationLog, guestConversions, liveSessions, lrAttempts, mistakes, quotaUsage, replaySessions, user } from './db/schema';
 import { storage } from './storage';
@@ -20,7 +21,8 @@ export async function linkGuest(anonId: string, newId: string) {
     await tx.update(lrAttempts).set({ userId: newId }).where(eq(lrAttempts.userId, anonId)); // Listening & Reading tests
     await tx.update(cards).set({ userId: newId }).where(eq(cards.userId, anonId)); // spelling cards made on L/R submit
     await tx.update(notificationDevices).set({ userId: newId }).where(eq(notificationDevices.userId, anonId)); // this phone keeps getting pushes
-    await tx.update(notificationLog).set({ userId: newId }).where(eq(notificationLog.userId, anonId)); // queued result pushes and open tracking
+    // queued result pushes and open tracking; result keys carry the user id (push.ts resultKey), so markSeen still finds them
+    await tx.update(notificationLog).set({ userId: newId, dedupeKey: sql`replace(${notificationLog.dedupeKey}, ${resultKey(anonId, '')}, ${resultKey(newId, '')})` }).where(eq(notificationLog.userId, anonId));
     await mergeDays(tx, anonId, newId); // streak days add onto the account's
     return tx.update(attempts).set({ userId: newId }).where(eq(attempts.userId, anonId)).returning({ id: attempts.id, audioKey: attempts.audioKey });
   });

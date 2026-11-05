@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, gt, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { currentUser, requireUser } from '../auth';
 import { db } from '../db/client';
 import { notificationDevices, notificationLog } from '../db/schema';
@@ -37,6 +37,8 @@ export function register(app: App) {
     async (c) => {
       const me = currentUser(c);
       const b = c.req.valid('json');
+      // ponytail: no proof the caller owns this install. Taking another phone's FID (not public) only redirects pushes to it, and the app drops
+      // any push whose data.uid isn't its signed-in user; that phone's next launch takes its row back. A per-token move limit if that's ever abused.
       const row = { userId: me.id, kind: b.kind, platform: b.platform, appVersion: b.appVersion ?? null, locale: b.locale ?? null, lastSeenAt: new Date(), disabledAt: null };
       await db.insert(notificationDevices).values({ token: b.token, ...row }).onConflictDoUpdate({ target: notificationDevices.token, set: row });
       const keep = db.select({ token: notificationDevices.token }).from(notificationDevices).where(eq(notificationDevices.userId, me.id)).orderBy(desc(notificationDevices.lastSeenAt)).limit(MAX_DEVICES);
@@ -96,13 +98,9 @@ export function register(app: App) {
       if (!pushEnabled()) throw new ApiError(503, { error: 'Notifications are not available right now.', code: 'push_off' });
       const [device] = await db.select({ token: notificationDevices.token }).from(notificationDevices).where(and(eq(notificationDevices.userId, me.id), isNull(notificationDevices.disabledAt))).limit(1);
       if (!device) throw new ApiError(409, { error: 'Turn on notifications on this device first.', code: 'push_no_device' });
-      const [recent] = await db
-        .select({ id: notificationLog.id })
-        .from(notificationLog)
-        .where(and(eq(notificationLog.userId, me.id), eq(notificationLog.type, 'test'), gt(notificationLog.createdAt, sql`now() - interval '30 seconds'`)))
-        .limit(1);
-      if (recent) throw new ApiError(429, { error: 'Test sent. Try again in a few seconds.', code: 'push_rate_limited' });
-      return c.json({ sent: await sendTestPush(me.id) }, 200);
+      const sent = await sendTestPush(me.id);
+      if (sent === 'rate_limited') throw new ApiError(429, { error: 'Test sent. Try again in a few seconds.', code: 'push_rate_limited' });
+      return c.json({ sent }, 200);
     },
   );
 }

@@ -5,7 +5,7 @@
 // (its channel, action buttons, open tracking), so onMessageReceived runs in the background too. The data payload is
 // { id, type, channel, title, body, route } (all strings).
 import { checkPush, PUSH_TYPE_CHANNEL, renderPush, sessionBand, weightedWritingBand, type PushLanguage, type PushType } from '@ielts/core';
-import { and, desc, eq, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import { sign } from 'node:crypto';
 import { httpFetch } from './ai/openrouter';
 import type { AnalysisResult } from './ai/types';
@@ -70,8 +70,10 @@ export type Push = { id: string; type: PushType; title: string; body: string; ro
 type Outcome = 'sent' | 'dead' | 'error' | { retryMs: number };
 const TTL: Record<PushType, string> = { result: '86400s', failed: '86400s', best: '86400s', test: '3600s' };
 
-/** https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode: UNREGISTERED / INVALID_ARGUMENT / SENDER_ID_MISMATCH = this token is dead;
- *  QUOTA_EXCEEDED (429) and 5xx = retry with exponential backoff from 1 minute, honouring Retry-After. */
+/** https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode: UNREGISTERED (404) / SENDER_ID_MISMATCH (403) = this token is dead.
+ *  INVALID_ARGUMENT (400) is a dead token only when it names the token (manage-tokens: "only if the payload is completely valid"); any other
+ *  400 is our message's fault and must not switch off the student's devices. QUOTA_EXCEEDED (429) and 5xx = retry with exponential backoff
+ *  from 1 minute, honouring Retry-After. */
 async function sendOne(a: Account, d: Device, p: Push, tries: number): Promise<Outcome> {
   const r = await httpFetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(a.project_id)}/messages:send`, {
     method: 'POST',
@@ -81,14 +83,15 @@ async function sendOne(a: Account, d: Device, p: Push, tries: number): Promise<O
         [d.kind === 'fid' ? 'fid' : 'token']: d.token,
         // uid: the app drops a message meant for an account that is no longer signed in on this phone (a sign-out whose token delete never reached us)
         data: { id: p.id, uid: d.userId, type: p.type, channel: PUSH_TYPE_CHANNEL[p.type], title: p.title, body: p.body, route: p.route },
-        android: { priority: 'HIGH', ttl: TTL[p.type], collapse_key: p.type },
+        // no collapse_key: FCM keeps only the newest message per key for an offline phone, and every result must arrive
+        android: { priority: 'HIGH', ttl: TTL[p.type] },
       },
     }),
   });
   if (r.ok) return 'sent';
   const err = ((await r.json().catch(() => null)) as { error?: { status?: string; message?: string; details?: { '@type'?: string; errorCode?: string }[] } } | null)?.error;
   const code = err?.details?.find((x) => x['@type']?.endsWith('google.firebase.fcm.v1.FcmError'))?.errorCode ?? err?.status;
-  if (r.status === 404 || r.status === 400 || code === 'UNREGISTERED' || code === 'INVALID_ARGUMENT' || code === 'SENDER_ID_MISMATCH') {
+  if (r.status === 404 || code === 'UNREGISTERED' || code === 'SENDER_ID_MISMATCH' || (r.status === 400 && /token|fid|installation/i.test(err?.message ?? ''))) {
     console.warn('[push] dropping token', d.platform, r.status, code, err?.message?.slice(0, 200));
     return 'dead';
   }
@@ -107,7 +110,7 @@ const LEASE = sql`now() + interval '5 minutes'`; // a claimed row a crashed proc
 const RESULT_DELAY = sql`now() + interval '2 minutes'`; // §4 #1: only when the student hasn't seen the result within 2 minutes
 type Row = typeof notificationLog.$inferSelect;
 /** One student's result row: the user id is part of the key, so another account's session id can never touch it. */
-const resultKey = (userId: string, ref: string) => `result:${userId}:${ref}`;
+export const resultKey = (userId: string, ref: string) => `result:${userId}:${ref}`;
 
 const activeDevices = (userId: string) => db.select().from(notificationDevices).where(and(eq(notificationDevices.userId, userId), isNull(notificationDevices.disabledAt))).orderBy(desc(notificationDevices.lastSeenAt));
 
@@ -115,10 +118,14 @@ const activeDevices = (userId: string) => db.select().from(notificationDevices).
  *  changes, so a client that sees the result always finds the row to cancel (markSeen). Only for students with a device. Never throws. */
 export async function queueResult(a: { id: string; userId: string; sessionId: string | null }): Promise<void> {
   try {
-    if (!fcm() || !(await activeDevices(a.userId)).length) return;
+    if (!fcm()) return;
+    // the attempt's owner now, not a.userId: a guest may have signed up while it was marked (linkGuest moved it)
+    // ponytail: a link landing between this read and the insert loses the push (FK on the deleted guest); a one-statement insert…select if that matters
+    const userId = (await db.select({ userId: attempts.userId }).from(attempts).where(eq(attempts.id, a.id)))[0]?.userId ?? a.userId;
+    if (!(await activeDevices(userId)).length) return;
     await db
       .insert(notificationLog)
-      .values({ userId: a.userId, type: 'result', dedupeKey: resultKey(a.userId, a.sessionId ?? a.id), scheduledFor: RESULT_DELAY })
+      .values({ userId, type: 'result', dedupeKey: resultKey(userId, a.sessionId ?? a.id), scheduledFor: RESULT_DELAY })
       .onConflictDoUpdate({ target: notificationLog.dedupeKey, targetWhere: sql`status = 'pending'`, set: { scheduledFor: RESULT_DELAY } }); // the next part of a session pushes it back
   } catch (e) {
     console.error('[push] queueResult failed', a.id, e);
@@ -257,15 +264,23 @@ export function pushSweep(): Promise<number> {
   })());
 }
 
-/** Settings → "Send me a test notification": queued and delivered now. */
-export async function sendTestPush(userId: string): Promise<boolean> {
+/** Settings → "Send me a test notification": queued and delivered now. 'rate_limited' = another test was queued in the last 30 s. */
+export async function sendTestPush(userId: string): Promise<boolean | 'rate_limited'> {
   const a = fcm();
   if (!a) return false;
   const [settings, devices] = await Promise.all([getSettings(userId), activeDevices(userId)]);
   const m = renderPush('test', languageOf(settings.notifyLanguage, devices[0]?.locale), {});
-  const [row] = await db
-    .insert(notificationLog)
-    .values({ userId, type: 'test', templateId: m.templateId, title: m.title, body: m.body, route: '/settings', dedupeKey: `test:${crypto.randomUUID()}`, tries: 1, scheduledFor: LEASE })
-    .returning();
-  return deliver(a, row!);
+  // check + insert under a per-student lock, so two taps at once can't both pass the 30 s limit
+  const row = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`push-test:${userId}`}))`);
+    const [recent] = await tx.select({ id: notificationLog.id }).from(notificationLog)
+      .where(and(eq(notificationLog.userId, userId), eq(notificationLog.type, 'test'), gt(notificationLog.createdAt, sql`now() - interval '30 seconds'`))).limit(1);
+    if (recent) return null;
+    const [r] = await tx
+      .insert(notificationLog)
+      .values({ userId, type: 'test', templateId: m.templateId, title: m.title, body: m.body, route: '/settings', dedupeKey: `test:${crypto.randomUUID()}`, tries: 1, scheduledFor: LEASE })
+      .returning();
+    return r!;
+  });
+  return row ? deliver(a, row) : 'rate_limited';
 }

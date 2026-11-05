@@ -130,7 +130,7 @@ Priority: P0 = the student asked for it; P1 = timely and valuable; P2 = nudge. T
 
 | # | Type | Trigger | Pri | Channel | Example (English / Banglish variants exist) |
 |---|---|---|---|---|---|
-| 1 | Result ready | Marking finished and the student hasn't seen it within 2 min | P0 | push, else email | "Your Task 2 essay got **6.5** 🎯 See the one thing that held you back" |
+| 1 | Result ready | Marking finished and the student hasn't seen it within 2 min | P0 | push (email fallback: round D) | "Your Task 2 essay got **6.5** 🎯 See the one thing that held you back" |
 | 2 | Marking failed | Analysis failed | P0 | push | "We couldn't mark your Speaking Part 2. Tap to try again, it's free" |
 | 3 | Streak saver | Streak ≥ 2, not practised today, at the student's usual time (or 20:30 at the latest) | P1 | push + **local fallback** | "🔥 12 days. One 2-minute drill keeps it alive" |
 | 4 | Last call | Streak ≥ 7, still not practised, 21:30 | P1 (only if #3 was opened, or #3 wasn't sent) | local | "1.5 hours left on your 12-day streak ⏳" |
@@ -157,7 +157,7 @@ Email uses the existing unsubscribe and campaign system.
 ## 5. The engine (server)
 
 ### 5.1 Pieces
-- `notification_devices(token pk, kind token|fid, user_id, platform, app_version, locale, created_at, last_seen_at, disabled_at)`, filled by `PUT /api/push/token` (every app start; a token moves to whoever registered it last) and emptied by `DELETE /api/push/token` (sign-out). At most 10 per student.
+- `notification_devices(token pk, kind token|fid, user_id, platform, app_version, locale, created_at, last_seen_at, disabled_at)`, filled by `PUT /api/push/token` (every app start; a token moves to whoever registered it last, with no proof of owning the install: the `uid` check below keeps a taken-over row from showing anything) and emptied by `DELETE /api/push/token` (sign-out). At most 10 per student.
 - Preferences live in the existing settings (`PUT /api/settings`, guests too for these fields): `notifyResults`, `notifyPractice`, `notifyStreak`, `notifyExam`, `notifyWeekly`, `quietStart`, `quietEnd`, `remindAt` (null = Auto), `notifyLanguage` (null = from the device locale). Email tips stay `productEmails`.
   - Defaults: everything on, quiet hours 22:30–08:00, language from the device.
 - `notification_log(id, user_id, type, template_id, channel, dedupe_key, status, title, body, route, tries, scheduled_for, sent_at, opened_at, acted_at, holdout bool)`. `dedupe_key` is unique among `pending` rows; sent rows stay as history. `POST /api/push/opened` sets `opened_at`.
@@ -167,7 +167,9 @@ Email uses the existing unsubscribe and campaign system.
 - **Sender:**
   - FCM HTTP v1 for Android, with web push and iOS later through the same FCM project.
   - Email through the existing `sendEmail`.
-  - A dead token (FCM `UNREGISTERED`) deletes its device row.
+  - A dead token (FCM `UNREGISTERED`, `SENDER_ID_MISMATCH`, or an `INVALID_ARGUMENT` that names the token) sets the device row's `disabled_at`: it gets nothing until the app registers it again (`PUT` turns it back on). Any other 400 is a fault in our message and leaves the device alone.
+  - Every data message carries `uid` (the target user). The app draws it only when that is the user signed in on the phone, so a sign-out whose `DELETE` never arrived can't show one account's result to the next.
+  - The app removes its row (`DELETE /api/push/token`) while Android notifications are off for it and registers it again when they're back on, so FCM never gets high-priority messages that show nothing (it deprioritises apps that do that).
 
 ### 5.2 Timing per student
 - The **usual time** is the median local hour of the student's activity starts over the last 21 days, minus 30 minutes. The window is ±15 min.
@@ -301,7 +303,7 @@ Owner approval is needed before turning AI on. The template versions ship first,
 | **Review** | The same 12-area Claude + Sol panel, plus a 13th area, "Engagement & notifications quality", scored against §2 | after C |
 
 ## 10. What the owner needs to do
-1. **Create a Firebase project** (free) at console.firebase.google.com and add the Android app `com.soyeb.ieltspractice`.
+1. **Create a Firebase project** (free) at console.firebase.google.com and add the Android app **`app.nextband`** (the applicationId; the Kotlin namespace `com.soyeb.ieltspractice` doesn't matter to Firebase). `google-services.json` must contain a client for `app.nextband`.
    - Download `google-services.json` and keep it out of git; CI gets it from a secret.
    - Create a **service account key** (Project settings → Service accounts → Generate new private key). It goes in Dokploy as `FCM_SERVICE_ACCOUNT_JSON`.
 2. Approve AI-written messages (§5.6): about $2.60 a month per 1,000 weekly-active students.
