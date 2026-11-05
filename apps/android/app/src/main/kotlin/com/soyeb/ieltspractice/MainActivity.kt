@@ -18,11 +18,12 @@ class MainActivity : ComponentActivity() {
 
     private var graph: AppGraph? = null
 
-    // Notifications switched on or off in Android's settings while we were away: the server's device row follows (Push.sync).
-    // A tapped push arrives through PushOpenActivity (not exported), never as extras on this exported activity.
+    // The app is on screen: the device row is refreshed with foreground = true, which resets the server's nudge back-off (§5.4), and it
+    // follows notifications switched on or off in Android's settings while we were away (Push.sync). A process FCM started in the
+    // background never gets here. A tapped push arrives through PushOpenActivity (not exported), never as extras on this exported activity.
     override fun onStart() {
         super.onStart()
-        graph?.push?.resync()
+        graph?.push?.foreground()
     }
 
     // The TTS engine binds a system service on first use; let it go when the app leaves the screen. The next speak() starts it again.

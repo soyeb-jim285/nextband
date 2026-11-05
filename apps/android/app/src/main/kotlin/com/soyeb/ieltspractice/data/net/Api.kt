@@ -507,10 +507,12 @@ class Api(
 
     // Push (feature/push). The server contract: docs/engagement/notifications-and-streaks.md §5.1.
 
-    /** PUT /api/push/token: this install, by its Firebase Installation ID. Idempotent; sent only under the session [asToken]. */
-    suspend fun pushRegister(fid: String, appVersion: String, locale: String, asToken: String) {
+    /** PUT /api/push/token: this install, by its Firebase Installation ID. Idempotent; sent only under the session [asToken].
+     *  [foreground]: the app opened on screen (resets the server's nudge back-off); false for a background start. */
+    suspend fun pushRegister(fid: String, appVersion: String, locale: String, foreground: Boolean, asToken: String) {
         raw("PUT", "/api/push/token", buildJsonObject {
             put("token", fid); put("kind", "fid"); put("platform", "android"); put("appVersion", appVersion.take(40)); put("locale", locale.take(35))
+            if (foreground) put("foreground", true)
         }, asToken = asToken)
     }
 

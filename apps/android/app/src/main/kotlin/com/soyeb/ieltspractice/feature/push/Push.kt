@@ -78,20 +78,23 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
     /** Every sign-out (AppGraph): pushes still addressed to that account are dropped from now on. */
     suspend fun forgetUser() = prefs.setString(UID, null)
 
-    @Volatile private var syncedEnabled: Boolean? = null
+    /** The app came on screen and the server hasn't been told yet (the first [sync] with a session tells it). */
+    @Volatile private var foregroundPending = false
 
     /**
      * PUT /api/push/token for the current session while Android lets us notify, else DELETE it: FCM deprioritises apps whose
      * high-priority messages show nothing. Quiet on failure (the next launch, sign-in or return to the app sends it again).
+     * `foreground` is sent only after [foreground]: a start in the background (FCM waking the app for a push) must not reset the back-off.
      */
     suspend fun sync() {
         val fid = prefs.getString(FID) ?: return
         val session = api.token.value ?: return
         val on = enabled()
+        val fg = foregroundPending
         try {
-            if (on) api.pushRegister(fid, BuildConfig.VERSION_NAME, Locale.getDefault().toLanguageTag(), session)
+            if (on) api.pushRegister(fid, BuildConfig.VERSION_NAME, Locale.getDefault().toLanguageTag(), fg, session)
             else api.pushUnregister(fid, session)
-            syncedEnabled = on
+            if (fg) foregroundPending = false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -99,8 +102,12 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
         }
     }
 
-    /** MainActivity.onStart: notifications were switched on or off in Android's settings since the last [sync]. */
-    fun resync() { if (available && enabled() != syncedEnabled) scope.launch { sync() } }
+    /** MainActivity.onStart: the app is on screen. Sends it with the next [sync] (now, or once the session and FID are loaded). */
+    fun foreground() {
+        if (!available) return
+        foregroundPending = true
+        scope.launch { sync() }
+    }
 
     fun enabled(): Boolean = NotificationManagerCompat.from(app).areNotificationsEnabled()
 
