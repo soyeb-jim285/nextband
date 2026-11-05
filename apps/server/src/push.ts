@@ -79,7 +79,8 @@ async function sendOne(a: Account, d: Device, p: Push, tries: number): Promise<O
     body: JSON.stringify({
       message: {
         [d.kind === 'fid' ? 'fid' : 'token']: d.token,
-        data: { id: p.id, type: p.type, channel: PUSH_TYPE_CHANNEL[p.type], title: p.title, body: p.body, route: p.route },
+        // uid: the app drops a message meant for an account that is no longer signed in on this phone (a sign-out whose token delete never reached us)
+        data: { id: p.id, uid: d.userId, type: p.type, channel: PUSH_TYPE_CHANNEL[p.type], title: p.title, body: p.body, route: p.route },
         android: { priority: 'HIGH', ttl: TTL[p.type], collapse_key: p.type },
       },
     }),
