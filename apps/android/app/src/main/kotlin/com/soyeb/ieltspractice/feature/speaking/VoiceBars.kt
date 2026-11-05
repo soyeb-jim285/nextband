@@ -83,12 +83,12 @@ fun VoiceBars(
     val h = if (compact) 32.dp else 112.dp
     val halo = if (compact) 64.dp else 192.dp
     Canvas(Modifier.width(halo).height(if (compact) 40.dp else 168.dp).then(modifier).clearAndSetSemantics {}) {
-        clock.longValue // redraw every frame
+        val ticking = clock.longValue != 0L // redraw every frame; before the first one (or in tests) draw the target shape
         val t = (System.nanoTime() / 1_000_000 - start) / 1000f
         val lit = barTargets(mode, t, voice(), level(), reduced, target)
         for (i in 0 until BARS) {
             // fast attack, slower release: speech peaks land at once and fall back smoothly
-            shown[i] = if (reduced) target[i] else shown[i] + (target[i] - shown[i]) * (if (target[i] > shown[i]) 0.55f else 0.18f)
+            shown[i] = if (reduced || !ticking) target[i] else shown[i] + (target[i] - shown[i]) * (if (target[i] > shown[i]) 0.55f else 0.18f)
         }
         val loud = shown.average().toFloat()
         val v = when (mode) {
