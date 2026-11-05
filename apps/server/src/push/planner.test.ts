@@ -56,8 +56,8 @@ it('queues the streak saver once, in the send window of the student zone, and de
   expect(await nudgeSweep(at(`${THU}T19:20`))).toBe(1);
   expect(await nudgeSweep(at(`${THU}T19:35`))).toBe(0); // the same local day: once
   const [row] = await logs(id);
-  expect(row).toMatchObject({ type: 'streak', status: 'pending', holdout: false, route: '/streak', dedupeKey: `nudge:${id}:${THU}`, templateId: expect.stringMatching(/^streak-en-/) });
-  expect(row!.title).toContain('2');
+  expect(row).toMatchObject({ type: 'streak', status: 'pending', holdout: false, route: '/streak', dedupeKey: `nudge:${id}:${THU}`, templateId: expect.stringMatching(/^saver-en-/) });
+  expect(`${row!.title} ${row!.body}`).not.toContain('{');
 
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(at(`${THU}T22:00`)); // delivered late (a retry): 30 min left before quiet hours
@@ -155,14 +155,25 @@ it('finds the candidates: drills due, a pattern, the exam countdown, a cold skil
   const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
   const c = await candidates(id, settings, 'Asia/Dhaka', now);
   expect(c.map((x) => x.type).sort()).toEqual(['cold', 'drills', 'exam', 'pattern', 'winback']);
-  expect(c.find((x) => x.type === 'pattern')).toMatchObject({ vars: { pattern: 'Articles', skill: 'Writing', count: '3', of: '4' }, route: '/improve/drill?pattern=grammar.article' });
-  expect(c.find((x) => x.type === 'cold')).toMatchObject({ vars: { skill: 'Speaking', days: '10', band: '6.0' }, route: '/speaking' });
-  expect(c.find((x) => x.type === 'exam')!.vars).toEqual({ days: '14' });
-  expect(c.find((x) => x.type === 'winback')!.vars).toMatchObject({ days: '3', band: '6.5' });
+  expect(c.find((x) => x.type === 'pattern')).toMatchObject({ vars: { pattern: 'Articles', skill: 'Writing', hits: '3', of: '4' }, route: '/improve/drill?pattern=grammar.article' });
+  expect(c.find((x) => x.type === 'cold')).toMatchObject({ vars: { skill: 'Speaking', idle: '10', band: '6.0' }, route: '/speaking' });
+  expect(c.find((x) => x.type === 'exam')!.vars).toEqual({ days: '14', band: '6.5', weakest: 'Speaking' });
+  expect(c.find((x) => x.type === 'winback')!.vars).toMatchObject({ idle: '3', band: '6.5' });
   expect(c.find((x) => x.type === 'drills')!.vars).toEqual({ due: '5' });
   // P1 pattern and exam beat the rest; with both fresh the first listed wins
   expect(await nudgeSweep(now)).toBe(1);
   expect(['pattern', 'exam']).toContain((await logs(id))[0]!.type);
+});
+
+it('milestone near replaces the streak saver two practice days before a milestone', async () => {
+  const id = await student();
+  await practised(id, '2026-10-28'); // a 1-day streak, today not yet: today and tomorrow make day 3
+  const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
+  expect(await candidates(id, settings, 'Asia/Dhaka', at(`${THU}T19:30`))).toEqual([{ type: 'milestone', vars: { milestone: '3' }, route: '/streak' }]);
+  expect(await nudgeSweep(at(`${THU}T19:30`))).toBe(1);
+  const [row] = await logs(id);
+  expect(row).toMatchObject({ type: 'milestone', templateId: expect.stringMatching(/^milestone-en-/) });
+  expect(`${row!.title} ${row!.body}`).not.toContain('{');
 });
 
 it('bandit counts: sent, not holdout, at least 2 h old; wins are the ones practised after', async () => {

@@ -14,7 +14,7 @@ import {
   allowedAt, backoffLevel, fmtMin, inWindow, isHoldout, localClock, NUDGE_SWITCH, NUDGE_TYPES, pickCandidate, pickTemplate, quietOf, sendMinute,
   underCaps, zoneIn, type Candidate, type NudgeType, type Rng, type Stats, type TypeHistory,
 } from './rules';
-import { NUDGE_TEMPLATES } from './templates';
+import { nudgeTemplates } from './templates';
 
 const DAY = 864e5;
 const ACT_MS = 2 * 3_600_000; // §5.7: practised within 2 h of the send
@@ -41,10 +41,10 @@ export async function candidates(userId: string, s: Settings, tz: string, now: D
   const today = localClock(now, tz).day;
   const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / DAY);
 
-  // #3 streak saver / #9 milestone near
+  // #3 streak saver, or #9 milestone near merged into it: not practised today and the milestone is two practice days away (today + tomorrow)
   const st = await getStreak(userId, now);
-  if (st.today === 'pending' && st.current >= 2) out.push({ type: 'streak', vars: { streak: String(st.current) }, route: '/streak' });
-  if (st.today === 'done' && MILESTONES.includes(st.current + 1)) out.push({ type: 'milestone', vars: { streak: String(st.current), milestone: String(st.current + 1) }, route: '/streak' });
+  if (st.today === 'pending' && st.current >= 1 && MILESTONES.includes(st.current + 2)) out.push({ type: 'milestone', vars: { milestone: String(st.current + 2) }, route: '/streak' });
+  else if (st.today === 'pending' && st.current >= 2) out.push({ type: 'streak', vars: { streak: String(st.current) }, route: '/streak' });
 
   // #5 drills due: 5+ cards due and no drill yesterday
   const [[due], [yday]] = await Promise.all([
@@ -63,11 +63,7 @@ export async function candidates(userId: string, s: Settings, tz: string, now: D
     having count(distinct t.id) >= 3 and max(t.created_at) > ${new Date(now.getTime() - 7 * DAY).toISOString()}
     order by tests desc, max(t.created_at) desc limit 1`)) as unknown as { skill: Skill; category: string; tests: number }[];
   if (pat && PATTERN_LABEL[pat.category])
-    out.push({ type: 'pattern', vars: { pattern: PATTERN_LABEL[pat.category]!, skill: SKILL_LABEL[pat.skill], count: String(pat.tests), of: '4' }, route: `/improve/drill?pattern=${encodeURIComponent(pat.category)}` });
-
-  // #7 exam countdown at 30, 21, 14, 7, 3 and 1 days
-  const toExam = s.examDate ? daysBetween(today, s.examDate) : null;
-  if (toExam != null && EXAM_DAYS.includes(toExam)) out.push({ type: 'exam', vars: { days: String(toExam) }, route: '/mock' });
+    out.push({ type: 'pattern', vars: { pattern: PATTERN_LABEL[pat.category]!, skill: SKILL_LABEL[pat.skill], hits: String(pat.tests), of: '4' }, route: `/improve/drill?pattern=${encodeURIComponent(pat.category)}` });
 
   // #8 skill gone cold (7–30 days untouched while another skill was practised this week) and #12 win-back (3 / 7 / 14 days with nothing)
   const last = (await db.execute(sql`select skill, max(at) as at, (array_agg(band order by at desc))[1] as band from (
@@ -75,15 +71,25 @@ export async function candidates(userId: string, s: Settings, tz: string, now: D
       union all select t.skill::text, l.submitted_at, l.band from lr_attempts l join lr_tests t on t.id = l.test_id where l.user_id = ${userId} and l.status = 'submitted'
     ) s group by skill`)) as unknown as { skill: Skill; at: Date | string; band: string | number | null }[];
   const ago = (r: { at: Date | string }) => (now.getTime() - new Date(r.at).getTime()) / DAY;
+
+  // #7 exam countdown at 30, 21, 14, 7, 3 and 1 days, with the last band and (with 2+ banded skills) the weakest skill
+  const toExam = s.examDate ? daysBetween(today, s.examDate) : null;
+  if (toExam != null && EXAM_DAYS.includes(toExam)) {
+    const banded = last.filter((r) => r.band != null && n(r.band) > 0);
+    const latest = [...banded].sort((a, b) => ago(a) - ago(b))[0];
+    const [low, next] = [...banded].sort((a, b) => n(a.band) - n(b.band));
+    const weakest = low && next && n(low.band) < n(next.band) ? low : undefined; // a tie has no weakest
+    out.push({ type: 'exam', vars: { days: String(toExam), ...(latest && { band: n(latest.band).toFixed(1) }), ...(weakest && { weakest: SKILL_LABEL[weakest.skill] }) }, route: '/mock' });
+  }
   if (last.some((r) => ago(r) < 7)) {
     const cold = last.filter((r) => ago(r) >= 7 && ago(r) <= 30).sort((a, b) => ago(a) - ago(b))[0];
-    if (cold) out.push({ type: 'cold', vars: { skill: SKILL_LABEL[cold.skill], days: String(Math.floor(ago(cold))), ...(cold.band != null && { band: n(cold.band).toFixed(1) }) }, route: `/${cold.skill}` });
+    if (cold) out.push({ type: 'cold', vars: { skill: SKILL_LABEL[cold.skill], idle: String(Math.floor(ago(cold))), ...(n(cold.band) > 0 && { band: n(cold.band).toFixed(1) }) }, route: `/${cold.skill}` });
   }
   const [act] = await db.select({ day: sql<string | null>`max(${activityDays.day})` }).from(activityDays).where(eq(activityDays.userId, userId));
   const idle = act?.day ? daysBetween(act.day, today) : null;
   if (idle != null && WINBACK_DAYS.includes(idle)) {
     const best = last.filter((r) => r.band != null).map((r) => n(r.band)).sort((a, b) => b - a)[0];
-    out.push({ type: 'winback', vars: { days: String(idle), ...(best != null && { band: best.toFixed(1) }) }, route: '/' });
+    out.push({ type: 'winback', vars: { idle: String(idle), ...(best != null && { band: best.toFixed(1) }) }, route: '/' });
   }
 
   // #14 mock ready: started over 24 h ago, not finished, not expired
@@ -93,7 +99,7 @@ export async function candidates(userId: string, s: Settings, tz: string, now: D
   if (mock) {
     // ponytail: "not started" per section from the mock row; a section started and abandoned reads as done here
     const left = [!mock.listeningAttemptId && 'Listening', !mock.readingAttemptId && 'Reading', !mock.writingAttemptIds.length && !mock.writingStartedAt && 'Writing', !mock.speakingSessionId && 'Speaking'].filter((x): x is string => !!x);
-    if (left.length) out.push({ type: 'mock', vars: { left: left.length > 1 ? `${left.slice(0, -1).join(', ')} and ${left.at(-1)}` : left[0]! }, route: `/mock/${mock.id}` });
+    if (left.length) out.push({ type: 'mock', vars: { parts: left.length > 1 ? `${left.slice(0, -1).join(', ')} and ${left.at(-1)}` : left[0]! }, route: `/mock/${mock.id}` });
   }
   return out;
 }
@@ -158,8 +164,8 @@ export async function planUser(userId: string, s: Settings, tz: string, now: Dat
 
     const [device] = await tx.select({ locale: notificationDevices.locale }).from(notificationDevices).where(eq(notificationDevices.userId, userId)).orderBy(desc(notificationDevices.lastSeenAt)).limit(1);
     const fill = (t: { id: string; title: string; body: string }) => ({ ...t, title: fillTemplate(t.title, pick.vars), body: fillTemplate(t.body, pick.vars) });
-    // templates whose variables this student has (a guest has no name, a skill may have no band yet) and whose copy passes checkPush
-    const ok = NUDGE_TEMPLATES[pick.type][languageOf(s.notifyLanguage, device?.locale)].map(fill).filter((t) => !checkPush(t).length);
+    // templates whose facts this student has (a skill may have no band yet: unfilled fails checkPush) and whose copy passes checkPush
+    const ok = nudgeTemplates(pick.type, pick.vars, languageOf(s.notifyLanguage, device?.locale)).map(fill).filter((t) => !checkPush(t).length);
     if (!ok.length) {
       console.error('[push] no sendable template', pick.type, Object.keys(pick.vars));
       return null;
