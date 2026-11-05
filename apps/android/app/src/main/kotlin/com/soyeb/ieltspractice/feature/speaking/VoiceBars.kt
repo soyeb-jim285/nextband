@@ -7,13 +7,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.withInfiniteAnimationFrameMillis
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.soyeb.ieltspractice.design.LocalReducedMotion
@@ -51,6 +51,7 @@ internal fun barTargets(mode: OrbMode, tSec: Float, voice: Float, level: Float, 
         mode == OrbMode.Connecting -> 0.14f
         else -> 0.12f
     }
+    for (i in 0 until BARS) out[i] = out[i].coerceIn(0f, 1f)
     if (mode == OrbMode.Connecting && !reduced) {
         lit = floor(tSec * 6f).toInt() % (BARS * 2 - 2)
         if (lit >= BARS) lit = BARS * 2 - 2 - lit
@@ -75,7 +76,8 @@ fun VoiceBars(
     val start = remember { System.nanoTime() / 1_000_000 }
     val shown = remember { FloatArray(BARS) { 0.12f } }
     val target = remember { FloatArray(BARS) }
-    if (!reduced) LaunchedEffect(Unit) { while (true) withFrameMillis { clock.longValue = it } }
+    // The infinite-animation clock (not withFrameMillis): tests and the system's animation policy treat it like any endless animation.
+    if (!reduced) LaunchedEffect(Unit) { while (true) withInfiniteAnimationFrameMillis { clock.longValue = it } }
     val w = if (compact) 6.dp else 16.dp
     val gap = if (compact) 4.dp else 10.dp
     val h = if (compact) 32.dp else 112.dp
