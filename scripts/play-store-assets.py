@@ -9,7 +9,7 @@ FONTS='<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@
 SHOTS=[
  ("light-result-writing-Overview","A band score for every criterion"),
  ("light-result-writing-Essay","Every mistake marked in your essay"),
- ("light-live-talk","Talk to a live AI examiner"),
+ ("light-live-intro","Talk to a live AI examiner"),
  ("light-result-speaking-Fluency","See your pace, pauses and fluency"),
  ("light-lr-listening-exam-Playing","Listening and Reading, timed like the exam"),
  ("light-lr-result-Overview","Find out why you lost each mark"),
