@@ -1,6 +1,9 @@
 package com.soyeb.ieltspractice.feature.push
 
 import kotlin.test.Test
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -68,5 +71,10 @@ class PushLogicTest {
         assertEquals("10:30 pm", displayClock("22:30", is24 = false))
         assertEquals("12:00 am", displayClock("00:00", is24 = false))
         assertEquals("12:15 pm", displayClock("12:15", is24 = false))
+    }
+
+    @Test fun signingOutAndBackIntoTheSameAccountStoresTheUidAgain() = runBlocking {
+        assertEquals(listOf("A", "A"), uidWrites(flowOf("A", null, "A")).toList())
+        assertEquals(listOf("A", "B"), uidWrites(flowOf("A", "A", "B")).toList())
     }
 }

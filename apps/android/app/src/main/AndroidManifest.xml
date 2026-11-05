@@ -34,10 +34,12 @@
             </intent-filter>
         </activity>
 
-        <!-- A tapped push opens through this (feature/push/PushOpenActivity.kt): not exported, so other apps can't send push extras. -->
+        <!-- A tapped push opens through this (feature/push/PushOpenActivity.kt): not exported, so other apps can't send push extras.
+             The docs' "special activity" pattern: its own empty-affinity task is the one hidden from Recents; MainActivity starts in the app's normal task. -->
         <activity
             android:name=".feature.push.PushOpenActivity"
             android:exported="false"
+            android:taskAffinity=""
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.NoDisplay" />

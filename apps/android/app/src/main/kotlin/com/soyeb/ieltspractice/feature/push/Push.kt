@@ -30,7 +30,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -61,7 +63,7 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
             api.token.collect { if (it != null) sync() }
         }
         // The signed-in user, kept for NbMessagingService (a cold start from FCM never loads /api/me). Cleared on sign-out ([forgetUser]).
-        scope.launch { api.me.mapNotNull { it?.user?.id }.distinctUntilChanged().collect { prefs.setString(UID, it) } }
+        scope.launch { uidWrites(api.me.map { it?.user?.id }).collect { prefs.setString(UID, it) } }
         // Auto-init is off in the manifest, so the docs' pattern: register() on every start; onRegistered() hands us the FID.
         FirebaseMessaging.getInstance().register().addOnFailureListener { Log.w(TAG, "FCM registration failed", it) }
     }
@@ -183,3 +185,7 @@ class Push(private val app: Context, private val api: Api, private val prefs: Pr
         }
     }
 }
+
+/** The signed-in user ids to store as push:uid. The sign-out null stays in until after the distinct check, so A, sign-out, A
+ *  writes A again ([Push.forgetUser] cleared it in between). */
+internal fun uidWrites(ids: Flow<String?>): Flow<String> = ids.distinctUntilChanged().filterNotNull()

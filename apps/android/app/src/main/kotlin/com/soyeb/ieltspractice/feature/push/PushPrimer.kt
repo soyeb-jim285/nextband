@@ -84,10 +84,12 @@ fun appNotificationSettings(pkg: String): Intent =
 fun PushPrimerHost() {
     val g = LocalGraph.current
     val demo = LocalDemo.current
-    if (demo?.screen == "push-primer") LaunchedEffect(Unit) { g.push.primer = true }
-    if (!g.push.primer || g.streak.celebrating != null) return
+    // Above the early return: "Turn on" closes the sheet first, and the scope and the permission launcher must outlive it to
+    // receive the system dialog's answer (sync on grant, refusal count on deny).
     val scope = rememberCoroutineScope()
     val request = rememberPushPermission()
+    if (demo?.screen == "push-primer") LaunchedEffect(Unit) { g.push.primer = true }
+    if (!g.push.primer || g.streak.celebrating != null) return
     PushPrimer(
         onTurnOn = { g.push.primer = false; if (demo == null) request() },
         onNotNow = { g.push.primer = false; if (demo == null) scope.launch { g.push.refused() } },
