@@ -7823,6 +7823,8 @@ export interface components {
                 until: string;
                 daysDone: number;
             } | null;
+            /** @description Today's reminder time, HH:MM local: the student's chosen time, else their usual practice time (20:30 at the latest while a streak is at risk), clear of quiet hours and Jumu'ah. The app schedules its local streak reminder for it; null = no time fits today */
+            remindAt: string | null;
             /** @description A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today */
             justReached?: number;
         };

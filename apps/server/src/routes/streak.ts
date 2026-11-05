@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { currentUser, requireUser } from '../auth';
+import { remindAtFor } from '../push/planner';
 import { getStreak } from '../streaks';
 import type { App } from '../types';
 
@@ -21,6 +22,7 @@ const Streak = z
       .object({ target: z.number(), until: z.string(), daysDone: z.number() })
       .nullable()
       .openapi({ description: 'Broken streak with no freeze: practise on 2 separate days before `until` to get `target` back' }),
+    remindAt: z.string().nullable().openapi({ description: 'Today\'s reminder time, HH:MM local: the student\'s chosen time, else their usual practice time (20:30 at the latest while a streak is at risk), clear of quiet hours and Jumu\'ah. The app schedules its local streak reminder for it; null = no time fits today' }),
     justReached: z.number().optional().openapi({ description: 'A milestone (3, 7, 14, 30, 50, 100, 200, 365) reached today' }),
   })
   .openapi('Streak');
@@ -37,6 +39,10 @@ export function register(app: App) {
       description: 'A practice day is a submitted test part, 5 drill cards graded, or 10+ minutes of Listening/Reading. docs/engagement/notifications-and-streaks.md §3',
       responses: { 200: { description: 'Streak', content: { 'application/json': { schema: Streak } } } },
     }),
-    async (c) => c.json(await getStreak(currentUser(c).id), 200),
+    async (c) => {
+      const id = currentUser(c).id;
+      const [streak, remindAt] = await Promise.all([getStreak(id), remindAtFor(id).catch(() => null)]);
+      return c.json({ ...streak, remindAt }, 200);
+    },
   );
 }

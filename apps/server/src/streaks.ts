@@ -5,6 +5,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { localDay } from './coach/report';
 import { db } from './db/client';
 import { activityDays, streaks, userSettings } from './db/schema';
+import { markActed } from './push';
 import { isTimeZone } from './settings';
 
 const DAY = 864e5;
@@ -103,6 +104,7 @@ export async function recordActivity(userId: string, add: Add, at = new Date()):
       await tx.insert(activityDays).values({ userId, day: localDay(at, tz), ...v }).onConflictDoUpdate({ target: [activityDays.userId, activityDays.day], set });
       await settle(tx, userId, tz, at);
     });
+    await markActed(userId, at);
   } catch (e) {
     console.error('recordActivity', userId, (e as Error).message);
   }

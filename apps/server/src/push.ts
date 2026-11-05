@@ -5,14 +5,15 @@
 // (its channel, action buttons, open tracking), so onMessageReceived runs in the background too. The data payload is
 // { id, type, channel, title, body, route } (all strings).
 import { checkPush, PUSH_TYPE_CHANNEL, renderPush, sessionBand, weightedWritingBand, type PushLanguage, type PushType } from '@ielts/core';
-import { and, desc, eq, gt, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, isNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import { sign } from 'node:crypto';
 import { httpFetch } from './ai/openrouter';
 import type { AnalysisResult } from './ai/types';
 import { db } from './db/client';
-import { analyses, attempts, mockExams, notificationDevices, notificationLog } from './db/schema';
+import { analyses, attempts, mockExams, notificationDevices, notificationLog, userSettings } from './db/schema';
 import { env } from './env';
-import { getSettings } from './settings';
+import { isNudge, NUDGE_CHANNEL, NUDGE_TYPES, nudgeTtl, zoneIn, type NudgeType } from './push/rules';
+import { getSettings, mergeSettings } from './settings';
 
 type Account = { project_id: string; client_email: string; private_key: string };
 const parseAccount = (json: string | undefined): Account | null => {
@@ -66,7 +67,7 @@ async function accessToken(a: Account): Promise<string> {
 
 // ---------- One message to one device ----------
 type Device = typeof notificationDevices.$inferSelect;
-export type Push = { id: string; type: PushType; title: string; body: string; route: string };
+export type Push = { id: string; type: PushType | NudgeType; title: string; body: string; route: string; ttl?: number };
 type Outcome = 'sent' | 'dead' | 'error' | { retryMs: number };
 const TTL: Record<PushType, string> = { result: '86400s', failed: '86400s', best: '86400s', test: '3600s' };
 
@@ -82,9 +83,9 @@ async function sendOne(a: Account, d: Device, p: Push, tries: number): Promise<O
       message: {
         [d.kind === 'fid' ? 'fid' : 'token']: d.token,
         // uid: the app drops a message meant for an account that is no longer signed in on this phone (a sign-out whose token delete never reached us)
-        data: { id: p.id, uid: d.userId, type: p.type, channel: PUSH_TYPE_CHANNEL[p.type], title: p.title, body: p.body, route: p.route },
+        data: { id: p.id, uid: d.userId, type: p.type, channel: isNudge(p.type) ? NUDGE_CHANNEL[p.type] : PUSH_TYPE_CHANNEL[p.type], title: p.title, body: p.body, route: p.route },
         // no collapse_key: FCM keeps only the newest message per key for an offline phone, and every result must arrive
-        android: { priority: 'HIGH', ttl: TTL[p.type] },
+        android: { priority: 'HIGH', ttl: p.ttl ? `${p.ttl}s` : TTL[p.type as PushType] },
       },
     }),
   });
@@ -190,7 +191,7 @@ async function resultContent(row: Row): Promise<Content> {
   return { type: best ? 'best' : 'result', vars, route };
 }
 
-const languageOf = (pref: PushLanguage | null, locale: string | null | undefined): PushLanguage => pref ?? (locale?.toLowerCase().startsWith('bn') ? 'banglish' : 'en');
+export const languageOf = (pref: PushLanguage | null, locale: string | null | undefined): PushLanguage => pref ?? (locale?.toLowerCase().startsWith('bn') ? 'banglish' : 'en');
 
 /** Sends one claimed row to all of the student's devices and records the outcome. */
 async function deliver(a: Account, row: Row): Promise<boolean> {
@@ -207,7 +208,17 @@ async function deliver(a: Account, row: Row): Promise<boolean> {
   }
   let push: Push;
   if (row.type === 'test') push = { id: row.id, type: 'test', title: row.title!, body: row.body!, route: row.route ?? '/settings' };
-  else {
+  else if (isNudge(row.type)) {
+    // planned and written by push/planner.ts; re-checked now: switched off since, or a retry that ran into quiet hours / Jumu'ah, is dropped
+    const data = (await db.query.userSettings.findFirst({ where: eq(userSettings.userId, row.userId), columns: { data: true } }))?.data;
+    const tz = zoneIn(data);
+    const ttl = nudgeTtl(row.type, mergeSettings({ ...data, timeZone: tz }), tz, new Date());
+    if (!ttl) {
+      await done('skipped');
+      return false;
+    }
+    push = { id: row.id, type: row.type, title: row.title!, body: row.body!, route: row.route ?? '/', ttl };
+  } else {
     const c = await resultContent(row);
     if (c === 'wait') {
       // not a try: back in a minute
@@ -283,4 +294,17 @@ export async function sendTestPush(userId: string): Promise<boolean | 'rate_limi
     return r!;
   });
   return row ? deliver(a, row) : 'rate_limited';
+}
+
+/** The student practised (streaks.ts recordActivity): nudges sent, and holdout rows logged, in the 2 h before `at` count as acted on (§5.7;
+ *  the bandit's win). Never throws. */
+export async function markActed(userId: string, at = new Date()): Promise<void> {
+  const from = new Date(at.getTime() - 2 * 3_600_000);
+  await db
+    .update(notificationLog)
+    .set({ actedAt: at })
+    .where(and(eq(notificationLog.userId, userId), isNull(notificationLog.actedAt), inArray(notificationLog.type, [...NUDGE_TYPES]),
+      or(and(eq(notificationLog.status, 'sent'), gte(notificationLog.sentAt, from), lte(notificationLog.sentAt, at)),
+        and(eq(notificationLog.holdout, true), gte(notificationLog.scheduledFor, from), lte(notificationLog.scheduledFor, at)))))
+    .catch((e) => console.error('[push] markActed failed', userId, e));
 }

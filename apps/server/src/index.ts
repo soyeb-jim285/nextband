@@ -13,6 +13,7 @@ import { coachSweep } from './coach/report';
 import { weeklySweep } from './coach/weekly';
 import { planReminderSweep } from './plan-reminders';
 import { pushSweep } from './push';
+import { nudgeSweep } from './push/planner';
 import { settlePending } from './routes/pay';
 import { purgeReplays } from './replay';
 import { isKnownPath } from '@ielts/core';
@@ -67,6 +68,9 @@ if (env.NODE_ENV === 'production') {
 }
 // queued pushes (results 2 min after marking, retries); a no-op without FCM_SERVICE_ACCOUNT_JSON. Rows are claimed with SKIP LOCKED, so every instance may run it.
 setInterval(() => void pushSweep(), 30_000).unref();
+// round C nudges: plans the students whose send window is now (each is planned once a local day under a lock, so every instance may run it)
+setInterval(() => void nudgeSweep(), 15 * 60_000).unref();
+setTimeout(() => void nudgeSweep(), 60_000).unref(); // soon after boot too, so frequent deploys never skip a window
 const grants = () => loadCambridgeGrants().catch((e) => console.error('loadCambridgeGrants failed', e));
 await grants();
 setInterval(grants, 60_000).unref(); // another process's toggle is honoured within a minute
