@@ -1,6 +1,6 @@
 # Google Play: Data safety answers (NextBand Android, app.nextband)
 
-Paste these into Play Console → App content → Data safety. Update them when the app changes; the push-notifications phase adds a device ID (see the end).
+Paste these into Play Console → App content → Data safety. Update them when the app changes.
 
 ## Overview questions
 | Question | Answer |
@@ -23,7 +23,7 @@ Paste these into Play Console → App content → Data safety. Update them when 
 | Messages / App activity → **Other user-generated content** | Yes | No | Required to use tests | App functionality | Essays, written answers, notes |
 | App activity → **App interactions** | Yes | No | Required | App functionality, Analytics | Test attempts, scores, drill history, streak, minutes practised (shown back to the user) |
 | App info and performance → **Crash logs** | **No** unless a crash SDK is added | | | | The app has no crash reporter today |
-| Device or other IDs | **No** (until push notifications ship) | | | | |
+| Device or other IDs → **Device or other IDs** | Yes | No | Required | App functionality | The Firebase Installation ID that push notifications are delivered to (with app version and phone language), sent on every launch and sign-in; Google Firebase Cloud Messaging delivers the pushes as our service provider. Removed from the account on sign-out, deleted with the account |
 | Financial info → Purchase history | **No** in the Play build | | | | The Play build sells nothing. Web purchases are tied to the account server-side, not collected by the app |
 | Location, Contacts, Photos, Calendar, Health, Web browsing, Installed apps | **No** | | | | |
 
@@ -35,8 +35,8 @@ Is the data processed ephemerally? **No** for all of the above (it is stored in 
 - Committed to the Play Families policy: **No** (the app is not for children)
 - Independent security review: **No**
 
-## When push notifications ship (round B)
-Add: **Device or other IDs → Yes, collected, not shared, required for notifications, purpose App functionality** (the Firebase Cloud Messaging token). The privacy policy already describes it.
+## Push notifications (round B)
+Declared above: **Device or other IDs → collected, not shared, required, App functionality** (the Firebase Installation ID). The app includes only Firebase Cloud Messaging, with Analytics collection switched off in the manifest; no other Firebase or Google SDK. Notification preferences (types, quiet hours, reminder time, language) are stored with the account. The privacy policy already describes it.
 
 ## Other App content forms (for reference)
 - **Privacy policy:** https://nextband.app/privacy
