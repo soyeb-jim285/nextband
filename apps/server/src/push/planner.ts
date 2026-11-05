@@ -196,7 +196,11 @@ export async function planUser(userId: string, s: Settings, tz: string, now: Dat
       console.error('[push] no sendable template', pick.type, Object.keys(pick.vars));
       return null;
     }
-    const t = pickTemplate(ok, stats, rng);
+    // vary the copy for this student: skip their last 3 of this type and anything they got in the last 7 days, unless that leaves nothing
+    const same = rows.filter((r) => r.type === pick.type).sort((a, b) => +at(b) - +at(a)).slice(0, 3);
+    const seen = new Set([...same, ...rows.filter((r) => +at(r) > now.getTime() - 7 * DAY)].map((r) => r.templateId));
+    const fresh = ok.filter((t) => !seen.has(t.id));
+    const t = pickTemplate(fresh.length ? fresh : ok, stats, rng);
     await tx.insert(notificationLog).values({ userId, type: pick.type, templateId: t.id, title: t.title, body: t.body, route: pick.route, dedupeKey: key, scheduledFor: now });
     return 'queued';
   });

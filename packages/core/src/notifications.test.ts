@@ -31,6 +31,8 @@ it('push never sells or shames', () => {
   for (const s of ['You broke your streak 😢', 'You lost your streak', "Don't give up now", 'No excuses tonight', "Why haven't you practised?", 'Why haven’t you practised?',
     'You missed yesterday', 'Tumi bhule gecho?', 'Keno practice koroni?', 'Streak hariye felecho', 'Streak is waiting 😞', 'Hmm 💔'])
     expect(bad(s).some((p) => p.startsWith('shaming word')), s).toBe(true);
+  for (const s of ['You forgot your practice', 'Your drills feel forgotten', 'You ignored us', 'Stop slacking', 'A wasted week', "Don't quit now", "You're behind", 'Don’t abandon your goal'])
+    expect(bad(s).some((p) => p.startsWith('shaming word')), s).toBe(true);
   // whole words only: progress, pronunciation, explanation are fine
   expect(bad('Your progress and pronunciation improved. Planned well')).toEqual([]);
 });

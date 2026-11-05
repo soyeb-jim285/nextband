@@ -3,13 +3,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeFetch, guestUser, json, req, seedPrompt } from '../test/helpers';
 import { generateKeyPairSync } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
+import { NUDGE_TEMPLATES } from '@ielts/core';
 import { db } from '../db/client';
 import { activityDays, analyses, attempts, cards, lrTests, mistakes, mockExams, notificationDevices, notificationLog, user, userSettings } from '../db/schema';
 import { setFetch } from '../ai/openrouter';
 import { pushSweep, setFcmAccount } from '../push';
 import { getSettings } from '../settings';
 import { getStreak, recordActivity } from '../streaks';
-import { candidates, nudgeSweep, remindAtFor, templateStats } from './planner';
+import { candidates, nudgeSweep, planUser, remindAtFor, templateStats } from './planner';
 import { isHoldout } from './rules';
 
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -279,6 +280,20 @@ it('mock ready: only a mock with some sections done and some left, started over 
   expect(await mock()).toMatchObject({ vars: { parts: 'Reading, Writing and Speaking' }, route: `/mock/${m!.id}` });
 });
 
+it('the same student never gets the same streak-saver copy on consecutive days, even when the bandit favours it', async () => {
+  const id = await student();
+  await practised(id, '2026-10-27', '2026-10-28');
+  const settings = { ...(await getSettings(id)), timeZone: 'Asia/Dhaka' };
+  const stats = new Map<string, { sends: number; wins: number }>();
+  expect(await planUser(id, settings, 'Asia/Dhaka', at(`${THU}T19:20`), stats)).toBe('queued');
+  const first = (await logs(id))[0]!.templateId!;
+  for (const t of NUDGE_TEMPLATES['streak-saver'].en) stats.set(t.id, { sends: 1000, wins: t.id === first ? 990 : 10 }); // a clear winner
+  await practised(id, THU);
+  expect(await planUser(id, settings, 'Asia/Dhaka', at('2026-10-30T19:20'), stats)).toBe('queued');
+  const [, second] = await logs(id);
+  expect(second).toMatchObject({ type: 'streak', templateId: expect.stringMatching(/^saver-en-/) });
+  expect(second!.templateId).not.toBe(first);
+});
 it('a saved freeze: the streak saver goes without FOMO copy', async () => {
   const id = await student();
   await practised(id, ...Array.from({ length: 8 }, (_, i) => `2026-10-${String(20 + i).padStart(2, '0')}`).concat('2026-10-28')); // 9 days: 1 freeze earned

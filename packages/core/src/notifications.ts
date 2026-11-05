@@ -70,6 +70,7 @@ const SHAME = [
   'you missed', 'you broke', 'lost your streak', 'give up', 'giving up', 'no excuses', "why haven't you", "why didn't you",
   'olosh', 'alsho', 'lojja', 'lojjar', 'faki', 'fanki', 'pichiye porcho', 'pichiye pore', 'pichiye jaccho', 'bondhura', 'bondhu ra', 'shobai egiye',
   'bhule gecho', 'bhule gele', 'koroni', 'korli na', 'hariye',
+  'forgot', 'forgotten', 'ignored', 'ignoring', 'slacking', 'wasted', 'quit', "you're behind", 'abandon', 'abandoned',
 ];
 const SYMBOLS = ['৳', '$', '%', 'nextband.app', 'http', 'www.'];
 const GUILT_EMOJI = /[😢😞😔💔😭😟☹🙁]/u;
