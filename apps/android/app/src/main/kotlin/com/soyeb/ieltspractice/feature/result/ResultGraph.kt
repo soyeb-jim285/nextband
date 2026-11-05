@@ -10,6 +10,7 @@ import com.soyeb.ieltspractice.nav.Nav
 fun NavGraphBuilder.resultGraph(nav: Nav) {
     composable<AttemptResult> { entry ->
         StreakAfterPractice()
+        com.soyeb.ieltspractice.feature.push.PushAskAfterResult()
         AttemptResultScreen(entry.toRoute<AttemptResult>().ids, nav)
     }
 }

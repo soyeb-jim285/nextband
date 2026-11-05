@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: the NextBand N (logo symbol geometry, as splash_icon's clip path), white on transparent as Android requires. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="96" android:viewportHeight="96">
+    <group android:translateX="28" android:translateY="-1.25">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M2.5 79A2.5 2.5 0 0 1 0 76.5 L0 42.865A10 10 0 0 1 4.996 34.207 L25.356 22.439A20 20 0 0 1 35.364 19.755 L37.5 19.755A2.5 2.5 0 0 1 40 22.255 L40 76.5A2.5 2.5 0 0 1 37.5 79 L32.5 79A2.5 2.5 0 0 1 30 76.5 L30 30.15 L10 41.71 L10 76.5A2.5 2.5 0 0 1 7.5 79Z" />
+    </group>
+</vector>

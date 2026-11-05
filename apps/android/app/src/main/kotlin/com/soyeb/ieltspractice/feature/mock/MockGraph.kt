@@ -23,6 +23,7 @@ fun NavGraphBuilder.mockGraph(nav: Nav) {
     composable<MockHub> { entry -> Shared { Box(Modifier.fillMaxSize().sharedBox(MOCK_HERO, NB.shape.card)) { MockHubScreen(nav, entry.toRoute<MockHub>()) } } }
     composable<MockResult> { entry ->
         com.soyeb.ieltspractice.feature.streak.StreakAfterPractice()
+        com.soyeb.ieltspractice.feature.push.PushAskAfterResult()
         MockResultScreen(nav, entry.toRoute<MockResult>())
     }
 }

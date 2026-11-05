@@ -256,6 +256,7 @@ fun YouScreen(nav: Nav) {
             scope.launch {
                 val ok = save { if (date == null) api.saveSettings(clearExamDate = true) else api.saveSettings(examDate = date.toString()) }
                 if (ok) datePicker = false
+                if (ok && date != null) graph.push.maybeAsk() // the plan's second moment to offer notifications (exam countdown)
             }
         },
     )

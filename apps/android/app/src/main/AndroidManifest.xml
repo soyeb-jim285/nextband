@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Android 13+: asked at run time after the first result, never at launch (feature/push/PushPrimer.kt). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- Android 11+ package visibility: lets TextToSpeech bind the device's engine (Review "Hear the word"). -->
@@ -31,5 +33,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Push: Firebase Cloud Messaging only. Messages are data-only; NbMessagingService draws them on our channels. -->
+        <service android:name=".feature.push.NbMessagingService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- Register by Firebase Installation ID (token APIs are deprecated); Push.start() calls register() on every launch. -->
+        <meta-data android:name="firebase_messaging_installation_id_enabled" android:value="true" />
+        <!-- No registration before the app asks (and never in demo / screenshot runs), and no Analytics. -->
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="results" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_notification" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/logo_symbol" />
     </application>
 </manifest>

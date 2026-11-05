@@ -180,6 +180,11 @@ private fun AppShell(graph: AppGraph, start: Any) {
         }
     }
 
+    // A tapped push (MainActivity -> Push.handle): open its screen once the shell is up.
+    LaunchedEffect(graph) {
+        graph.push.opened.collect { o -> if (o != null) { graph.push.opened.value = null; graph.push.open(o, nav) } }
+    }
+
     val d = if (reduced) 0 else 1
     // Push: the new screen slides in from the right edge (a third of the way) over the old one, which drifts left and
     // fades a little (parallax). Pop mirrors it; predictive back scrubs the same transition with the gesture.
@@ -233,5 +238,6 @@ private fun AppShell(graph: AppGraph, start: Any) {
         }
         GateHost(nav)
         com.soyeb.ieltspractice.feature.streak.StreakCelebrationHost()
+        com.soyeb.ieltspractice.feature.push.PushPrimerHost()
     }
 }

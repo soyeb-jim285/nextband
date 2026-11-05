@@ -410,8 +410,14 @@ class Api(
     /** Signs out here at once, then revokes the old token on the server in the background, so a slow network never stalls the tap. */
     fun signOut() {
         val t = _token.value
+        val device = pushDevice
         signOutLocal()
         if (t != null) scope.launch {
+            // This phone stops getting the account's pushes (feature/push): before the token is revoked, while it still works.
+            if (device != null) runCatching {
+                val body = AppJson.encodeToString(JsonElement.serializer(), buildJsonObject { put("token", device) }).toRequestBody(JSON_MEDIA)
+                execute(Request.Builder().url(baseUrl + "/api/push/token").delete(body).header("Authorization", "Bearer $t").build(), "offline")
+            }
             runCatching {
                 execute(
                     Request.Builder().url(baseUrl + "/api/auth/sign-out").post("{}".toRequestBody(JSON_MEDIA)).header("Authorization", "Bearer $t").build(),
@@ -420,6 +426,9 @@ class Api(
             }
         }
     }
+
+    /** This install's push address (the Firebase Installation ID) once registered; [signOut] removes it from the account. Set by Push. */
+    @Volatile var pushDevice: String? = null
 
     /** An account deletes with its password (Better Auth delete-user), like the web dialog; a guest (no password) uses DELETE /api/me/guest. */
     suspend fun deleteAccount(password: String? = null) {
@@ -480,18 +489,36 @@ class Api(
     suspend fun saveSettings(
         targetBand: Double? = null, writingAutoSubmit: Boolean? = null, blockPaste: Boolean? = null, productEmails: Boolean? = null,
         examDate: String? = null, clearExamDate: Boolean = false, timeZone: String? = null,
-    ): AppSettings {
-        val saved: AppSettings = send("PUT", "/api/settings", buildJsonObject {
-            targetBand?.let { put("targetBand", it) }
-            writingAutoSubmit?.let { put("writingAutoSubmit", it) }
-            blockPaste?.let { put("blockPaste", it) }
-            productEmails?.let { put("productEmails", it) }
-            if (clearExamDate) put("examDate", JsonNull) else examDate?.let { put("examDate", it) }
-            timeZone?.let { put("timeZone", it) }
-        })
+    ): AppSettings = saveSettings(buildJsonObject {
+        targetBand?.let { put("targetBand", it) }
+        writingAutoSubmit?.let { put("writingAutoSubmit", it) }
+        blockPaste?.let { put("blockPaste", it) }
+        productEmails?.let { put("productEmails", it) }
+        if (clearExamDate) put("examDate", JsonNull) else examDate?.let { put("examDate", it) }
+        timeZone?.let { put("timeZone", it) }
+    })
+
+    /** PUT /api/settings with a ready partial body (the notification fields: guests may change only those). Updates [me]. */
+    suspend fun saveSettings(patch: JsonObject): AppSettings {
+        val saved: AppSettings = send("PUT", "/api/settings", patch)
         _me.value = _me.value?.copy(settings = saved)
         return saved
     }
+
+    // Push (feature/push). The server contract: docs/engagement/notifications-and-streaks.md §5.1.
+
+    /** PUT /api/push/token: this install, by its Firebase Installation ID. Idempotent; sent only under the session [asToken]. */
+    suspend fun pushRegister(fid: String, appVersion: String, locale: String, asToken: String) {
+        raw("PUT", "/api/push/token", buildJsonObject {
+            put("token", fid); put("kind", "fid"); put("platform", "android"); put("appVersion", appVersion.take(40)); put("locale", locale.take(35))
+        }, asToken = asToken)
+    }
+
+    /** POST /api/push/opened: the app was opened by tapping push [id]. */
+    suspend fun pushOpened(id: String) { raw("POST", "/api/push/opened", buildJsonObject { put("id", id) }) }
+
+    /** POST /api/push/test: true when FCM took it. Errors: 409 push_no_device, 429 push_rate_limited, 503 push_off (the server's message). */
+    suspend fun pushTest(): Boolean = send<PushTest>("POST", "/api/push/test").sent
 
     // Prompts
 

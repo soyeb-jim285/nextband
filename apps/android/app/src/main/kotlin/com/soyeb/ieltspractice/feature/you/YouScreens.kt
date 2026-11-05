@@ -1,5 +1,6 @@
 package com.soyeb.ieltspractice.feature.you
 
+import com.soyeb.ieltspractice.nav.NotificationsRoute
 import com.soyeb.ieltspractice.nav.Plan
 import com.soyeb.ieltspractice.nav.ScreenSpec
 import com.soyeb.ieltspractice.nav.SettingsRoute
@@ -12,6 +13,9 @@ val youScreens: List<ScreenSpec> = listOf(
     ScreenSpec("guest-you", You),
     ScreenSpec("settings", SettingsRoute),
     ScreenSpec("settings-delete", SettingsRoute, listOf("Delete")),
+    // Notifications: the screen, the phone's permission off, and the time sheets. push-primer: the explainer over Today.
+    ScreenSpec("notifications", NotificationsRoute, listOf("On", "Off", "QuietStart", "RemindAt")),
+    ScreenSpec("push-primer", com.soyeb.ieltspractice.nav.TodayTab),
     // Debug renders the web channel (WEB_CHECKOUT true: prices and PayStation), so these are named "-web": never use them for
     // the Play listing or review. The store Plan screen: record with -Pnextband.channel=play.
     ScreenSpec("plan-web", Plan),

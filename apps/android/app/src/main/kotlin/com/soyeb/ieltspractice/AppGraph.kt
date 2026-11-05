@@ -13,6 +13,7 @@ import com.soyeb.ieltspractice.data.demo.DemoConfig
 import com.soyeb.ieltspractice.data.demo.DemoFixtures
 import com.soyeb.ieltspractice.data.demo.DemoInterceptor
 import com.soyeb.ieltspractice.data.net.Api
+import com.soyeb.ieltspractice.feature.push.Push
 import com.soyeb.ieltspractice.feature.streak.StreakStore
 import com.soyeb.ieltspractice.media.MediaCache
 import com.soyeb.ieltspractice.media.Tts
@@ -59,7 +60,11 @@ class AppGraph(context: Context, val demo: DemoConfig? = null) {
     /** The last loaded streak and the daily celebration (feature/streak). */
     val streak = StreakStore(api, prefs)
 
+    /** Push notifications (feature/push). Off in demo runs. */
+    val push = Push(app, api, prefs, scope, live = demo == null)
+
     init {
+        if (demo == null) push.start()
         api.onGuestLinked = { guest, account -> scope.launch { pending.reassign(guest, account) } }
         if (demo == null) api.onSignedOut = { expired, lastUser ->
             // Cached audio includes this account's own recordings: gone on every sign-out (and account delete, which signs out).

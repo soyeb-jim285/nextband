@@ -62,6 +62,7 @@ import com.soyeb.ieltspractice.design.components.SectionHeader
 import com.soyeb.ieltspractice.design.components.Segmented
 import com.soyeb.ieltspractice.nav.Auth
 import com.soyeb.ieltspractice.nav.Nav
+import com.soyeb.ieltspractice.nav.NotificationsRoute
 import com.soyeb.ieltspractice.nav.Welcome
 import com.soyeb.ieltspractice.data.currentUserId
 import kotlinx.coroutines.CancellationException
@@ -126,6 +127,11 @@ fun SettingsScreen(nav: Nav) {
 
     PushedScreen("Settings", nav::back) { pad ->
         PushedList(pad) {
+            item {
+                Block("Notifications") {
+                    RowGroup { NbListRow("What we send and when", subtitle = "Results, streak and exam reminders, quiet hours", onClick = { nav.go(NotificationsRoute) }) }
+                }
+            }
             item {
                 Block("Appearance") {
                     Segmented(listOf("System", "Light", "Dark"), appearances.indexOf(appearance).coerceAtLeast(0), { i -> scope.launch { prefs.setAppearance(appearances[i]) } }, role = androidx.compose.ui.semantics.Role.RadioButton)
@@ -204,7 +210,7 @@ fun SettingsScreen(nav: Nav) {
 }
 
 @Composable
-private fun Block(title: String, content: @Composable () -> Unit) {
+internal fun Block(title: String, content: @Composable () -> Unit) {
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader(title)
         content()
@@ -213,7 +219,7 @@ private fun Block(title: String, content: @Composable () -> Unit) {
 
 /** A whole row that toggles; the switch only shows state. The value follows the tap at once and goes back if the save fails. */
 @Composable
-private fun ToggleRow(title: String, sub: String, value: Boolean, save: suspend (Boolean) -> Boolean) {
+internal fun ToggleRow(title: String, sub: String, value: Boolean, save: suspend (Boolean) -> Boolean) {
     var on by remember(value) { mutableStateOf(value) }
     val scope = rememberCoroutineScope()
     val c = NB.colors

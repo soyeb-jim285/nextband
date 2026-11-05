@@ -123,6 +123,10 @@ Only `.github/workflows/android.yml` builds Android (ubuntu-latest). It runs on 
 and on manual dispatch, doing one Gradle run: `assembleDebug assembleRelease recordRoborazziDebug` (debug and release APKs, all unit tests,
 screenshots). Artifacts: `IELTS-android-debug-apk`, `android-screens`, and `android-test-reports` on failure.
 
+Push (Firebase Cloud Messaging) needs `app/google-services.json`, which is never committed: CI writes it from the
+`GOOGLE_SERVICES_JSON_B64` secret before the build. Without the file (forks, PRs) the google-services plugin is skipped and the app
+builds with push off (`feature/push/Push.kt` checks `FirebaseApp.getApps`).
+
 ```bash
 git add apps/android && git commit -m "..." && git pull --rebase --autostash && git push
 gh run list --workflow android.yml -L 1

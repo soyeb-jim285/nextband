@@ -19,7 +19,22 @@ import kotlinx.serialization.Serializable
     /** `yyyy-MM-dd` or null. */
     val examDate: String? = null,
     val timeZone: String = "",
+    // Push notifications (guests may change these too). Times are local "HH:MM".
+    val notifyResults: Boolean = true,
+    val notifyStreak: Boolean = true,
+    val notifyPractice: Boolean = true,
+    val notifyExam: Boolean = true,
+    val notifyWeekly: Boolean = true,
+    val quietStart: String = "22:30",
+    val quietEnd: String = "08:00",
+    /** null = Auto (the server picks the student's usual time). */
+    val remindAt: String? = null,
+    /** "en" | "banglish" | null (from the phone's language). */
+    val notifyLanguage: String? = null,
 )
+
+/** POST /api/push/test */
+@Serializable data class PushTest(val sent: Boolean = false)
 
 /** Listening and Reading tests the caller can open, of all a plan can open. */
 @Serializable data class LrOpen(val open: Int = 0, val total: Int = 0)

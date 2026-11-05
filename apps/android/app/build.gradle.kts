@@ -8,6 +8,11 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+// Push (Firebase Cloud Messaging only, no Analytics). google-services.json is never committed: CI writes it from the
+// GOOGLE_SERVICES_JSON_B64 secret. Without it (forks, PRs, a laptop) the plugin is skipped, Firebase never initialises and
+// push stays off at runtime (feature/push/Push.kt checks FirebaseApp.getApps); everything else builds and runs.
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
+
 // Release signing: the Play upload key comes from CI secrets. Without them the release APK is a test build, debug-signed with
 // demo mode on (device-video CI drives it), and bundleRelease (the Play artifact) refuses to run.
 val releaseKeystore: File? = System.getenv("NEXTBAND_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
@@ -147,6 +152,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.livekit.android)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

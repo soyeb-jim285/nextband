@@ -44,6 +44,12 @@ jobs:
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.p12"
             echo "NEXTBAND_KEYSTORE=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
           fi
+      # Firebase config for push (repo secret). Without it (forks, PRs) the build skips the google-services plugin and push stays off.
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_B64" ]; then echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > app/google-services.json; fi
       - name: Build, test and record screenshots
         env:
           NEXTBAND_KEYSTORE_PASSWORD: ${{ secrets.NEXTBAND_KEYSTORE_PASSWORD }}

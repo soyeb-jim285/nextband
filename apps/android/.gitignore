@@ -8,3 +8,5 @@ captures/
 screenshots/
 # Copied from apps/ios/IELTS/Demo/fixtures.json at build time
 app/build/
+# Firebase config: CI writes it from the GOOGLE_SERVICES_JSON_B64 secret; never commit it
+app/google-services.json

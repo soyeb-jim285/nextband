@@ -15,6 +15,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object You
 @Serializable data object SettingsRoute
 @Serializable data object Plan
+/** Settings > Notifications (feature/you/NotificationsScreen.kt); the test push opens it. */
+@Serializable data object NotificationsRoute
 
 // Study tools
 @Serializable data class History(val skill: String? = null)       // feature/history

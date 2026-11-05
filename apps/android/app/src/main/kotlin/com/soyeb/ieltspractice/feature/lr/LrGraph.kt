@@ -22,6 +22,7 @@ fun NavGraphBuilder.lrGraph(nav: Nav) {
     composable<LrRun> { entry -> LrRunScreen(entry.toRoute<LrRun>(), nav) }
     composable<LrResult> { entry ->
         com.soyeb.ieltspractice.feature.streak.StreakAfterPractice()
+        com.soyeb.ieltspractice.feature.push.PushAskAfterResult()
         LrResultScreen(entry.toRoute<LrResult>(), nav)
     }
     composable<Spelling> { SpellingScreen(nav) }
