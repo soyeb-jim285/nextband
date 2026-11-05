@@ -42,7 +42,7 @@ function Privacy() {
             <li>Microphone: asked for only when you start a speaking test, and used only to record your answers. You can turn it off in your phone&apos;s settings at any time.</li>
             <li>On your phone, the app keeps your sign-in (encrypted with a key held by Android), unsent speaking recordings, essay drafts and your settings. Unsent recordings belong to the account that made them and are deleted when you sign out without sending them. None of this is included in phone backups or transferred to a new phone.</li>
             <li>The app does not use advertising IDs, does not show ads and does not track you across other apps.</li>
-            <li>If we add notifications, the app will ask for permission first, and you can turn each kind off in Settings. To send them we keep a notification token for your device, which is deleted with your account.</li>
+            <li>Notifications: the app asks for permission first (after your first result, never when you open it), and you can turn each kind off in Settings, along with quiet hours, a reminder time and the language. To send them we keep your phone&apos;s Firebase installation ID, the app version and the phone&apos;s language. Signing out removes the ID from your account, and deleting your account deletes it and your notification history.</li>
           </List>
         </Section>
 
@@ -51,6 +51,7 @@ function Privacy() {
             <li>AI model providers, through OpenRouter and similar services, receive your essays, transcripts and (for the optional pronunciation check) audio so they can score your work.</li>
             <li>Speech and voice providers turn your speech into text and play the examiner&apos;s voice.</li>
             <li>An email service delivers sign-in codes and password resets.</li>
+            <li>Google Firebase Cloud Messaging delivers the app&apos;s notifications. It receives your phone&apos;s installation ID and the notification text. The app does not include Google Analytics or any other Firebase service.</li>
             <li>PayStation, our payment gateway, processes your payments; it receives your name, email and mobile number to do so. We receive the amount, the status, the payment method and a transaction ID, never your full card or wallet details.</li>
           </List>
           <p>We do not sell your data and we do not show ads.</p>
