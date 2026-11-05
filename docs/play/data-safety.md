@@ -23,7 +23,7 @@ Paste these into Play Console → App content → Data safety. Update them when 
 | Messages / App activity → **Other user-generated content** | Yes | No | Required to use tests | App functionality | Essays, written answers, notes |
 | App activity → **App interactions** | Yes | No | Required | App functionality, Analytics | Test attempts, scores, drill history, streak, minutes practised (shown back to the user) |
 | App info and performance → **Crash logs** | **No** unless a crash SDK is added | | | | The app has no crash reporter today |
-| Device or other IDs → **Device or other IDs** | Yes | No | Required | App functionality | The Firebase Installation ID that push notifications are delivered to (with app version and phone language), sent on every launch and sign-in; Google Firebase Cloud Messaging delivers the pushes as our service provider. Removed from the account on sign-out, deleted with the account |
+| Device or other IDs → **Device or other IDs** | Yes | No | Required | App functionality | The Firebase Installation ID that push notifications are delivered to (with app version and phone language), sent on every launch and sign-in; Google Firebase Cloud Messaging delivers the pushes as our service provider. Removed from the account on sign-out (if the phone is offline then, when the next push for that account reaches the phone, which drops it unshown), deleted with the account |
 | Financial info → Purchase history | **No** in the Play build | | | | The Play build sells nothing. Web purchases are tied to the account server-side, not collected by the app |
 | Location, Contacts, Photos, Calendar, Health, Web browsing, Installed apps | **No** | | | | |
 

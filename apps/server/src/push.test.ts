@@ -61,6 +61,17 @@ it('registers, refreshes, moves and forgets a device token', async () => {
   expect(await devices(b.user.id)).toEqual([]);
 });
 
+it('forget needs no session but only removes the token while it belongs to the uid the push carried', async () => {
+  const a = await testUser();
+  const b = await testUser();
+  await device(a.headers, 'phone');
+  expect((await req('/api/push/forget', { method: 'POST', body: { token: 'phone', uid: b.user.id } })).status).toBe(200); // not b's: untouched
+  expect(await devices(a.user.id)).toHaveLength(1);
+  expect((await req('/api/push/forget', { method: 'POST', body: { token: 'phone' } })).status).toBe(400);
+  expect((await req('/api/push/forget', { method: 'POST', body: { token: 'phone', uid: a.user.id } })).status).toBe(200);
+  expect(await devices(a.user.id)).toEqual([]);
+});
+
 it('keeps at most 10 devices per student, dropping the least recently seen', async () => {
   const { headers, user } = await testUser();
   for (let i = 0; i < 12; i++) await device(headers, `t${i}`);

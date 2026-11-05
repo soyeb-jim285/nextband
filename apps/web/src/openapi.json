@@ -8917,6 +8917,26 @@
           "token"
         ]
       },
+      "PushForget": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "FCM registration token, or the Firebase Installation ID when kind is fid"
+          },
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "token",
+          "uid"
+        ]
+      },
       "PushOpened": {
         "type": "object",
         "properties": {
@@ -15139,6 +15159,47 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PushUnregister"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/forget": {
+      "post": {
+        "tags": [
+          "Push"
+        ],
+        "summary": "No session needed: the phone got a push for an account no longer signed in there (its sign-out DELETE never arrived, or the session had expired). Removes the token only while it still belongs to `uid`; always 200.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushForget"
               }
             }
           }

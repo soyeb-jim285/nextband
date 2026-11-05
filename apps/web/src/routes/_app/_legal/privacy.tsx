@@ -42,7 +42,7 @@ function Privacy() {
             <li>Microphone: asked for only when you start a speaking test, and used only to record your answers. You can turn it off in your phone&apos;s settings at any time.</li>
             <li>On your phone, the app keeps your sign-in (encrypted with a key held by Android), unsent speaking recordings, essay drafts and your settings. Unsent recordings belong to the account that made them and are deleted when you sign out without sending them. None of this is included in phone backups or transferred to a new phone.</li>
             <li>The app does not use advertising IDs, does not show ads and does not track you across other apps.</li>
-            <li>Notifications: the app asks for permission first (after your first result, never when you open it), and you can turn each kind off in Settings, along with quiet hours, a reminder time and the language. To send them we keep your phone&apos;s Firebase installation ID, the app version and the phone&apos;s language. Signing out removes the ID from your account, and deleting your account deletes it and your notification history.</li>
+            <li>Notifications: the app asks for permission first (after your first result, never when you open it), and you can turn each kind off in Settings, along with quiet hours, a reminder time and the language. To send them we keep your phone&apos;s Firebase installation ID, the app version and the phone&apos;s language. Signing out removes the ID from your account (if the phone is offline at the time, the next notification for that account is not shown and removes it then), and deleting your account deletes it and your notification history.</li>
           </List>
         </Section>
 

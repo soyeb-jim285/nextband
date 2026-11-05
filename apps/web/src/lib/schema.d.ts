@@ -5531,6 +5531,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/push/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** No session needed: the phone got a push for an account no longer signed in there (its sign-out DELETE never arrived, or the session had expired). Removes the token only while it still belongs to `uid`; always 200. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PushForget"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/push/opened": {
         parameters: {
             query?: never;
@@ -7848,6 +7891,11 @@ export interface components {
         PushUnregister: {
             /** @description FCM registration token, or the Firebase Installation ID when kind is fid */
             token: string;
+        };
+        PushForget: {
+            /** @description FCM registration token, or the Firebase Installation ID when kind is fid */
+            token: string;
+            uid: string;
         };
         PushOpened: {
             id: string;

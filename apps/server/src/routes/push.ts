@@ -65,6 +65,24 @@ export function register(app: App) {
 
   app.openapi(
     createRoute({
+      tags: ['Push'],
+      method: 'post',
+      path: '/api/push/forget',
+      summary: 'No session needed: the phone got a push for an account no longer signed in there (its sign-out DELETE never arrived, or the session had expired). Removes the token only while it still belongs to `uid`; always 200.',
+      request: { body: { required: true, content: { 'application/json': { schema: z.object({ token: Token, uid: z.string().min(1).max(64) }).openapi('PushForget') } } } },
+      responses: ok,
+    }),
+    async (c) => {
+      // Needs both the install ID (only on the phone) and the user ID the push carried. The uid check keeps a stale push for A from
+      // removing the row once B has signed in on the phone.
+      const b = c.req.valid('json');
+      await db.delete(notificationDevices).where(and(eq(notificationDevices.token, b.token), eq(notificationDevices.userId, b.uid)));
+      return c.json({ ok: true as const }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       ...common,
       method: 'post',
       path: '/api/push/opened',
