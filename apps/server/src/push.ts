@@ -105,6 +105,8 @@ const MAX_TRIES = 3;
 const LEASE = sql`now() + interval '5 minutes'`; // a claimed row a crashed process never finished is due again after this
 const RESULT_DELAY = sql`now() + interval '2 minutes'`; // §4 #1: only when the student hasn't seen the result within 2 minutes
 type Row = typeof notificationLog.$inferSelect;
+/** One student's result row: the user id is part of the key, so another account's session id can never touch it. */
+const resultKey = (userId: string, ref: string) => `result:${userId}:${ref}`;
 
 const activeDevices = (userId: string) => db.select().from(notificationDevices).where(and(eq(notificationDevices.userId, userId), isNull(notificationDevices.disabledAt))).orderBy(desc(notificationDevices.lastSeenAt));
 
@@ -115,7 +117,7 @@ export async function queueResult(a: { id: string; userId: string; sessionId: st
     if (!fcm() || !(await activeDevices(a.userId)).length) return;
     await db
       .insert(notificationLog)
-      .values({ userId: a.userId, type: 'result', dedupeKey: `result:${a.sessionId ?? a.id}`, scheduledFor: RESULT_DELAY })
+      .values({ userId: a.userId, type: 'result', dedupeKey: resultKey(a.userId, a.sessionId ?? a.id), scheduledFor: RESULT_DELAY })
       .onConflictDoUpdate({ target: notificationLog.dedupeKey, targetWhere: sql`status = 'pending'`, set: { scheduledFor: RESULT_DELAY } }); // the next part of a session pushes it back
   } catch (e) {
     console.error('[push] queueResult failed', a.id, e);
@@ -129,8 +131,8 @@ export async function markSeen(userId: string, ref: string | null | undefined): 
   await db
     .update(notificationLog)
     .set({ status: 'cancelled' })
-    .where(and(eq(notificationLog.userId, userId), eq(notificationLog.dedupeKey, `result:${ref}`), eq(notificationLog.status, 'pending'),
-      sql`not exists (select 1 from attempts where (id = ${ref} or session_id = ${ref}) and status = 'analyzing')`))
+    .where(and(eq(notificationLog.userId, userId), eq(notificationLog.dedupeKey, resultKey(userId, ref)), eq(notificationLog.status, 'pending'),
+      sql`not exists (select 1 from attempts where user_id = ${userId} and (id = ${ref} or session_id = ${ref}) and status = 'analyzing')`))
     .catch((e) => console.error('[push] markSeen failed', e));
 }
 
@@ -139,7 +141,7 @@ type Content = { type: PushType; vars: Record<string, string>; route: string } |
 
 /** What a result row says now, from the attempts' current state: null = nothing to say, 'wait' = a part is still being marked or recorded. */
 async function resultContent(row: Row): Promise<Content> {
-  const ref = row.dedupeKey.slice('result:'.length);
+  const ref = row.dedupeKey.slice(resultKey(row.userId, '').length);
   const parts = await db.select().from(attempts).where(and(eq(attempts.userId, row.userId), or(eq(attempts.id, ref), eq(attempts.sessionId, ref)))).orderBy(attempts.part);
   // a part still being marked, or recorded in the last 30 minutes (the student is mid-test): wait for it. Older recordings were abandoned.
   if (parts.some((p) => p.status === 'analyzing' || (p.status === 'recording' && p.updatedAt.getTime() > Date.now() - 30 * 60_000))) return 'wait';
@@ -148,7 +150,7 @@ async function resultContent(row: Row): Promise<Content> {
   if (!first) return null;
   const skill = first.skill;
   const mock = first.sessionId
-    ? await db.query.mockExams.findFirst({ where: or(eq(mockExams.writingSessionId, first.sessionId), eq(mockExams.speakingSessionId, first.sessionId)), columns: { id: true } })
+    ? await db.query.mockExams.findFirst({ where: and(eq(mockExams.userId, row.userId), or(eq(mockExams.writingSessionId, first.sessionId), eq(mockExams.speakingSessionId, first.sessionId))), columns: { id: true } })
     : undefined;
   const what = (p: typeof first) => (skill === 'writing' ? `Writing Task ${p.part}` : `Speaking Part ${p.part}`);
   const failed = ended.find((p) => p.status === 'failed');

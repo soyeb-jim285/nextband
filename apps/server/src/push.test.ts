@@ -103,7 +103,7 @@ it('marking an attempt queues a result push for 2 minutes; the FCM v1 message is
   await storage.put(a!.audioKey!, new Uint8Array([1]), 'audio/webm');
   await runAnalysis(a!.id);
   const [row] = await logs(user.id);
-  expect(row).toMatchObject({ type: 'result', dedupeKey: `result:${a!.id}`, status: 'pending' });
+  expect(row).toMatchObject({ type: 'result', dedupeKey: `result:${a!.userId}:${a!.id}`, status: 'pending' });
   expect(row!.scheduledFor.getTime() - Date.now()).toBeGreaterThan(60_000); // not before 2 minutes
   expect(await pushSweep()).toBe(0);
 
