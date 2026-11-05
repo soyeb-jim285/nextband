@@ -11,6 +11,7 @@ import io.livekit.android.room.Room
 import io.livekit.android.room.participant.Participant
 import io.livekit.android.room.track.DataPublishReliability
 import io.livekit.android.room.track.LocalAudioTrack
+import io.livekit.android.room.track.RemoteAudioTrack
 import io.livekit.android.room.track.Track
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,20 @@ class LiveKitExaminer(private val context: Context, private val audio: LiveAudio
     private val ready = CompletableDeferred<Unit>()
     private val sink = AudioTrackSink { data, bits, rate, channels, _, _ -> if (bits == 16) audio.feed(data, rate, channels) }
 
+    /** The examiner's voice level (0..1) for the voice bars, read every frame; 0 once its audio has been quiet for 200 ms. */
+    val voiceLevel: Float get() = if (System.nanoTime() - voiceAt < 200_000_000L) voice else 0f
+    @Volatile private var voice = 0f
+    @Volatile private var voiceAt = 0L
+    private val voiceSink = AudioTrackSink { data, bits, _, channels, _, _ ->
+        if (bits != 16) return@AudioTrackSink
+        val shorts = data.duplicate().order(java.nio.ByteOrder.nativeOrder()).asShortBuffer()
+        val ch = channels.coerceAtLeast(1)
+        val n = shorts.remaining() / ch
+        if (n <= 0) return@AudioTrackSink
+        voice = levelOf(rmsOf(ShortArray(n) { shorts.get(it * ch) }, n)).toFloat()
+        voiceAt = System.nanoTime()
+    }
+
     /** Joins the room, publishes the microphone, waits for the worker (30 s) and starts the test. Throws if any step fails. */
     suspend fun connect(join: LiveKitJoin) {
         // Like every other server-given URL (isWebUrl): TLS only, since the room token and the microphone go over it.
@@ -68,6 +83,8 @@ class LiveKitExaminer(private val context: Context, private val audio: LiveAudio
                 when (ev) {
                     is RoomEvent.DataReceived -> if (ev.topic == "ielts.events" && ev.participant?.kind == Participant.Kind.AGENT) handle(ev.data)
                     is RoomEvent.Disconnected -> lost()
+                    // Only to draw the voice bars; the room plays the voice itself.
+                    is RoomEvent.TrackSubscribed -> if (ev.participant.kind == Participant.Kind.AGENT) (ev.track as? RemoteAudioTrack)?.addSink(voiceSink)
                     else -> {}
                 }
             }

@@ -82,6 +82,8 @@ class LiveExam(
     var listening by mutableStateOf(false); private set
     var thinking by mutableStateOf(false); private set
     var examinerTalking by mutableStateOf(false); private set
+    /** The examiner's voice level (0..1), for the voice bars: read per frame, not state. */
+    fun examinerVoice(): Float = examiner?.voiceLevel ?: 0f
     var cueCard by mutableStateOf<Prompt?>(null); private set
     var prepLeft by mutableIntStateOf(0); private set
     var micDenied by mutableStateOf(false)

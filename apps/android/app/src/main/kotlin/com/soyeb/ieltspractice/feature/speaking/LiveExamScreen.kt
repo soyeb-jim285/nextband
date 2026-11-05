@@ -1,5 +1,13 @@
 package com.soyeb.ieltspractice.feature.speaking
 
+import com.soyeb.ieltspractice.design.LocalReducedMotion
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -83,7 +91,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.soyeb.ieltspractice.media.LiveExam as LiveModel
 
-// The live examiner (LiveKit): pre-screen with the mic check, then a voice orb stage. State comes from media/LiveExam.
+// The live examiner (LiveKit): pre-screen with the mic check, then the voice-bar stage. State comes from media/LiveExam.
 
 @Composable
 fun LiveExamScreen(route: LiveExam, nav: Nav) {
@@ -263,7 +271,7 @@ private fun PreScreen(exam: LiveModel, onCheck: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(NB.space.lg),
     ) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            VoiceOrb(OrbMode.Idle, { 0f }, orbSize = 150.dp)
+            VoiceBars(OrbMode.Thinking, { 0f })
             Text("Talk to a live examiner", style = NB.type.headline, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
             Text(
                 "A full speaking test with a voice examiner, about 11–14 minutes, like the real thing.",
@@ -369,11 +377,24 @@ private fun Stage(exam: LiveModel, now: Long, captions: Boolean, connecting: Boo
     ) {
         PartStepper(exam.phase)
         Text(phaseLabel(exam.phase), style = NB.type.label, color = c.muted, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-        VoiceOrb(mode, { exam.level.toFloat() }, orbSize = if (part2 && card != null) 170.dp else 240.dp)
-        Text(
-            status.ifEmpty { " " }, style = NB.type.title1, color = c.ink, textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
-        )
+        // Part 2: the cue card is the focus, so the examiner shrinks to one row beside its status (as on the web).
+        val compact = part2 && card != null
+        NbCard(Modifier.fillMaxWidth(), padding = if (compact) PaddingValues(horizontal = 20.dp, vertical = 12.dp) else PaddingValues(vertical = 24.dp, horizontal = 20.dp)) {
+            val bars = @Composable { VoiceBars(mode, { exam.level.toFloat() }, voice = exam::examinerVoice, compact = compact) }
+            val line = @Composable { m: Modifier ->
+                Text(
+                    status.ifEmpty { " " }, style = if (compact) NB.type.label else NB.type.title2, color = c.ink,
+                    textAlign = if (compact) TextAlign.Start else TextAlign.Center, modifier = m.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            if (compact) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                bars(); line(Modifier.weight(1f))
+            } else Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                whoOf(mode, connecting)?.let { who -> WhoChip(who, you = mode == OrbMode.Listening, live = mode == OrbMode.Speaking || mode == OrbMode.Listening) }
+                bars()
+                line(Modifier.fillMaxWidth())
+            }
+        }
         if (captions && exam.caption.isNotEmpty()) {
             NbCard(tone = CardTone.Inset) {
                 Overline("Examiner")
@@ -399,6 +420,27 @@ private fun Stage(exam: LiveModel, now: Long, captions: Boolean, connecting: Boo
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** Whose turn it is, above the bars (web LiveStage WHO). */
+private fun whoOf(mode: OrbMode, connecting: Boolean): String? = when {
+    connecting || mode == OrbMode.Speaking || mode == OrbMode.Thinking -> "Examiner"
+    mode == OrbMode.Listening -> "You"
+    else -> null
+}
+
+/** "● EXAMINER": the dot is brand for the examiner, ink for you, and pulses while someone is talking. */
+@Composable
+private fun WhoChip(who: String, you: Boolean, live: Boolean) {
+    val reduced = LocalReducedMotion.current
+    val dot = if (you) NB.colors.ink.copy(alpha = 0.7f) else NB.colors.brand
+    val pulse = if (live && !reduced) rememberInfiniteTransition(label = "who").animateFloat(
+        1f, 0.35f, infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = "dot",
+    ) else null
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(8.dp).graphicsLayer { alpha = pulse?.value ?: 1f }.background(dot, CircleShape))
+        Text(who.uppercase(), style = NB.type.overline, color = NB.colors.muted)
     }
 }
 

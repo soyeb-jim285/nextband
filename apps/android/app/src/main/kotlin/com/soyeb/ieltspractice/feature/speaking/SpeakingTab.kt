@@ -241,7 +241,7 @@ fun SpeakingTabScreen(nav: Nav) {
     }
 }
 
-/** The live examiner: the screen's brand hero, with the voice orb breathing beside the pitch. */
+/** The live examiner: the screen's brand hero, with the voice bars moving beside the pitch. */
 @Composable
 private fun LiveHero(left: String?, checking: Boolean, onStart: () -> Unit) {
     BrandHero { ink ->
@@ -254,7 +254,7 @@ private fun LiveHero(left: String?, checking: Boolean, onStart: () -> Unit) {
                 NbButton("Start live test", onStart, kind = BtnKind.Inverse, icon = Icons.Rounded.Mic, loading = checking, haptic = true)
                 if (left != null) Text(left, style = NB.type.caption, color = ink.muted)
             }
-            VoiceOrb(OrbMode.Speaking, { 0.3f }, orbSize = 96.dp)
+            VoiceBars(OrbMode.Speaking, { 0f }, voice = { 0.35f }, compact = true, tint = ink.fg)
         }
     }
 }
