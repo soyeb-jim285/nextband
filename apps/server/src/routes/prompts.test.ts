@@ -161,20 +161,20 @@ describe('speaking test + seed', () => {
   it('opens with a random frame from every frame file, never followed by a topic on the same theme, and picks random work/study sets', async () => {
     await seedBank(db);
     const frames = await db.select({ topic: prompts.topic }).from(prompts).where(eq(prompts.type, 'p1-intro'));
-    expect(new Set(frames.map((f) => f.topic)).size).toBeGreaterThanOrEqual(4); // Hometown, The area you live in, Your home, Accommodation, Work or study
+    expect(new Set(frames.map((f) => f.topic)).size).toBeGreaterThanOrEqual(15); // place and work/study openers plus the everyday ones (Family, Weekends, ...)
     const { headers, user } = await testUser();
     const seen = new Set<string>();
     for (let i = 0; i < 12; i++) {
       const t = await body(await req('/api/speaking/test', { headers }));
       seen.add(t.part1[0].topic);
-      if (t.part1[0].topic !== 'Work or study') expect(t.part1.slice(1).map((p: any) => p.topic)).not.toEqual(expect.arrayContaining([expect.stringMatching(/^(Where you live|Neighbours)$/)]));
+      if (/^(Your home|Your hometown|The area you live in)$/.test(t.part1[0].topic)) expect(t.part1.slice(1).map((p: any) => p.topic)).not.toEqual(expect.arrayContaining([expect.stringMatching(/^(Where you live|Neighbours)$/)]));
     }
     expect(seen.size).toBeGreaterThan(1);
     // the place clash, forced: only clashing topics besides two others
     await db.delete(prompts).where(eq(prompts.type, 'p1-topic'));
     for (const topic of ['Where you live', 'Neighbours', 'Music', 'Food']) await seedPrompt({ topic, followUps: ['a?', 'b?', 'c?'] });
-    await db.delete(prompts).where(and(eq(prompts.type, 'p1-intro'), ne(prompts.topic, 'Hometown')));
-    for (let i = 0; i < 4; i++) expect((await body(await req('/api/speaking/test', { headers }))).part1.map((p: any) => p.topic).sort()).toEqual(['Food', 'Hometown', 'Music']);
+    await db.delete(prompts).where(and(eq(prompts.type, 'p1-intro'), ne(prompts.topic, 'Your hometown')));
+    for (let i = 0; i < 4; i++) expect((await body(await req('/api/speaking/test', { headers }))).part1.map((p: any) => p.topic).sort()).toEqual(['Food', 'Music', 'Your hometown']);
     // work/study branch sets: a random one of each, not always the first
     for (const n of [2, 3, 4]) for (const topic of ['Work', 'Study']) await seedPrompt({ slug: `b-${topic}-${n}`, type: 'p1-branch', topic, followUps: [`${topic} ${n}?`, 'x?', 'y?'] });
     const picks = new Set<string>();

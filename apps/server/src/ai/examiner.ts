@@ -7,7 +7,18 @@ export type Turn = { role: 'examiner' | 'candidate'; text: string; at: number; a
 type Branches = { work: string[]; study: string[] };
 /** This session's opening wording, picked once at /live/start and stored on the test so resumes and every engine say the same lines. */
 export type Script = { intro: string[]; p1Lead: string; moveOn: string };
-export type LiveTest = SpeakingTest & { branches?: Branches; script?: Script };
+/** `asked`: questions this candidate was asked in earlier tests (Parts 1 and 3), which the topic-led examiner must not ask again. */
+export type LiveTest = SpeakingTest & { branches?: Branches; script?: Script; asked?: string[] };
+
+/** The question each earlier examiner turn ended with (lead-ins and app cues dropped), newest first, deduplicated, at most `max`. */
+export function earlierQuestions(turns: (string | undefined)[], max = 60): string[] {
+  const qs = turns.map((t) => t?.replace(/\[APP CUE\][^\n]*\n*/g, '').match(/([^.!?]*\?)\s*$/)?.[1]?.trim()).filter((q): q is string => !!q && q.split(' ').length > 2);
+  return [...new Set(qs)].slice(0, max);
+}
+const avoid = (t: SpeakingTest) => {
+  const qs = (t as LiveTest).asked;
+  return qs?.length ? `\nThe candidate has taken earlier tests. Never ask any of these questions from them again, nor a close rewording; take a different angle on the topic:\n${qs.map((q) => `- ${q}`).join('\n')}\n` : '';
+};
 export type LiveState = {
   sessionId: string;
   phase: Phase;
@@ -129,7 +140,7 @@ ${TURN_RULE}
 Messages that begin with "${CUE_PREFIX.trim()}" come from the test application, not from the candidate. Follow them immediately, even in the middle of a sentence, and never read them aloud, answer them or mention them. You only start speaking when you receive the first cue, "${CUE_PREFIX}Begin the test."
 The app keeps the time: Parts 1 and 3 each last about 4-5 minutes, and you never move on to the next part until you are told to.
 
-Follow this plan. The introduction, the Part 2 card and the closing are word for word; in Parts 1 and 3 you only get topics. ${FREE} ${MEMORY}
+Follow this plan. The introduction, the Part 2 card and the closing are word for word; in Parts 1 and 3 you only get topics. ${FREE} ${MEMORY}${avoid(t)}
 1. Introduction (not assessed: no comments on the answers, no other questions). ${introPlan(sc, 'and wait for the answer.')}
 2. Part 1 (interview on familiar, everyday topics about the candidate's own life): ${p1Opening(sc)} Topics, in this order: ${topics}. Ask short, simple, personal questions (likes, habits, routines, experiences, preferences) and expect short answers; after a one-word answer you may ask "Why?" or "Why not?". Stay on these topics: do not add others.
 3. Part 2 (long turn): when told to move to Part 2, say "${LINES.prep(t.part2.title)}" The candidate sees this cue card:

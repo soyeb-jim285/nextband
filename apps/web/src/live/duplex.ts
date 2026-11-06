@@ -275,8 +275,7 @@ export function useDuplexExaminer(
           break;
         case 'p2-prep':
           c.x?.listen(false);
-          await parts.stop();
-          if (c.ended) return;
+          void parts.stop(); // the recorder finishes in the background: the examiner never waits on it (finish() still does)
           cue('part2', CUE_TEXT.part2, showCard, false, () => setPhase('p2-prep'));
           break;
         case 'p2-talk':
@@ -288,8 +287,7 @@ export function useDuplexExaminer(
           break;
         case 'p2-follow':
           talk.stop();
-          await parts.stop();
-          if (c.ended) return;
+          void parts.stop();
           cue(
             timeUp ? 'follow-timeup' : 'follow',
             timeUp ? CUE_TEXT['follow-timeup'] : CUE_TEXT.follow,
@@ -301,8 +299,7 @@ export function useDuplexExaminer(
           c.timer = setTimeout(() => void go('closing'), PART_MS);
           break;
         case 'closing':
-          await parts.stop();
-          if (c.ended) return;
+          void parts.stop();
           cue('closing', CUE_TEXT.closing, () => void finish());
           break;
       }

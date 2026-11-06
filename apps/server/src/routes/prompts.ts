@@ -114,7 +114,8 @@ export async function markSeen(user: SessionUser | null, ids: string[]) {
 
 /** Familiar topics that repeat a place frame (hometown, home, accommodation, the area you live in): never asked straight after one. */
 const PLACE_TOPICS = ['Where you live', 'Neighbours'];
-const repeatsFrame = (frame: { topic: string } | undefined, t: { topic: string }) => !!frame && frame.topic !== 'Work or study' && PLACE_TOPICS.includes(t.topic);
+const PLACE_FRAMES = ['Your home', 'Your hometown', 'The area you live in'];
+const repeatsFrame = (frame: { topic: string } | undefined, t: { topic: string }) => !!frame && PLACE_FRAMES.includes(frame.topic) && PLACE_TOPICS.includes(t.topic);
 
 /** A full speaking test: a random P1 intro frame plus 2 familiar topics (P1_TEST_QUESTIONS each), a P2 cue card and its linked P3 set. Null when the bank has no card. */
 /** Question lists an examiner can ask: at most `max` lines (Part 1: 8, Part 3: 12), each a question or "Tell me about…". Keeps out extraction junk (a Listening dialogue, an old-format

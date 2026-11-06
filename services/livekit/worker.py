@@ -120,6 +120,43 @@ def _sentence_end(text):
     return None
 
 
+async def drop_cues(text, tag):
+    """The examiner's words without any line it starts with the app's cue tag: the model sometimes writes a cue of its own
+    ("[APP CUE] Part 2 is over. ..."), which the voice would read out and the captions show."""
+    buf, skipping, trim = "", False, False
+    async for delta in text:
+        buf += str(delta)
+        if trim:
+            buf = buf.lstrip()
+            trim = not buf
+        while buf:
+            if skipping:
+                nl = buf.find("\n")
+                if nl < 0:
+                    buf = ""
+                    break
+                buf, skipping = buf[nl + 1:].lstrip(), False
+                trim = not buf
+                continue
+            i = buf.find("[")
+            if i < 0:
+                yield buf
+                buf = ""
+                break
+            if i:
+                yield buf[:i]
+                buf = buf[i:]
+            if buf.startswith(tag):
+                skipping = True
+            elif tag.startswith(buf):
+                break  # a tag may be arriving: wait for the next delta
+            else:
+                yield buf[0]
+                buf = buf[1:]
+    if buf and not skipping:
+        yield buf
+
+
 # OpenRouter routes by price by default; for deepseek that picked hosts with multi-second first tokens (p90 3.5 s, p99 22 s on
 # OpenInference, 2026-10-26). InferenceNet measured p50 ~0.29 s / p90 ~0.55 s; fallbacks stay on so an outage degrades, not fails.
 PROVIDERS = {"deepseek/deepseek-v4.1-flash": {"order": ["inference-net/fp8", "inference-net/us"], "allow_fallbacks": True,
@@ -176,6 +213,7 @@ class Examiner(Agent):
                          # there and the turn ends with no words to speak, leaving the examiner silent.
                          extra_body={"reasoning": {"enabled": False}, **({"provider": PROVIDERS[c.llm]} if c.llmHost == "fastest" and c.llm in PROVIDERS else {})})
         self.part_cfg = c
+        self.cue_tag = d.cuePrefix.strip()
         super().__init__(instructions=d.prompt, chat_ctx=chat_ctx, stt=stt, tts=tts, llm=llm,
                          # ponytail: fixed, stricter than Silero's 0.5 so room noise (fans, traffic, a TV) reads as silence and
                          # the turn can end; make it a per-part setting if quiet speakers start getting cut off.
@@ -200,10 +238,14 @@ class Examiner(Agent):
     async def on_enter(self):
         self.entered.set()
 
+    async def tts_node(self, text, model_settings):
+        async for frame in Agent.default.tts_node(self, drop_cues(text, self.cue_tag), model_settings):
+            yield frame
+
     async def transcription_node(self, text, model_settings):
         """Caption each sentence as the LLM writes it (the chat item only arrives after the line was spoken)."""
         buf, first = "", True
-        async for delta in Agent.default.transcription_node(self, text, model_settings):
+        async for delta in Agent.default.transcription_node(self, drop_cues(text, self.cue_tag), model_settings):
             buf += str(delta)
             while (cut := _sentence_end(buf)) is not None:
                 self._emit({"type": "caption", "text": buf[:cut].strip(), "append": not first})

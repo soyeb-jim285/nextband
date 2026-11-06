@@ -146,6 +146,20 @@ it('Part 2 gets a full prep minute and two-minute talk after the cue lines finis
   unmount();
 });
 
+it('a part recorder that is slow to stop never delays the examiner cue (the gap before Part 3)', async () => {
+  const { h, transport, unmount } = await setup();
+  act(() => toPart1(h));
+  rec.stop.mockReturnValue(new Promise(() => {})); // MediaRecorder onstop never fires
+  await act(async () => vi.advanceTimersByTime(270_000));
+  expect(transport.cue.mock.calls.map((c) => c[2])).toContain('part2');
+  act(() => { h.speaking(true); h.speaking(false); });
+  await act(async () => vi.advanceTimersByTime(60_000));
+  act(() => { h.speaking(true); h.speaking(false); });
+  await act(async () => vi.advanceTimersByTime(120_000));
+  expect(transport.cue.mock.calls.map((c) => c[2])).toContain('follow-timeup');
+  unmount();
+});
+
 it('a missing cue response recovers to waiting and then candidate instead of remaining thinking', async () => {
   const { result, h, unmount } = await setup();
   act(() => toPart1(h)); // the examiner's Part 1 lead: Part 1

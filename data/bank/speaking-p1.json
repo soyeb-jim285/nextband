@@ -1,7 +1,7 @@
 [
   {
     "slug": "p1-hometown",
-    "topic": "Hometown",
+    "topic": "Your hometown",
     "questions": [
       "Where is your hometown?",
       "Is it a big town or a small one?",
@@ -12,7 +12,7 @@
   },
   {
     "slug": "p1-accommodation",
-    "topic": "Accommodation",
+    "topic": "Your home",
     "questions": [
       "Do you live in a house or a flat?",
       "Who do you live with?",

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { SpeakingTest } from '../routes/prompts';
-import { examinerPrompt, liveQuestions, newState, sessionScript } from './examiner';
+import { earlierQuestions, examinerPrompt, liveQuestions, newState, sessionScript } from './examiner';
 
 const prompt = (id: string, part: number, extra = {}) => ({
   id, slug: id, skill: 'speaking' as const, part, variant: null, type: 't', topic: `topic ${id}`, title: `Describe ${id}`, body: `body ${id}`,
@@ -54,4 +54,19 @@ it('live Part 1 is marked against the examiner lines, else the scripted question
   expect(liveQuestions(s, 3)).toBeNull();
   s.history.push({ role: 'examiner', text: 'Why?', at: 0, phase: 'p3' });
   expect(liveQuestions(s, 3)).toEqual(['Why?']);
+});
+
+it('earlier tests: the questions asked before are listed for the examiner to avoid', () => {
+  const asked = earlierQuestions([
+    "[APP CUE] Part 2 is over. Move to Part 3 now.\n\nWe've been talking about goals. Why do people find it hard to set goals?",
+    "Thanks. Now, in this first part, I'm going to ask you some questions about yourself. Let's talk about your home. Do you live in a house or a flat?",
+    'Do you live in a house or a flat?',
+    'Thank you.',
+    'Why?',
+    undefined,
+  ]);
+  expect(asked).toEqual(['Why do people find it hard to set goals?', 'Do you live in a house or a flat?']);
+  const p = examinerPrompt({ ...test, asked } as SpeakingTest);
+  expect(p).toContain('- Do you live in a house or a flat?');
+  expect(examinerPrompt(test)).not.toContain('earlier tests');
 });

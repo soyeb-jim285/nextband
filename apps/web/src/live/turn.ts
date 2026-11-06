@@ -125,14 +125,18 @@ export function usePartRecorder() {
     [prepare],
   );
 
-  const stop = useCallback(async () => {
+  /** The stop in flight: callers may fire stop() without waiting (the examiner is cued at once), so a later stop/start/finish waits for it. */
+  const stopping = useRef<Promise<void>>(Promise.resolve());
+  const stop = useCallback(() => {
     const c = cur.current;
-    if (!c) return;
+    if (!c) return stopping.current;
     cur.current = null;
     const segments = c.windows.finish();
-    const [r, mix] = await Promise.all([withDeadline(recStop(), 10_000).catch(() => null), c.mix ? withDeadline(c.mix.stop(), 10_000).catch(() => null) : null]);
-    if (r) parts.current.set(c.part, { rec: r, segments: segments.length ? segments : undefined, conversation: mix ?? undefined });
-    if (r) send(c.part);
+    return (stopping.current = (async () => {
+      const [r, mix] = await Promise.all([withDeadline(recStop(), 10_000).catch(() => null), c.mix ? withDeadline(c.mix.stop(), 10_000).catch(() => null) : null]);
+      if (r) parts.current.set(c.part, { rec: r, segments: segments.length ? segments : undefined, conversation: mix ?? undefined });
+      if (r) send(c.part);
+    })());
   }, [recStop, send]);
 
   const start = useCallback(

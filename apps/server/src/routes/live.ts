@@ -1,8 +1,8 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { newState, sessionScript, type LiveState } from '../ai/examiner';
+import { earlierQuestions, newState, sessionScript, type LiveState } from '../ai/examiner';
 import { keyCtx } from '../ai/keyctx';
 import { currentUser, requireUser } from '../auth';
 import { recordActivity } from '../streaks';
@@ -151,11 +151,16 @@ export function register(app: App) {
       await checkStart(payer, 'examiner', clientIpHash(c)); // its analysis may still run on the community balance: tell them now, not after 14 minutes
       const picked = await pickSpeakingTest(user, source, mock?.ref);
       if (!picked) return c.json({ error: 'No speaking test available' }, 404);
-      const test = { ...picked, branches: await pickP1Branches(user), script: sessionScript(localHour, picked.part1[0]?.topic) };
+      // ponytail: the last 15 Part 1/3 recordings' questions; enough to stop the stock questions coming back, short enough for every turn's prompt
+      const past = await db.select({ segments: attempts.segments }).from(attempts)
+        .where(and(eq(attempts.userId, user.id), eq(attempts.skill, 'speaking'), inArray(attempts.part, [1, 3]), isNotNull(attempts.segments)))
+        .orderBy(desc(attempts.createdAt)).limit(15);
+      const earlier = earlierQuestions(past.flatMap((r) => [...r.segments!].reverse().map((x) => x.question)));
+      const test = { ...picked, branches: await pickP1Branches(user), script: sessionScript(localHour, picked.part1[0]?.topic), asked: earlier };
       const sessionId = crypto.randomUUID();
       const s = newState(sessionId, test, Date.now());
       await db.insert(liveSessions).values({ id: sessionId, userId: user.id, state: s });
-      return c.json({ sessionId, test, examinerText: s.history[0]!.text, phase: s.phase }, 200);
+      return c.json({ sessionId, test: { ...test, asked: undefined }, examinerText: s.history[0]!.text, phase: s.phase }, 200);
     },
   );
 

@@ -446,3 +446,18 @@ async def test_soniox_finalize_on_end_of_speech(monkeypatch):
     await s.aclose()
     for resource in a.resources:
         await resource.aclose()
+
+
+def test_drop_cues_removes_a_cue_line_the_model_wrote_itself():
+    from worker import drop_cues
+
+    async def run(deltas):
+        async def gen():
+            for d in deltas:
+                yield d
+        return "".join([x async for x in drop_cues(gen(), "[APP CUE]")])
+
+    said = ["[APP", " CUE] Part 2 is over. Move to Part 3 now.\n", "\nWe've been talking about a goal. Why do", " people [sometimes] fail?"]
+    assert asyncio.run(run(said)) == "We've been talking about a goal. Why do people [sometimes] fail?"
+    assert asyncio.run(run(["Thank you. ", "Do you like music?"])) == "Thank you. Do you like music?"
+    assert asyncio.run(run(["[APP CUE] Move on."])) == ""
